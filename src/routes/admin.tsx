@@ -426,7 +426,7 @@ function AdminPage() {
                     {r.last_run_at ? `${r.last_run_rows ?? 0} · ${new Date(r.last_run_at).toLocaleDateString()}` : "—"}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <button onClick={() => runRec.mutate(r.id)} disabled={runRec.isPending} className="mr-1 inline-flex items-center gap-1 rounded bg-primary/90 px-2 py-1 text-[11px] text-primary-foreground disabled:opacity-50">
+                    <button onClick={() => runRec.mutate({ id: r.id, name: r.name })} disabled={runRec.isPending} className="mr-1 inline-flex items-center gap-1 rounded bg-primary/90 px-2 py-1 text-[11px] text-primary-foreground disabled:opacity-50">
                       <Play className="h-3 w-3" /> Run
                     </button>
                     <button onClick={() => confirm(`Delete ${r.name}?`) && delRec.mutate(r.id)} className="rounded border border-border p-1 text-skeptic hover:bg-skeptic/10">
