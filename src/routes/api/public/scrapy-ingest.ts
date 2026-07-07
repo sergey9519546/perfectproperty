@@ -90,7 +90,7 @@ async function dispatch(recipe: string, items: any[], sourceUrl?: string) {
       data_source: "SCRAPY",
     })).filter((r) => r.county_fips && r.sale_price);
     if (rows.length) {
-      const { error } = await supabaseAdmin.from("sales").insert(rows);
+      const { error } = await supabaseAdmin.from("sales").insert(rows as any);
       if (error) throw new Error(error.message);
       inserted = rows.length;
     }
@@ -119,7 +119,7 @@ async function dispatch(recipe: string, items: any[], sourceUrl?: string) {
     })).filter((r) => r.apn && r.county_fips);
     if (rows.length) {
       const { error } = await supabaseAdmin.from("parcels")
-        .upsert(rows, { onConflict: "county_fips,apn" });
+        .upsert(rows as any, { onConflict: "county_fips,apn" });
       if (error) throw new Error(error.message);
       inserted = rows.length;
     }
