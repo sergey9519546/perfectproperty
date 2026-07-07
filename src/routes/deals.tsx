@@ -45,6 +45,8 @@ function DealsPage() {
                 <th className="px-4 py-3 text-left">Scope</th>
                 <th className="px-4 py-3 text-right">Offer</th>
                 <th className="px-4 py-3 text-right">Gross Profit</th>
+                <th className="px-4 py-3 text-right">P50 · P5</th>
+                <th className="px-4 py-3 text-right">P(loss)</th>
                 <th className="px-4 py-3 text-right">P(acq)</th>
                 <th className="px-4 py-3 text-right">Exit</th>
                 <th className="px-4 py-3 text-left">Skeptic</th>
@@ -65,6 +67,13 @@ function DealsPage() {
                     <td className="px-4 py-3 text-[12px]">{r.recommended_scope}</td>
                     <td className="num px-4 py-3 text-right">{fmt$(Number(r.modeled_offer))}</td>
                     <td className="num px-4 py-3 text-right text-profit-strong">{fmt$(Number(r.gross_profit))}</td>
+                    <td className="num px-4 py-3 text-right text-[12px]">
+                      {r.mc_profit_p50 != null ? fmt$(Number(r.mc_profit_p50)) : "—"}
+                      <div className="text-[10px] text-muted-foreground">{r.mc_profit_p5 != null ? `p5 ${fmt$(Number(r.mc_profit_p5))}` : ""}</div>
+                    </td>
+                    <td className="num px-4 py-3 text-right" style={{ color: Number(r.mc_p_loss) > 0.35 ? "var(--skeptic)" : Number(r.mc_p_loss) > 0.15 ? "var(--opportunity)" : "var(--profit-strong)" }}>
+                      {r.mc_p_loss != null ? `${Math.round(Number(r.mc_p_loss) * 100)}%` : "—"}
+                    </td>
                     <td className="num px-4 py-3 text-right">{Math.round(Number(r.acquisition_probability) * 100)}%</td>
                     <td className="num px-4 py-3 text-right">{r.exit_days}d</td>
                     <td className="px-4 py-3 text-[11px] text-skeptic">{flags.length ? `${flags.length} flag${flags.length > 1 ? "s" : ""}` : "—"}</td>

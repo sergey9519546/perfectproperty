@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getDossier } from "@/lib/parcels.functions";
 import { fmt$, pct, tierLabel } from "@/lib/format";
-import { X, TrendingUp, AlertTriangle, Building2, ScrollText, Zap } from "lucide-react";
+import { X, TrendingUp, AlertTriangle, Building2, ScrollText, Zap, Activity } from "lucide-react";
 
 interface Props {
   parcelId: string | null;
@@ -35,6 +35,7 @@ export function DossierPanel({ parcelId, onClose }: Props) {
           <Header d={q.data} />
           <ScoreStrip d={q.data} />
           <ValueLadder d={q.data} />
+          <MonteCarloBlock d={q.data} />
           <OfferCurve d={q.data} />
           <ExitForecast d={q.data} />
           <SkepticBlock d={q.data} />
@@ -218,6 +219,60 @@ function OfferCurve({ d }: { d: D }) {
             ))}
           </tbody>
         </table>
+      </div>
+    </section>
+  );
+}
+
+function MonteCarloBlock({ d }: { d: D }) {
+  const s: any = d.score; if (!s) return null;
+  const p5 = Number(s.mc_profit_p5 ?? NaN);
+  const p50 = Number(s.mc_profit_p50 ?? NaN);
+  const p95 = Number(s.mc_profit_p95 ?? NaN);
+  const pLoss = Number(s.mc_p_loss ?? NaN);
+  const cvar = Number(s.mc_cvar_loss ?? NaN);
+  const er = Number(s.exceedance_rank ?? NaN);
+  const sigma = Number(s.sigma_arv_log ?? NaN);
+  const drift = Number(s.drift_used_monthly ?? NaN);
+  const dqr = s.mc_dqr;
+  if (!Number.isFinite(p50)) return null;
+
+  const min = Math.min(p5, 0), max = Math.max(p95, 0);
+  const span = Math.max(max - min, 1);
+  const zero = ((0 - min) / span) * 100;
+  const barL = ((p5 - min) / span) * 100;
+  const barR = ((p95 - min) / span) * 100;
+  const medX = ((p50 - min) / span) * 100;
+  const lossColor = pLoss > 0.35 ? "var(--skeptic)" : pLoss > 0.15 ? "var(--opportunity)" : "var(--profit-strong)";
+
+  return (
+    <section>
+      <SectionHead icon={<Activity className="h-3.5 w-3.5" />} title="Monte Carlo — 800 draws" />
+      <div className="mt-2 rounded-lg border border-border bg-surface-2 p-3">
+        <div className="relative h-8 rounded bg-surface-3" style={{ backgroundColor: "var(--surface-3)" }}>
+          <div className="absolute h-full opacity-60" style={{
+            left: `${barL}%`, width: `${Math.max(barR - barL, 1)}%`,
+            background: "linear-gradient(90deg, var(--skeptic), var(--opportunity), var(--profit-strong))",
+            borderRadius: 3,
+          }} />
+          <div className="absolute top-0 h-full w-px bg-foreground/70" style={{ left: `${zero}%` }} title="break-even" />
+          <div className="absolute -top-1 h-10 w-0.5 bg-foreground" style={{ left: `${medX}%` }} title={`P50 ${fmt$(p50)}`} />
+        </div>
+        <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+          <MiniStat label="P5" v={<span className="num" style={{ color: p5 < 0 ? "var(--skeptic)" : "var(--foreground)" }}>{fmt$(p5)}</span>} />
+          <MiniStat label="P50" v={<span className="num">{fmt$(p50)}</span>} />
+          <MiniStat label="P95" v={<span className="num text-profit-strong">{fmt$(p95)}</span>} />
+        </div>
+        <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+          <MiniStat label="P(loss)" v={<span className="num" style={{ color: lossColor }}>{Number.isFinite(pLoss) ? pct(pLoss) : "—"}</span>} />
+          <MiniStat label="CVaR(5%)" v={<span className="num" style={{ color: cvar > 0 ? "var(--skeptic)" : "var(--foreground)" }}>{Number.isFinite(cvar) ? fmt$(cvar) : "—"}</span>} />
+          <MiniStat label="Exceed. rank" v={<span className="num">{Number.isFinite(er) ? pct(er) : "—"}</span>} />
+        </div>
+        <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+          <MiniStat label="σ ARV (log)" v={<span className="num">{Number.isFinite(sigma) ? sigma.toFixed(2) : "—"}</span>} />
+          <MiniStat label="Drift/mo" v={<span className="num">{Number.isFinite(drift) ? `${(drift * 100).toFixed(2)}%` : "—"}</span>} />
+          <MiniStat label="DQR" v={<span className="num">{dqr != null ? Number(dqr).toFixed(2) : "—"}</span>} />
+        </div>
       </div>
     </section>
   );
