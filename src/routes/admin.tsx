@@ -3,9 +3,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCoverage } from "@/lib/parcels.functions";
 import { seedFixtures, runUnderwrite } from "@/lib/seed.functions";
+import { ingestCounty, scoreAll, listSources } from "@/lib/ingest.functions";
 import { PageHead } from "./deals";
 import { toast } from "sonner";
-import { Database, Zap } from "lucide-react";
+import { Database, Zap, Globe } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -21,8 +22,12 @@ function AdminPage() {
   const covFn = useServerFn(getCoverage);
   const seedFn = useServerFn(seedFixtures);
   const uwFn = useServerFn(runUnderwrite);
+  const ingestFn = useServerFn(ingestCounty);
+  const scoreFn = useServerFn(scoreAll);
+  const sourcesFn = useServerFn(listSources);
   const qc = useQueryClient();
   const cov = useQuery({ queryKey: ["coverage"], queryFn: () => covFn() });
+  const sources = useQuery({ queryKey: ["sources"], queryFn: () => sourcesFn() });
 
   const seed = useMutation({
     mutationFn: () => seedFn(),
@@ -34,13 +39,44 @@ function AdminPage() {
     onSuccess: (r) => { toast.success(`Underwrote ${r.scored} parcels · ${r.outcomes} historical outcomes graded`); qc.invalidateQueries(); },
     onError: (e: any) => toast.error(e.message ?? "Underwrite failed"),
   });
+  const ingest = useMutation({
+    mutationFn: (fips: string) => ingestFn({ data: { county_fips: fips, max_parcels: 300, enrich_flood: true } }),
+    onSuccess: (r) => {
+      if (r.status === "OK") toast.success(`${r.name}: ingested ${r.inserted} real parcels`);
+      else toast.error(`${r.name}: ${r.note}`);
+      qc.invalidateQueries();
+    },
+    onError: (e: any) => toast.error(e.message ?? "Ingest failed"),
+  });
+  const ingestAll = useMutation({
+    mutationFn: async () => {
+      const list = (sources.data ?? []).filter((s: any) => s.parcels);
+      const results = [] as any[];
+      for (const s of list) {
+        try { results.push(await ingestFn({ data: { county_fips: s.fips, max_parcels: 250, enrich_flood: true } })); }
+        catch (e: any) { results.push({ name: s.name, status: "FAIL", note: e.message }); }
+      }
+      return results;
+    },
+    onSuccess: (rs: any[]) => {
+      const ok = rs.filter((r) => r.status === "OK").length;
+      toast.success(`Scanned ${rs.length} counties · ${ok} live`);
+      qc.invalidateQueries();
+    },
+  });
+  const score = useMutation({
+    mutationFn: () => scoreFn(),
+    onSuccess: (r) => { toast.success(`Scored ${r.scored} real parcels`); qc.invalidateQueries(); },
+  });
 
   const adapters = [
-    { name: "Parcels + Assessor", source: "PARCELS", status: "Fixture adapter (CA·FL)", real: "County GIS / Regrid / ATTOM" },
-    { name: "Recorder / Deeds", source: "DEEDS", status: "Fixture adapter", real: "County recorder scrape or DataTree" },
-    { name: "Distress Signals", source: "DISTRESS", status: "Fixture adapter", real: "Foreclosure lists, tax rolls, probate, code violations" },
-    { name: "MLS Feed", source: "MLS", status: "Fixture adapter", real: "RESO API / Trestle (requires licensed broker)" },
-    { name: "Aggregator", source: "AGGREGATOR", status: "—", real: "ATTOM, PropStream, Estated" },
+    { name: "Parcels + Assessor", source: "PARCELS", status: "LIVE — county ArcGIS/Socrata", real: "LA · SD · SF · Miami-Dade · Broward" },
+    { name: "FEMA Flood Zones", source: "FEMA", status: "LIVE — hazards.fema.gov NFHL", real: "Sampled during parcel enrichment" },
+    { name: "Recorder / Deeds", source: "DEEDS", status: "Fixture", real: "County recorder scrape (per-county HTML)" },
+    { name: "Distress Signals", source: "DISTRESS", status: "Fixture", real: "LA Treasurer tax-defaulted list, foreclosure dockets, probate court, code violations" },
+    { name: "HUD Homes", source: "HUD", status: "URL wired", real: "hudhomestore.gov storefront" },
+    { name: "MLS Feed", source: "MLS", status: "Fixture", real: "RESO / Trestle — requires licensed broker" },
+    { name: "Aggregator", source: "AGGREGATOR", status: "—", real: "ATTOM / PropStream / Estated" },
   ];
 
   return (
@@ -48,15 +84,43 @@ function AdminPage() {
       <PageHead title="Ingestion" sub="Every data adapter, every coverage number, every underwrite run. This is the operator's control panel for the pipeline described in Layer 1." />
 
       <div className="mt-6 flex flex-wrap gap-3">
-        <button onClick={() => seed.mutate()} disabled={seed.isPending} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
+        <button onClick={() => ingestAll.mutate()} disabled={ingestAll.isPending} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
+          <Globe className="h-4 w-4" />
+          {ingestAll.isPending ? "Scanning live sources…" : "Scan all live public sources"}
+        </button>
+        <button onClick={() => score.mutate()} disabled={score.isPending} className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:opacity-50">
+          <Zap className="h-4 w-4" />
+          {score.isPending ? "Scoring…" : "Underwrite real parcels"}
+        </button>
+        <button onClick={() => seed.mutate()} disabled={seed.isPending} className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:opacity-50">
           <Database className="h-4 w-4" />
-          {seed.isPending ? "Ingesting…" : "Re-ingest fixture data (CA + FL)"}
+          {seed.isPending ? "Ingesting…" : "Load fixtures (demo)"}
         </button>
         <button onClick={() => uw.mutate()} disabled={uw.isPending} className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:opacity-50">
           <Zap className="h-4 w-4" />
-          {uw.isPending ? "Scoring…" : "Run nightly underwrite"}
+          {uw.isPending ? "Scoring…" : "Fixture underwrite"}
         </button>
       </div>
+
+      <section className="mt-8">
+        <h2 className="text-[11px] uppercase tracking-widest text-muted-foreground">Live public data sources</h2>
+        <div className="mt-2 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+          {(sources.data ?? []).map((s: any) => (
+            <div key={s.fips} className="rounded-lg border border-border bg-surface p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="text-[13px] font-medium">{s.state} · {s.name}</div>
+                  <div className="mt-0.5 text-[10px] uppercase tracking-widest text-muted-foreground">{s.parcels?.kind ?? "—"}</div>
+                </div>
+                <button onClick={() => ingest.mutate(s.fips)} disabled={ingest.isPending} className="rounded-md bg-primary/90 px-2.5 py-1 text-[11px] font-medium text-primary-foreground disabled:opacity-50">
+                  Fetch live
+                </button>
+              </div>
+              <div className="mt-2 truncate text-[10px] text-muted-foreground" title={s.parcels?.url}>{s.parcels?.url ?? "no parcel endpoint"}</div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <section>
