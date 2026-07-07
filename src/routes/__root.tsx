@@ -11,24 +11,15 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { Toaster } from "sonner";
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 dark">
       <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
-        </p>
-        <div className="mt-6">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Go home
-          </Link>
-        </div>
+        <h1 className="text-7xl font-bold text-foreground num">404</h1>
+        <p className="mt-4 text-sm text-muted-foreground">This parcel isn't in the genome.</p>
+        <Link to="/" className="mt-6 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Return to the map</Link>
       </div>
     </div>
   );
@@ -37,35 +28,15 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
-
+  useEffect(() => { reportLovableError(error, { boundary: "tanstack_root_error_component" }); }, [error]);
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 dark">
       <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <button
-            onClick={() => {
-              router.invalidate();
-              reset();
-            }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Try again
-          </button>
-          <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-          >
-            Go home
-          </a>
+        <h1 className="text-xl font-semibold text-foreground">The engine hit an exception</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+        <div className="mt-6 flex justify-center gap-2">
+          <button onClick={() => { router.invalidate(); reset(); }} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground">Retry</button>
+          <a href="/" className="rounded-md border border-border bg-surface px-4 py-2 text-sm text-foreground">Home</a>
         </div>
       </div>
     </div>
@@ -77,21 +48,20 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "Perfect Property Engine — every parcel, underwritten every night" },
+      { name: "description", content: "The county glows where profit lives. Nightly underwriting for every parcel, listed or not, across CA and FL." },
+      { property: "og:title", content: "Perfect Property Engine" },
+      { property: "og:description", content: "The Bloomberg terminal of residential opportunity. Every parcel, underwritten every night." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
+      { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "preconnect", href: "https://rsms.me/" },
+      { rel: "stylesheet", href: "https://rsms.me/inter/inter.css" },
+      { rel: "stylesheet", href: "https://cdn.jsdelivr.net/gh/JetBrains/JetBrainsMono/web/webfonts/jetbrains-mono.css" },
+      { rel: "stylesheet", href: "https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" },
     ],
   }),
   shellComponent: RootShell,
@@ -102,10 +72,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
+    <html lang="en" className="dark">
+      <head><HeadContent /></head>
       <body>
         {children}
         <Scripts />
@@ -116,11 +84,50 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <div className="dark min-h-screen bg-background text-foreground">
+        <TopNav />
+        <Outlet />
+        <Toaster theme="dark" position="bottom-right" />
+      </div>
     </QueryClientProvider>
+  );
+}
+
+function TopNav() {
+  return (
+    <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur">
+      <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-8 px-6">
+        <Link to="/" className="flex items-center gap-2.5">
+          <div className="h-2.5 w-2.5 rounded-full bg-opportunity opp-pulse text-opportunity" />
+          <span className="text-[13px] font-semibold tracking-wide uppercase">Perfect Property Engine</span>
+        </Link>
+        <nav className="flex items-center gap-1 text-[13px]">
+          {[
+            { to: "/", label: "Map" },
+            { to: "/deals", label: "Ranked Deals" },
+            { to: "/shadow", label: "Shadow Market" },
+            { to: "/prophecy", label: "Prophecy" },
+            { to: "/accuracy", label: "Accuracy" },
+            { to: "/admin", label: "Ingestion" },
+          ].map((l) => (
+            <Link
+              key={l.to}
+              to={l.to}
+              className="rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
+              activeProps={{ className: "rounded-md px-3 py-1.5 bg-surface text-foreground" }}
+              activeOptions={{ exact: l.to === "/" }}
+            >
+              {l.label}
+            </Link>
+          ))}
+        </nav>
+        <div className="ml-auto flex items-center gap-2 text-[11px] text-muted-foreground">
+          <span className="h-1.5 w-1.5 rounded-full bg-profit-strong" />
+          <span className="num">engine live · CA + FL pilot</span>
+        </div>
+      </div>
+    </header>
   );
 }
