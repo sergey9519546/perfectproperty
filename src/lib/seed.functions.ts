@@ -40,14 +40,18 @@ export const seedFixtures = createServerFn({ method: "POST" }).handler(async () 
   const supabase = await adminClient();
   const rng = mulberry32(20260707);
 
-  // Wipe prior seed
+  // Wipe prior FIXTURE data only — never touch LIVE ingested rows.
   await supabase.from("prediction_outcomes").delete().gte("predicted_at", "1900-01-01");
-  await supabase.from("parcel_scores").delete().gt("as_is_value", -1);
-  await supabase.from("distress_events").delete().gte("event_date", "1900-01-01");
-  await supabase.from("listings").delete().gte("listed_at", "1900-01-01");
-  await supabase.from("deeds").delete().gte("recorded_at", "1900-01-01");
-  await supabase.from("parcels").delete().neq("apn", "___");
-  await supabase.from("ingestion_runs").delete().gte("started_at", "1900-01-01");
+  await supabase.from("parcel_scores").delete().eq("data_source", FIXTURE);
+  const { data: fx } = await supabase.from("parcels").select("id").eq("data_source", FIXTURE);
+  const fxIds = (fx ?? []).map((r: any) => r.id);
+  if (fxIds.length) {
+    // cascades to deeds/distress/listings via FK, but be explicit for clarity
+    for (let i = 0; i < fxIds.length; i += 200) {
+      await supabase.from("parcels").delete().in("id", fxIds.slice(i, i + 200));
+    }
+  }
+  await supabase.from("ingestion_runs").delete().eq("source", "FIXTURE_SEED");
   await supabase.from("counties").delete().neq("fips", "___");
 
   // Counties
