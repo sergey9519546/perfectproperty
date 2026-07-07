@@ -96,28 +96,45 @@ function normalizeArcGISFeature(f: ArcGISFeature, src: CountySource) {
 
 function normalizeSocrataRow(r: Record<string, any>, src: CountySource) {
   const c = src.parcels!;
+  let address = "Address unknown";
+  let city: string | null = null;
+  if (c.address_builder === "sf") {
+    const num = r.from_address_num ?? r.to_address_num ?? "";
+    const street = [r.street_name, r.street_type].filter(Boolean).join(" ");
+    address = `${num} ${street}`.trim() || "Address unknown";
+    city = "San Francisco";
+  } else if (c.address_builder === "nyc") {
+    address = String(r.address ?? "").trim() || "Address unknown";
+    city = { BX: "Bronx", BK: "Brooklyn", MN: "Manhattan", QN: "Queens", SI: "Staten Island" }[r.borough as string] ?? null;
+  } else if (c.field_address) {
+    address = String(r[c.field_address] ?? "").trim() || "Address unknown";
+    city = c.field_city ? String(r[c.field_city] ?? "").trim() || null : null;
+  }
+  const yb = c.field_year_built ? Number(r[c.field_year_built]) || null : null;
+  const sqft = c.field_living_sqft ? Number(r[c.field_living_sqft]) || null : null;
+  // NYC lat/lng comes from latitude/longitude fields; SF from location
+  let lat = src.center[0], lng = src.center[1];
+  if (r.latitude && r.longitude) { lat = Number(r.latitude); lng = Number(r.longitude); }
+  else if (r.location?.latitude && r.location?.longitude) { lat = Number(r.location.latitude); lng = Number(r.location.longitude); }
   return {
     apn: String(r[c.field_apn ?? "id"] ?? crypto.randomUUID()),
     county_fips: src.fips,
-    address: (c.field_address ? String(r[c.field_address] ?? "").trim() : "") || "Address unknown",
-    city: c.field_city ? String(r[c.field_city] ?? "").trim() || null : null,
-    state: src.state,
+    address, city, state: src.state,
     zip: c.field_zip ? String(r[c.field_zip] ?? "").trim() || null : null,
-    lat: r.latitude ? Number(r.latitude) : src.center[0],
-    lng: r.longitude ? Number(r.longitude) : src.center[1],
+    lat, lng,
     property_type: "SFR",
-    year_built: null,
-    living_sqft: null,
-    lot_sqft: null,
+    year_built: yb,
+    living_sqft: sqft,
+    lot_sqft: c.field_lot_sqft ? Number(r[c.field_lot_sqft]) || null : null,
     bedrooms: null,
     bathrooms: null,
-    condition_grade: "B",
+    condition_grade: inferCondition(yb),
     flood_zone: "X",
     school_score: 6,
-    owner_name: null,
+    owner_name: c.field_owner ? String(r[c.field_owner] ?? "").trim() || null : null,
     owner_is_absentee: false,
     owner_is_corporate: false,
-    assessed_value: null,
+    assessed_value: c.field_assessed ? Number(r[c.field_assessed]) || null : null,
     estimated_equity: null,
     is_listed: false,
     is_vacant: false,
