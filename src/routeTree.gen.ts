@@ -16,6 +16,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccuracyRouteImport } from './routes/accuracy'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiPublicScrapyIngestRouteImport } from './routes/api/public/scrapy-ingest'
+import { Route as ApiPublicRunRecipesRouteImport } from './routes/api/public/run-recipes'
 
 const ShadowRoute = ShadowRouteImport.update({
   id: '/shadow',
@@ -52,6 +53,11 @@ const ApiPublicScrapyIngestRoute = ApiPublicScrapyIngestRouteImport.update({
   path: '/api/public/scrapy-ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicRunRecipesRoute = ApiPublicRunRecipesRouteImport.update({
+  id: '/api/public/run-recipes',
+  path: '/api/public/run-recipes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/deals': typeof DealsRoute
   '/prophecy': typeof ProphecyRoute
   '/shadow': typeof ShadowRoute
+  '/api/public/run-recipes': typeof ApiPublicRunRecipesRoute
   '/api/public/scrapy-ingest': typeof ApiPublicScrapyIngestRoute
 }
 export interface FileRoutesByTo {
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/deals': typeof DealsRoute
   '/prophecy': typeof ProphecyRoute
   '/shadow': typeof ShadowRoute
+  '/api/public/run-recipes': typeof ApiPublicRunRecipesRoute
   '/api/public/scrapy-ingest': typeof ApiPublicScrapyIngestRoute
 }
 export interface FileRoutesById {
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/deals': typeof DealsRoute
   '/prophecy': typeof ProphecyRoute
   '/shadow': typeof ShadowRoute
+  '/api/public/run-recipes': typeof ApiPublicRunRecipesRoute
   '/api/public/scrapy-ingest': typeof ApiPublicScrapyIngestRoute
 }
 export interface FileRouteTypes {
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/deals'
     | '/prophecy'
     | '/shadow'
+    | '/api/public/run-recipes'
     | '/api/public/scrapy-ingest'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/deals'
     | '/prophecy'
     | '/shadow'
+    | '/api/public/run-recipes'
     | '/api/public/scrapy-ingest'
   id:
     | '__root__'
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/deals'
     | '/prophecy'
     | '/shadow'
+    | '/api/public/run-recipes'
     | '/api/public/scrapy-ingest'
   fileRoutesById: FileRoutesById
 }
@@ -118,6 +130,7 @@ export interface RootRouteChildren {
   DealsRoute: typeof DealsRoute
   ProphecyRoute: typeof ProphecyRoute
   ShadowRoute: typeof ShadowRoute
+  ApiPublicRunRecipesRoute: typeof ApiPublicRunRecipesRoute
   ApiPublicScrapyIngestRoute: typeof ApiPublicScrapyIngestRoute
 }
 
@@ -172,6 +185,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicScrapyIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/run-recipes': {
+      id: '/api/public/run-recipes'
+      path: '/api/public/run-recipes'
+      fullPath: '/api/public/run-recipes'
+      preLoaderRoute: typeof ApiPublicRunRecipesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -182,6 +202,7 @@ const rootRouteChildren: RootRouteChildren = {
   DealsRoute: DealsRoute,
   ProphecyRoute: ProphecyRoute,
   ShadowRoute: ShadowRoute,
+  ApiPublicRunRecipesRoute: ApiPublicRunRecipesRoute,
   ApiPublicScrapyIngestRoute: ApiPublicScrapyIngestRoute,
 }
 export const routeTree = rootRouteImport
