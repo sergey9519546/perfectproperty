@@ -484,6 +484,81 @@ export type Database = {
           },
         ]
       }
+      probe_cache: {
+        Row: {
+          bytes: number
+          content_type: string | null
+          fetched_at: string
+          final_url: string | null
+          html: string | null
+          http_status: number
+          text_preview: string | null
+          tier: string
+          title: string | null
+          url: string
+        }
+        Insert: {
+          bytes?: number
+          content_type?: string | null
+          fetched_at?: string
+          final_url?: string | null
+          html?: string | null
+          http_status: number
+          text_preview?: string | null
+          tier: string
+          title?: string | null
+          url: string
+        }
+        Update: {
+          bytes?: number
+          content_type?: string | null
+          fetched_at?: string
+          final_url?: string | null
+          html?: string | null
+          http_status?: number
+          text_preview?: string | null
+          tier?: string
+          title?: string | null
+          url?: string
+        }
+        Relationships: []
+      }
+      probe_runs: {
+        Row: {
+          bytes: number | null
+          duration_ms: number | null
+          http_status: number | null
+          id: string
+          note: string | null
+          started_at: string
+          status: string
+          tier: string
+          url: string
+        }
+        Insert: {
+          bytes?: number | null
+          duration_ms?: number | null
+          http_status?: number | null
+          id?: string
+          note?: string | null
+          started_at?: string
+          status: string
+          tier: string
+          url: string
+        }
+        Update: {
+          bytes?: number | null
+          duration_ms?: number | null
+          http_status?: number | null
+          id?: string
+          note?: string | null
+          started_at?: string
+          status?: string
+          tier?: string
+          url?: string
+        }
+        Relationships: []
+      }
       sales: {
         Row: {
           address: string | null
