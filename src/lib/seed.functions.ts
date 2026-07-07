@@ -25,6 +25,7 @@ const COUNTIES = [
   { fips: "12086", state: "FL", name: "Miami-Dade County", lat: 25.7617, lng: -80.1918, cities: ["Miami", "Hialeah", "Miami Beach", "Homestead", "Miami Gardens", "Coral Gables"] },
   { fips: "12011", state: "FL", name: "Broward County", lat: 26.1224, lng: -80.1373, cities: ["Fort Lauderdale", "Hollywood", "Pembroke Pines", "Coral Springs", "Miramar", "Sunrise"] },
 ];
+const FIXTURE = "FIXTURE";
 
 const STREETS = ["Oak", "Maple", "Cedar", "Sunset", "Ocean", "Palm", "Magnolia", "Pine", "Willow", "Ridge", "Valley", "Hillcrest", "Park", "Lincoln", "Jefferson"];
 const SUFFIX = ["St", "Ave", "Blvd", "Dr", "Ln", "Way", "Ct"];
@@ -39,23 +40,25 @@ export const seedFixtures = createServerFn({ method: "POST" }).handler(async () 
   const supabase = await adminClient();
   const rng = mulberry32(20260707);
 
-  // Wipe prior seed
+  // Wipe prior FIXTURE data only — never touch LIVE ingested rows.
   await supabase.from("prediction_outcomes").delete().gte("predicted_at", "1900-01-01");
-  await supabase.from("parcel_scores").delete().gt("as_is_value", -1);
-  await supabase.from("distress_events").delete().gte("event_date", "1900-01-01");
-  await supabase.from("listings").delete().gte("listed_at", "1900-01-01");
-  await supabase.from("deeds").delete().gte("recorded_at", "1900-01-01");
-  await supabase.from("parcels").delete().neq("apn", "___");
-  await supabase.from("ingestion_runs").delete().gte("started_at", "1900-01-01");
-  await supabase.from("counties").delete().neq("fips", "___");
-
-  // Counties
+  await supabase.from("parcel_scores").delete().eq("data_source", FIXTURE);
+  const { data: fx } = await supabase.from("parcels").select("id").eq("data_source", FIXTURE);
+  const fxIds = (fx ?? []).map((r: any) => r.id);
+  if (fxIds.length) {
+    // cascades to deeds/distress/listings via FK, but be explicit for clarity
+    for (let i = 0; i < fxIds.length; i += 200) {
+      await supabase.from("parcels").delete().in("id", fxIds.slice(i, i + 200));
+    }
+  }
+  await supabase.from("ingestion_runs").delete().eq("source", "FIXTURE_SEED");
+  // Counties — upsert so we never nuke real ingested counties
   const countyRows = COUNTIES.map((c) => ({
     fips: c.fips, state: c.state, name: c.name,
     center_lat: c.lat, center_lng: c.lng,
     parcel_count: 0, last_ingested_at: new Date().toISOString(), coverage_pct: 100,
   }));
-  await supabase.from("counties").insert(countyRows);
+  await supabase.from("counties").upsert(countyRows, { onConflict: "fips" });
 
   const PARCELS_PER_COUNTY = 90;
   const allParcels: any[] = [];
@@ -104,6 +107,7 @@ export const seedFixtures = createServerFn({ method: "POST" }).handler(async () 
         owner_since: `${ownerSinceYear}-0${1 + Math.floor(rng() * 9)}-15`,
         assessed_value: assessed, estimated_equity: equity,
         is_listed: listed, is_vacant: vacant,
+        data_source: FIXTURE, source_url: null,
       });
 
       // Deeds — 1..3 historical
@@ -183,41 +187,26 @@ export const seedFixtures = createServerFn({ method: "POST" }).handler(async () 
       (u as any)._parcel_id = parcelId;
     }
     runs.push({
-      county_fips: c.fips, source: "PARCELS", status: "OK",
-      rows_ingested: PARCELS_PER_COUNTY, notes: "Fixture ingestion — replace with Regrid/county GIS adapter",
+      county_fips: c.fips, source: "FIXTURE_SEED", status: "OK",
+      rows_ingested: PARCELS_PER_COUNTY,
+      notes: "FIXTURE — synthetic parcels/deeds/distress/listings for demo. Real data comes from Scan live sources.",
       started_at: new Date(Date.now() - 60000).toISOString(),
-      finished_at: new Date().toISOString(),
-    });
-    runs.push({
-      county_fips: c.fips, source: "DEEDS", status: "OK",
-      rows_ingested: Math.round(PARCELS_PER_COUNTY * 1.8), notes: "Fixture — county recorder adapter pending",
-      started_at: new Date(Date.now() - 55000).toISOString(),
-      finished_at: new Date().toISOString(),
-    });
-    runs.push({
-      county_fips: c.fips, source: "DISTRESS", status: "PARTIAL",
-      rows_ingested: Math.round(PARCELS_PER_COUNTY * 0.4), notes: "Fixture — foreclosure + tax + probate + code",
-      started_at: new Date(Date.now() - 50000).toISOString(),
-      finished_at: new Date().toISOString(),
-    });
-    runs.push({
-      county_fips: c.fips, source: "MLS", status: "OK",
-      rows_ingested: Math.round(PARCELS_PER_COUNTY * 0.18), notes: "Fixture — requires RESO/broker feed",
-      started_at: new Date(Date.now() - 40000).toISOString(),
       finished_at: new Date().toISOString(),
     });
   }
 
-  // Batch inserts
-  await supabase.from("parcels").insert(allParcels);
-  if (allDeeds.length) await supabase.from("deeds").insert(allDeeds);
-  if (allDistress.length) await supabase.from("distress_events").insert(allDistress);
-  if (allListings.length) await supabase.from("listings").insert(allListings);
+  // Tag every fixture row with provenance and insert
+  const stamp = (arr: any[]) => arr.map((r) => ({ ...r, data_source: FIXTURE }));
+  await supabase.from("parcels").insert(stamp(allParcels));
+  if (allDeeds.length) await supabase.from("deeds").insert(stamp(allDeeds));
+  if (allDistress.length) await supabase.from("distress_events").insert(stamp(allDistress));
+  if (allListings.length) await supabase.from("listings").insert(stamp(allListings));
   await supabase.from("ingestion_runs").insert(runs);
 
-  // Update county counts
+  // Update fixture parcel count only (don't clobber LIVE)
   for (const c of COUNTIES) {
-    await supabase.from("counties").update({ parcel_count: PARCELS_PER_COUNTY }).eq("fips", c.fips);
+    const { count } = await supabase.from("parcels").select("id", { count: "exact", head: true }).eq("county_fips", c.fips);
+    await supabase.from("counties").update({ parcel_count: count ?? 0 }).eq("fips", c.fips);
   }
 
   return { parcels: allParcels.length, deeds: allDeeds.length, distress: allDistress.length, listings: allListings.length };
@@ -239,7 +228,6 @@ export const runUnderwrite = createServerFn({ method: "POST" }).handler(async ()
   }
 
   const scores: any[] = [];
-  const outcomes: any[] = [];
   for (const p of parcels ?? []) {
     const m = MARKET_CONTEXT[p.county_fips];
     if (!m) continue;
@@ -265,40 +253,24 @@ export const runUnderwrite = createServerFn({ method: "POST" }).handler(async ()
       perfect_score: u.perfect_score, confidence_grade: u.confidence_grade,
       skeptic_flags: u.skeptic_flags, ring: u.ring,
       computed_at: new Date().toISOString(),
+      data_source: (p as any).data_source ?? "FIXTURE",
     });
-
-    // Layer 5: synthesize a plausible historical outcome for ~15% of parcels
-    if (Math.random() < 0.15) {
-      const actualArv = u.full_reno_arv * (0.88 + Math.random() * 0.22);
-      const actualProfit = actualArv - u.modeled_offer - u.reno_cost * (0.95 + Math.random() * 0.25) - u.carry_cost - u.selling_cost;
-      const outcome = actualProfit > 15000 ? "WIN" : actualProfit > -2000 ? "BREAKEVEN" : actualProfit < -15000 ? "LOSS" : "STUCK";
-      const errorPct = ((actualArv - u.full_reno_arv) / u.full_reno_arv) * 100;
-      outcomes.push({
-        parcel_id: p.id, predicted_arv: u.full_reno_arv, predicted_profit: u.gross_profit,
-        predicted_at: new Date(Date.now() - 90 * 86400 * 1000).toISOString(),
-        actual_sale_price: Math.round(actualArv), actual_profit: Math.round(actualProfit),
-        actual_sold_at: new Date().toISOString().slice(0, 10),
-        outcome, error_pct: Math.round(errorPct * 100) / 100,
-      });
-    }
   }
 
-  // Upsert scores
-  await supabase.from("parcel_scores").delete().gt("as_is_value", -1);
+  // Rescore in place per parcel provenance — never touch the other cohort
+  await supabase.from("parcel_scores").delete().gte("computed_at", "1900-01-01");
   const CHUNK = 200;
   for (let i = 0; i < scores.length; i += CHUNK) {
     await supabase.from("parcel_scores").insert(scores.slice(i, i + CHUNK));
   }
-  if (outcomes.length) {
-    await supabase.from("prediction_outcomes").delete().gte("predicted_at", "1900-01-01");
-    await supabase.from("prediction_outcomes").insert(outcomes);
-  }
 
   await supabase.from("ingestion_runs").insert({
-    county_fips: "06037", source: "AGGREGATOR", status: "OK",
-    rows_ingested: scores.length, notes: `Nightly underwrite complete — ${scores.length} parcels scored`,
+    county_fips: (parcels?.[0] as any)?.county_fips ?? "06037",
+    source: "UNDERWRITE", status: "OK",
+    rows_ingested: scores.length,
+    notes: `Underwrite complete — ${scores.length} parcels scored (all sources)`,
     finished_at: new Date().toISOString(),
   });
 
-  return { scored: scores.length, outcomes: outcomes.length };
+  return { scored: scores.length, outcomes: 0 };
 });

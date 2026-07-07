@@ -54,6 +54,7 @@ export type Database = {
         Row: {
           buyer: string | null
           created_at: string
+          data_source: string
           deed_type: string
           id: string
           loan_amount: number | null
@@ -65,6 +66,7 @@ export type Database = {
         Insert: {
           buyer?: string | null
           created_at?: string
+          data_source?: string
           deed_type: string
           id?: string
           loan_amount?: number | null
@@ -76,6 +78,7 @@ export type Database = {
         Update: {
           buyer?: string | null
           created_at?: string
+          data_source?: string
           deed_type?: string
           id?: string
           loan_amount?: number | null
@@ -99,6 +102,7 @@ export type Database = {
           amount: number | null
           auction_date: string | null
           created_at: string
+          data_source: string
           details: Json | null
           event_date: string
           event_type: string
@@ -110,6 +114,7 @@ export type Database = {
           amount?: number | null
           auction_date?: string | null
           created_at?: string
+          data_source?: string
           details?: Json | null
           event_date: string
           event_type: string
@@ -121,6 +126,7 @@ export type Database = {
           amount?: number | null
           auction_date?: string | null
           created_at?: string
+          data_source?: string
           details?: Json | null
           event_date?: string
           event_type?: string
@@ -182,6 +188,7 @@ export type Database = {
       listings: {
         Row: {
           created_at: string
+          data_source: string
           dom: number | null
           id: string
           list_price: number
@@ -193,6 +200,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          data_source?: string
           dom?: number | null
           id?: string
           list_price: number
@@ -204,6 +212,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          data_source?: string
           dom?: number | null
           id?: string
           list_price?: number
@@ -231,6 +240,7 @@ export type Database = {
           computed_at: string
           confidence_grade: string
           cosmetic_arv: number
+          data_source: string
           exit_confidence: number
           exit_days: number
           expanded_arv: number
@@ -253,6 +263,7 @@ export type Database = {
           computed_at?: string
           confidence_grade: string
           cosmetic_arv: number
+          data_source?: string
           exit_confidence: number
           exit_days: number
           expanded_arv: number
@@ -275,6 +286,7 @@ export type Database = {
           computed_at?: string
           confidence_grade?: string
           cosmetic_arv?: number
+          data_source?: string
           exit_confidence?: number
           exit_days?: number
           expanded_arv?: number
@@ -311,11 +323,13 @@ export type Database = {
           condition_grade: string | null
           county_fips: string
           created_at: string
+          data_source: string
           estimated_equity: number | null
           flood_zone: string | null
           id: string
           is_listed: boolean
           is_vacant: boolean
+          last_seen_at: string
           lat: number
           living_sqft: number | null
           lng: number
@@ -326,6 +340,7 @@ export type Database = {
           owner_since: string | null
           property_type: string
           school_score: number | null
+          source_url: string | null
           state: string
           stories: number | null
           updated_at: string
@@ -342,11 +357,13 @@ export type Database = {
           condition_grade?: string | null
           county_fips: string
           created_at?: string
+          data_source?: string
           estimated_equity?: number | null
           flood_zone?: string | null
           id?: string
           is_listed?: boolean
           is_vacant?: boolean
+          last_seen_at?: string
           lat: number
           living_sqft?: number | null
           lng: number
@@ -357,6 +374,7 @@ export type Database = {
           owner_since?: string | null
           property_type?: string
           school_score?: number | null
+          source_url?: string | null
           state: string
           stories?: number | null
           updated_at?: string
@@ -373,11 +391,13 @@ export type Database = {
           condition_grade?: string | null
           county_fips?: string
           created_at?: string
+          data_source?: string
           estimated_equity?: number | null
           flood_zone?: string | null
           id?: string
           is_listed?: boolean
           is_vacant?: boolean
+          last_seen_at?: string
           lat?: number
           living_sqft?: number | null
           lng?: number
@@ -388,6 +408,7 @@ export type Database = {
           owner_since?: string | null
           property_type?: string
           school_score?: number | null
+          source_url?: string | null
           state?: string
           stories?: number | null
           updated_at?: string

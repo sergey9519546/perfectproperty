@@ -122,6 +122,36 @@ function AdminPage() {
         </div>
       </section>
 
+      <section className="mt-8">
+        <div className="rounded-lg border border-border bg-surface p-4">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-skeptic/15 px-2 py-0.5 text-[10px] uppercase tracking-widest text-skeptic">Honesty banner</span>
+            <span className="text-[12px] text-muted-foreground">what the app actually knows right now</span>
+          </div>
+          <div className="mt-3 grid gap-4 md:grid-cols-3">
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Real (LIVE) parcels</div>
+              <div className="mt-1 text-2xl font-semibold text-profit-strong">
+                {(cov.data?.live_totals?.parcels ?? 0).toLocaleString()}
+              </div>
+              <div className="text-[11px] text-muted-foreground">Scored: {(cov.data?.live_totals?.scored ?? 0).toLocaleString()}</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Demo (FIXTURE) parcels</div>
+              <div className="mt-1 text-2xl font-semibold text-muted-foreground">
+                {(cov.data?.total_fixture_parcels ?? 0).toLocaleString()}
+              </div>
+              <div className="text-[11px] text-muted-foreground">Hidden from /deals by default</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Graded predictions</div>
+              <div className="mt-1 text-2xl font-semibold">{(cov.data?.accuracy?.total ?? 0).toLocaleString()}</div>
+              <div className="text-[11px] text-muted-foreground">Real closed-sale outcomes only. Accuracy dashboard stays empty until deeds arrive.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <section>
           <h2 className="text-[11px] uppercase tracking-widest text-muted-foreground">County coverage</h2>
@@ -130,8 +160,8 @@ function AdminPage() {
               <thead className="bg-surface-2 text-[10px] uppercase tracking-widest text-muted-foreground">
                 <tr>
                   <th className="px-4 py-2 text-left">County</th>
-                  <th className="px-4 py-2 text-right">Parcels</th>
-                  <th className="px-4 py-2 text-right">Coverage</th>
+                  <th className="px-4 py-2 text-right">Live</th>
+                  <th className="px-4 py-2 text-right">Fixture</th>
                   <th className="px-4 py-2 text-left">Last ingest</th>
                 </tr>
               </thead>
@@ -139,13 +169,13 @@ function AdminPage() {
                 {(cov.data?.counties ?? []).map((c: any) => (
                   <tr key={c.fips} className="border-t border-border">
                     <td className="px-4 py-2">{c.state} · {c.name}</td>
-                    <td className="num px-4 py-2 text-right">{c.parcel_count.toLocaleString()}</td>
-                    <td className="num px-4 py-2 text-right">{Math.round(Number(c.coverage_pct))}%</td>
+                    <td className="num px-4 py-2 text-right text-profit-strong">{(c.live_parcels ?? 0).toLocaleString()}</td>
+                    <td className="num px-4 py-2 text-right text-muted-foreground">{(c.fixture_parcels ?? 0).toLocaleString()}</td>
                     <td className="num px-4 py-2 text-muted-foreground text-[11px]">{c.last_ingested_at ? new Date(c.last_ingested_at).toLocaleString() : "—"}</td>
                   </tr>
                 ))}
                 {(cov.data?.counties.length ?? 0) === 0 && (
-                  <tr><td colSpan={4} className="px-4 py-6 text-center text-muted-foreground text-sm">No counties yet — click Re-ingest to seed.</td></tr>
+                  <tr><td colSpan={4} className="px-4 py-6 text-center text-muted-foreground text-sm">No counties yet — click Scan live sources.</td></tr>
                 )}
               </tbody>
             </table>

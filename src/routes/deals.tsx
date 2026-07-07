@@ -19,14 +19,22 @@ export const Route = createFileRoute("/deals")({
 function DealsPage() {
   const listFn = useServerFn(listRankedParcels);
   const [selected, setSelected] = useState<string | null>(null);
+  const [includeFixture, setIncludeFixture] = useState(false);
   const q = useQuery({
-    queryKey: ["ranked-all"],
-    queryFn: () => listFn({ data: { limit: 500 } }),
+    queryKey: ["ranked-all", includeFixture],
+    queryFn: () => listFn({ data: { limit: 500, include_fixture: includeFixture } }),
   });
   return (
     <>
       <div className="mx-auto max-w-[1400px] px-6 py-8">
         <PageHead title="Ranked deals" sub="Every parcel the machine has underwritten, sorted by Perfect Score. Click any row for the full Dossier." />
+        <div className="mt-4 flex items-center gap-3 text-[12px]">
+          <label className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5">
+            <input type="checkbox" checked={includeFixture} onChange={(e) => setIncludeFixture(e.target.checked)} />
+            Include demo (FIXTURE) data
+          </label>
+          <span className="text-muted-foreground">Showing {q.data?.length ?? 0} {includeFixture ? "parcels (live + demo)" : "LIVE parcels"}.</span>
+        </div>
         <div className="mt-6 overflow-hidden rounded-lg border border-border bg-surface">
           <table className="w-full text-[13px]">
             <thead className="bg-surface-2 text-[10px] uppercase tracking-widest text-muted-foreground">

@@ -178,22 +178,34 @@ export const ingestCounty = createServerFn({ method: "POST" })
       }
     }
 
-    // Upsert parcels — key on (county_fips, apn) via delete-then-insert per county
+    // Upsert parcels on (county_fips, apn). NEVER wipe LIVE data; append/refresh.
     let inserted = 0;
     if (parcels.length) {
-      await supabase.from("parcels").delete().eq("county_fips", src.fips);
+      const url = src.parcels?.url ?? null;
+      const stamped = parcels.map((p) => ({
+        ...p,
+        data_source: "LIVE",
+        source_url: url,
+        last_seen_at: new Date().toISOString(),
+      }));
       const CHUNK = 200;
-      for (let i = 0; i < parcels.length; i += CHUNK) {
-        const chunk = parcels.slice(i, i + CHUNK);
-        const { error } = await supabase.from("parcels").insert(chunk);
+      for (let i = 0; i < stamped.length; i += CHUNK) {
+        const chunk = stamped.slice(i, i + CHUNK);
+        const { error } = await supabase
+          .from("parcels")
+          .upsert(chunk, { onConflict: "county_fips,apn" });
         if (error) {
           status = "PARTIAL";
-          note = `Insert error: ${error.message}`;
+          note = `Upsert error: ${error.message}`;
           break;
         }
         inserted += chunk.length;
       }
-      await supabase.from("counties").update({ parcel_count: inserted }).eq("fips", src.fips);
+      const { count } = await supabase
+        .from("parcels")
+        .select("id", { count: "exact", head: true })
+        .eq("county_fips", src.fips);
+      await supabase.from("counties").update({ parcel_count: count ?? 0 }).eq("fips", src.fips);
     }
 
     await supabase.from("ingestion_runs").insert({
@@ -205,20 +217,25 @@ export const ingestCounty = createServerFn({ method: "POST" })
     return { fips: src.fips, name: src.name, fetched: parcels.length, inserted, status, note };
   });
 
-// Underwrite everything currently in the parcels table using the engine.
+// Score only LIVE parcels. Fixture scoring is handled by runUnderwrite.
 export const scoreAll = createServerFn({ method: "POST" }).handler(async () => {
   const supabase = await adminClient();
-  const { data: parcels, error } = await supabase.from("parcels").select("*");
+  const { data: parcels, error } = await supabase
+    .from("parcels").select("*").eq("data_source", "LIVE");
   if (error) throw new Error(error.message);
-  const { data: distress } = await supabase.from("distress_events").select("*");
+  const parcelIds = (parcels ?? []).map((p) => p.id);
   const byParcel = new Map<string, DistressInput[]>();
-  for (const d of distress ?? []) {
-    const arr = byParcel.get(d.parcel_id) ?? [];
-    arr.push({
-      event_type: d.event_type, severity: d.severity, amount: d.amount,
-      event_date: d.event_date, auction_date: d.auction_date,
-    });
-    byParcel.set(d.parcel_id, arr);
+  if (parcelIds.length) {
+    const { data: distress } = await supabase
+      .from("distress_events").select("*").in("parcel_id", parcelIds);
+    for (const d of distress ?? []) {
+      const arr = byParcel.get(d.parcel_id) ?? [];
+      arr.push({
+        event_type: d.event_type, severity: d.severity, amount: d.amount,
+        event_date: d.event_date, auction_date: d.auction_date,
+      });
+      byParcel.set(d.parcel_id, arr);
+    }
   }
 
   const scores: any[] = [];
@@ -248,9 +265,11 @@ export const scoreAll = createServerFn({ method: "POST" }).handler(async () => {
       perfect_score: u.perfect_score, confidence_grade: u.confidence_grade,
       skeptic_flags: u.skeptic_flags, ring: u.ring,
       computed_at: new Date().toISOString(),
+      data_source: "LIVE",
     });
   }
-  await supabase.from("parcel_scores").delete().gt("as_is_value", -1);
+  // Only wipe LIVE scores; leave fixture scores alone.
+  await supabase.from("parcel_scores").delete().eq("data_source", "LIVE");
   const CHUNK = 200;
   for (let i = 0; i < scores.length; i += CHUNK) {
     await supabase.from("parcel_scores").insert(scores.slice(i, i + CHUNK));
