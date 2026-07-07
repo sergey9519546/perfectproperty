@@ -157,6 +157,120 @@ function AdminPage() {
       </section>
 
       <section className="mt-8">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[11px] uppercase tracking-widest text-muted-foreground">Live URL probe · tiered fetcher</h2>
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            Zyte key: <span className={probes.data?.zyte_key_present ? "text-profit-strong" : "text-skeptic"}>{probes.data?.zyte_key_present ? "present" : "missing"}</span>
+            {" · "}Cached URLs: <span className="text-foreground">{probes.data?.cached ?? 0}</span>
+          </div>
+        </div>
+        <div className="mt-2 rounded-lg border border-border bg-surface p-3">
+          <div className="flex flex-wrap gap-2">
+            <input
+              value={probeInput}
+              onChange={(e) => setProbeInput(e.target.value)}
+              placeholder="https://recorder.county.gov/foreclosure-calendar"
+              className="flex-1 min-w-[280px] rounded-md border border-border bg-background px-3 py-2 text-[13px] outline-none focus:border-primary"
+            />
+            <select
+              value={probeTier}
+              onChange={(e) => setProbeTier(e.target.value as any)}
+              className="rounded-md border border-border bg-background px-2 py-2 text-[12px]"
+            >
+              <option value="auto">auto (plain → zyte → browser)</option>
+              <option value="plain">plain fetch (free)</option>
+              <option value="zyte">zyte http (rotating proxy)</option>
+              <option value="browser">zyte browser (JS render)</option>
+            </select>
+            <button
+              onClick={() => probeInput && probe.mutate({ url: probeInput, tier: probeTier })}
+              disabled={!probeInput || probe.isPending}
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-foreground disabled:opacity-50"
+            >
+              <Search className="h-4 w-4" />
+              {probe.isPending ? "Fetching…" : "Probe URL"}
+            </button>
+          </div>
+          <div className="mt-2 text-[11px] text-muted-foreground">
+            Plain = free direct fetch (~40% of county HTML). Zyte = anti-bot proxy (~$0.0002/req, needs <code>ZYTE_API_KEY</code>). Browser = JS render (~5× cost). Results cached 24h.
+          </div>
+
+          {probeResult && (
+            <div className="mt-3 rounded-md border border-border bg-surface-2 p-3 text-[12px]">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-widest" style={{
+                  color: probeResult.status === "OK" || probeResult.status === "CACHED" ? "var(--profit-strong)" : probeResult.status === "BLOCKED" ? "var(--opportunity)" : "var(--skeptic)",
+                  backgroundColor: "color-mix(in oklab, " + (probeResult.status === "OK" || probeResult.status === "CACHED" ? "var(--profit-strong)" : probeResult.status === "BLOCKED" ? "var(--opportunity)" : "var(--skeptic)") + " 15%, transparent)",
+                }}>{probeResult.status}</span>
+                <span className="text-muted-foreground">tier: <span className="text-foreground">{probeResult.tier}</span></span>
+                <span className="text-muted-foreground">HTTP: <span className="text-foreground">{probeResult.http_status}</span></span>
+                <span className="text-muted-foreground">{(probeResult.bytes / 1024).toFixed(1)} KB</span>
+                <span className="text-muted-foreground">{probeResult.duration_ms} ms</span>
+              </div>
+              {probeResult.title && <div className="mt-2 font-medium">{probeResult.title}</div>}
+              <div className="mt-1 truncate text-[11px] text-muted-foreground">{probeResult.final_url}</div>
+              <div className="mt-2 grid gap-3 md:grid-cols-3">
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Headings</div>
+                  <ul className="mt-1 space-y-0.5">
+                    {(probeResult.hints?.headings ?? []).slice(0, 8).map((h: string, i: number) => (
+                      <li key={i} className="truncate text-[11px]">• {h}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Dates / $</div>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {(probeResult.hints?.dates ?? []).map((d: string, i: number) => (
+                      <span key={"d" + i} className="rounded bg-background px-1.5 py-0.5 text-[10px] font-mono">{d}</span>
+                    ))}
+                    {(probeResult.hints?.dollars ?? []).map((d: string, i: number) => (
+                      <span key={"$" + i} className="rounded bg-background px-1.5 py-0.5 text-[10px] font-mono text-profit">{d}</span>
+                    ))}
+                  </div>
+                  <div className="mt-2 text-[10px] uppercase tracking-widest text-muted-foreground">Structure</div>
+                  <div className="text-[11px] text-muted-foreground">Tables: {probeResult.hints?.tables ?? 0} · Forms: {probeResult.hints?.forms ?? 0}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Links (first 8)</div>
+                  <ul className="mt-1 space-y-0.5">
+                    {(probeResult.hints?.links ?? []).slice(0, 8).map((l: any, i: number) => (
+                      <li key={i} className="truncate text-[11px]">
+                        <a href={l.href} target="_blank" rel="noreferrer" className="text-primary hover:underline">{l.text}</a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <details className="mt-3">
+                <summary className="cursor-pointer text-[11px] text-muted-foreground">Text preview (first 4KB)</summary>
+                <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded bg-background p-2 text-[10px]">{probeResult.text_preview}</pre>
+              </details>
+            </div>
+          )}
+
+          {(probes.data?.runs?.length ?? 0) > 0 && (
+            <div className="mt-3">
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Recent probes</div>
+              <div className="mt-1 max-h-48 overflow-y-auto">
+                {(probes.data?.runs ?? []).map((r: any) => (
+                  <div key={r.id} className="flex items-center gap-2 border-t border-border py-1 text-[11px]">
+                    <span className="w-16 text-muted-foreground">{r.tier}</span>
+                    <span className="w-16" style={{ color: r.status === "OK" || r.status === "CACHED" ? "var(--profit-strong)" : r.status === "BLOCKED" ? "var(--opportunity)" : "var(--skeptic)" }}>{r.status}</span>
+                    <span className="w-14 num text-muted-foreground">{r.http_status ?? "—"}</span>
+                    <span className="w-16 num text-muted-foreground">{r.duration_ms ?? 0}ms</span>
+                    <span className="flex-1 truncate">{r.url}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+
+
+      <section className="mt-8">
         <div className="rounded-lg border border-border bg-surface p-4">
           <div className="flex items-center gap-2">
             <span className="rounded-full bg-skeptic/15 px-2 py-0.5 text-[10px] uppercase tracking-widest text-skeptic">Honesty banner</span>
