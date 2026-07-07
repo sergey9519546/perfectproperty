@@ -688,3 +688,25 @@ function AdminPage() {
     </div>
   );
 }
+
+function Stat({ label, value, tone }: { label: string; value: React.ReactNode; tone?: "warn" }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{label}</div>
+      <div className={`mt-1 text-xl font-semibold ${tone === "warn" ? "text-skeptic" : ""}`}>{value}</div>
+    </div>
+  );
+}
+
+function ConfBar({ label, pct, className, title }: { label: string; pct: number; className: string; title: string }) {
+  if (pct <= 0) return null;
+  return (
+    <div
+      className={`flex items-center justify-center overflow-hidden whitespace-nowrap px-1 ${className}`}
+      style={{ width: `${pct}%` }}
+      title={title}
+    >
+      {pct >= 8 ? label : ""}
+    </div>
+  );
+}
