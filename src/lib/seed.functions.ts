@@ -187,41 +187,26 @@ export const seedFixtures = createServerFn({ method: "POST" }).handler(async () 
       (u as any)._parcel_id = parcelId;
     }
     runs.push({
-      county_fips: c.fips, source: "PARCELS", status: "OK",
-      rows_ingested: PARCELS_PER_COUNTY, notes: "Fixture ingestion — replace with Regrid/county GIS adapter",
+      county_fips: c.fips, source: "FIXTURE_SEED", status: "OK",
+      rows_ingested: PARCELS_PER_COUNTY,
+      notes: "FIXTURE — synthetic parcels/deeds/distress/listings for demo. Real data comes from Scan live sources.",
       started_at: new Date(Date.now() - 60000).toISOString(),
-      finished_at: new Date().toISOString(),
-    });
-    runs.push({
-      county_fips: c.fips, source: "DEEDS", status: "OK",
-      rows_ingested: Math.round(PARCELS_PER_COUNTY * 1.8), notes: "Fixture — county recorder adapter pending",
-      started_at: new Date(Date.now() - 55000).toISOString(),
-      finished_at: new Date().toISOString(),
-    });
-    runs.push({
-      county_fips: c.fips, source: "DISTRESS", status: "PARTIAL",
-      rows_ingested: Math.round(PARCELS_PER_COUNTY * 0.4), notes: "Fixture — foreclosure + tax + probate + code",
-      started_at: new Date(Date.now() - 50000).toISOString(),
-      finished_at: new Date().toISOString(),
-    });
-    runs.push({
-      county_fips: c.fips, source: "MLS", status: "OK",
-      rows_ingested: Math.round(PARCELS_PER_COUNTY * 0.18), notes: "Fixture — requires RESO/broker feed",
-      started_at: new Date(Date.now() - 40000).toISOString(),
       finished_at: new Date().toISOString(),
     });
   }
 
-  // Batch inserts
-  await supabase.from("parcels").insert(allParcels);
-  if (allDeeds.length) await supabase.from("deeds").insert(allDeeds);
-  if (allDistress.length) await supabase.from("distress_events").insert(allDistress);
-  if (allListings.length) await supabase.from("listings").insert(allListings);
+  // Tag every fixture row with provenance and insert
+  const stamp = (arr: any[]) => arr.map((r) => ({ ...r, data_source: FIXTURE }));
+  await supabase.from("parcels").insert(stamp(allParcels));
+  if (allDeeds.length) await supabase.from("deeds").insert(stamp(allDeeds));
+  if (allDistress.length) await supabase.from("distress_events").insert(stamp(allDistress));
+  if (allListings.length) await supabase.from("listings").insert(stamp(allListings));
   await supabase.from("ingestion_runs").insert(runs);
 
-  // Update county counts
+  // Update fixture parcel count only (don't clobber LIVE)
   for (const c of COUNTIES) {
-    await supabase.from("counties").update({ parcel_count: PARCELS_PER_COUNTY }).eq("fips", c.fips);
+    const { count } = await supabase.from("parcels").select("id", { count: "exact", head: true }).eq("county_fips", c.fips);
+    await supabase.from("counties").update({ parcel_count: count ?? 0 }).eq("fips", c.fips);
   }
 
   return { parcels: allParcels.length, deeds: allDeeds.length, distress: allDistress.length, listings: allListings.length };
