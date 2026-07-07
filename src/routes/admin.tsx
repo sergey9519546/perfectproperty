@@ -1,0 +1,143 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getCoverage } from "@/lib/parcels.functions";
+import { seedFixtures, runUnderwrite } from "@/lib/seed.functions";
+import { PageHead } from "./deals";
+import { toast } from "sonner";
+import { Database, Zap } from "lucide-react";
+
+export const Route = createFileRoute("/admin")({
+  head: () => ({
+    meta: [
+      { title: "Ingestion — Perfect Property Engine" },
+      { name: "description", content: "Data adapters, coverage, and the nightly underwrite pipeline." },
+    ],
+  }),
+  component: AdminPage,
+});
+
+function AdminPage() {
+  const covFn = useServerFn(getCoverage);
+  const seedFn = useServerFn(seedFixtures);
+  const uwFn = useServerFn(runUnderwrite);
+  const qc = useQueryClient();
+  const cov = useQuery({ queryKey: ["coverage"], queryFn: () => covFn() });
+
+  const seed = useMutation({
+    mutationFn: () => seedFn(),
+    onSuccess: (r) => { toast.success(`Ingested ${r.parcels} parcels · ${r.deeds} deeds · ${r.distress} distress · ${r.listings} listings`); qc.invalidateQueries(); },
+    onError: (e: any) => toast.error(e.message ?? "Seed failed"),
+  });
+  const uw = useMutation({
+    mutationFn: () => uwFn(),
+    onSuccess: (r) => { toast.success(`Underwrote ${r.scored} parcels · ${r.outcomes} historical outcomes graded`); qc.invalidateQueries(); },
+    onError: (e: any) => toast.error(e.message ?? "Underwrite failed"),
+  });
+
+  const adapters = [
+    { name: "Parcels + Assessor", source: "PARCELS", status: "Fixture adapter (CA·FL)", real: "County GIS / Regrid / ATTOM" },
+    { name: "Recorder / Deeds", source: "DEEDS", status: "Fixture adapter", real: "County recorder scrape or DataTree" },
+    { name: "Distress Signals", source: "DISTRESS", status: "Fixture adapter", real: "Foreclosure lists, tax rolls, probate, code violations" },
+    { name: "MLS Feed", source: "MLS", status: "Fixture adapter", real: "RESO API / Trestle (requires licensed broker)" },
+    { name: "Aggregator", source: "AGGREGATOR", status: "—", real: "ATTOM, PropStream, Estated" },
+  ];
+
+  return (
+    <div className="mx-auto max-w-[1400px] px-6 py-8">
+      <PageHead title="Ingestion" sub="Every data adapter, every coverage number, every underwrite run. This is the operator's control panel for the pipeline described in Layer 1." />
+
+      <div className="mt-6 flex flex-wrap gap-3">
+        <button onClick={() => seed.mutate()} disabled={seed.isPending} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
+          <Database className="h-4 w-4" />
+          {seed.isPending ? "Ingesting…" : "Re-ingest fixture data (CA + FL)"}
+        </button>
+        <button onClick={() => uw.mutate()} disabled={uw.isPending} className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:opacity-50">
+          <Zap className="h-4 w-4" />
+          {uw.isPending ? "Scoring…" : "Run nightly underwrite"}
+        </button>
+      </div>
+
+      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        <section>
+          <h2 className="text-[11px] uppercase tracking-widest text-muted-foreground">County coverage</h2>
+          <div className="mt-2 overflow-hidden rounded-lg border border-border bg-surface">
+            <table className="w-full text-[13px]">
+              <thead className="bg-surface-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-2 text-left">County</th>
+                  <th className="px-4 py-2 text-right">Parcels</th>
+                  <th className="px-4 py-2 text-right">Coverage</th>
+                  <th className="px-4 py-2 text-left">Last ingest</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(cov.data?.counties ?? []).map((c: any) => (
+                  <tr key={c.fips} className="border-t border-border">
+                    <td className="px-4 py-2">{c.state} · {c.name}</td>
+                    <td className="num px-4 py-2 text-right">{c.parcel_count.toLocaleString()}</td>
+                    <td className="num px-4 py-2 text-right">{Math.round(Number(c.coverage_pct))}%</td>
+                    <td className="num px-4 py-2 text-muted-foreground text-[11px]">{c.last_ingested_at ? new Date(c.last_ingested_at).toLocaleString() : "—"}</td>
+                  </tr>
+                ))}
+                {(cov.data?.counties.length ?? 0) === 0 && (
+                  <tr><td colSpan={4} className="px-4 py-6 text-center text-muted-foreground text-sm">No counties yet — click Re-ingest to seed.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section>
+          <h2 className="text-[11px] uppercase tracking-widest text-muted-foreground">Data adapters</h2>
+          <div className="mt-2 space-y-2">
+            {adapters.map((a) => (
+              <div key={a.name} className="rounded-lg border border-border bg-surface p-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-[13px] font-medium">{a.name}</div>
+                  <span className="rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[10px] uppercase tracking-widest text-muted-foreground">{a.status}</span>
+                </div>
+                <div className="mt-1 text-[11px] text-muted-foreground">Real feed → {a.real}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <section className="mt-8">
+        <h2 className="text-[11px] uppercase tracking-widest text-muted-foreground">Recent runs</h2>
+        <div className="mt-2 overflow-hidden rounded-lg border border-border bg-surface">
+          <table className="w-full text-[12px]">
+            <thead className="bg-surface-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+              <tr>
+                <th className="px-4 py-2 text-left">Started</th>
+                <th className="px-4 py-2 text-left">County</th>
+                <th className="px-4 py-2 text-left">Source</th>
+                <th className="px-4 py-2 text-left">Status</th>
+                <th className="px-4 py-2 text-right">Rows</th>
+                <th className="px-4 py-2 text-left">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(cov.data?.runs ?? []).map((r: any) => (
+                <tr key={r.id} className="border-t border-border">
+                  <td className="num px-4 py-2 text-muted-foreground">{new Date(r.started_at).toLocaleString()}</td>
+                  <td className="num px-4 py-2">{r.county_fips}</td>
+                  <td className="px-4 py-2">{r.source}</td>
+                  <td className="px-4 py-2">
+                    <span className="rounded-full px-2 py-0.5 text-[10px]" style={{
+                      color: r.status === "OK" ? "var(--profit-strong)" : r.status === "PARTIAL" ? "var(--opportunity)" : "var(--skeptic)",
+                      backgroundColor: "color-mix(in oklab, " + (r.status === "OK" ? "var(--profit-strong)" : r.status === "PARTIAL" ? "var(--opportunity)" : "var(--skeptic)") + " 15%, transparent)",
+                    }}>{r.status}</span>
+                  </td>
+                  <td className="num px-4 py-2 text-right">{r.rows_ingested}</td>
+                  <td className="px-4 py-2 text-muted-foreground">{r.notes}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}
