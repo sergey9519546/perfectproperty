@@ -116,9 +116,18 @@ function normalizeSocrataRow(r: Record<string, any>, src: CountySource) {
   let lat = src.center[0], lng = src.center[1];
   if (r.latitude && r.longitude) { lat = Number(r.latitude); lng = Number(r.longitude); }
   else if (r.location?.latitude && r.location?.longitude) { lat = Number(r.location.latitude); lng = Number(r.location.longitude); }
+  // NYC PLUTO returns `bbl` as a numeric field which arrives as "2032020044.00000000".
+  // Sales use the 10-digit BBL string, so strip the decimal noise here so joins match.
+  let apn = String(r[c.field_apn ?? "id"] ?? crypto.randomUUID());
+  if (c.address_builder === "nyc") apn = apn.replace(/\..*$/, "").replace(/^0+/, "") || apn;
+  // NYC: map the borough letter → real per-county FIPS so sales/parcels agree.
+  const NYC_FIPS: Record<string, string> = { MN: "36061", BX: "36005", BK: "36047", QN: "36081", SI: "36085" };
+  const county_fips = c.address_builder === "nyc" && NYC_FIPS[r.borough as string]
+    ? NYC_FIPS[r.borough as string]!
+    : src.fips;
   return {
-    apn: String(r[c.field_apn ?? "id"] ?? crypto.randomUUID()),
-    county_fips: src.fips,
+    apn,
+    county_fips,
     address, city, state: src.state,
     zip: c.field_zip ? String(r[c.field_zip] ?? "").trim() || null : null,
     lat, lng,
