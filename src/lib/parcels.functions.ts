@@ -17,6 +17,7 @@ const ListInput = z.object({
   min_score: z.number().optional(),
   min_profit: z.number().optional(),
   max_offer: z.number().optional(),
+  include_fixture: z.boolean().default(false),
   limit: z.number().int().max(500).default(100),
 });
 
@@ -27,11 +28,12 @@ export const listRankedParcels = createServerFn({ method: "POST" })
     let q = supabase
       .from("parcel_scores")
       .select(
-        "parcel_id, perfect_score, gross_profit, risk_adjusted_profit, modeled_offer, acquisition_probability, exit_days, ring, confidence_grade, skeptic_flags, recommended_scope, reno_cost, parcels!inner(id, address, city, state, zip, lat, lng, living_sqft, year_built, bedrooms, bathrooms, condition_grade, owner_is_absentee, is_listed, is_vacant, county_fips)",
+        "parcel_id, perfect_score, gross_profit, risk_adjusted_profit, modeled_offer, acquisition_probability, exit_days, ring, confidence_grade, skeptic_flags, recommended_scope, reno_cost, data_source, parcels!inner(id, address, city, state, zip, lat, lng, living_sqft, year_built, bedrooms, bathrooms, condition_grade, owner_is_absentee, is_listed, is_vacant, county_fips, data_source)",
       )
       .order("perfect_score", { ascending: false })
       .limit(data.limit);
 
+    if (!data.include_fixture) q = q.eq("data_source", "LIVE");
     if (data.ring) q = q.eq("ring", data.ring);
     if (data.min_score !== undefined) q = q.gte("perfect_score", data.min_score);
     if (data.min_profit !== undefined) q = q.gte("gross_profit", data.min_profit);
