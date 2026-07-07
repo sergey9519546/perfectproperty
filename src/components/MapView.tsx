@@ -116,7 +116,7 @@ export function MapView({ parcels, center = [-98, 36], zoom = 4, onSelect, selec
             "circle-color": ["get", "color"],
             "circle-opacity": 0.92,
             "circle-stroke-width": ["case", ["==", ["get", "selected"], 1], 2.5, 0.5],
-            "circle-stroke-color": ["case", ["==", ["get", "selected"], 1], cssVar("--foreground", "#f6f2e0"), cssVar("--background", "#0b201f")],
+            "circle-stroke-color": ["case", ["==", ["get", "selected"], 1], "#ffffff", "#0e1218"],
           },
         });
         map.on("click", "parcels-core", (e) => {
