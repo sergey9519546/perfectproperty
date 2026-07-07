@@ -319,6 +319,16 @@ export const scoreAll = createServerFn({ method: "POST" }).handler(async () => {
       comps_used: comps,
       comp_count: u.comp_count,
       arv_source: u.arv_source,
+      mc_profit_p5: (u as any).mc_profit_p5 ?? null,
+      mc_profit_p50: (u as any).mc_profit_p50 ?? null,
+      mc_profit_p95: (u as any).mc_profit_p95 ?? null,
+      mc_p_loss: (u as any).mc_p_loss ?? null,
+      mc_cvar_loss: (u as any).mc_cvar_loss ?? null,
+      mc_dqr: (u as any).mc_dqr ?? null,
+      governor_kappa: (u as any).governor_kappa ?? null,
+      exceedance_rank: (u as any).exceedance_rank ?? null,
+      sigma_arv_log: (u as any).sigma_arv_log ?? null,
+      drift_used_monthly: (u as any).drift_used_monthly ?? null,
     });
   }
   // Only wipe LIVE scores; leave fixture scores alone.

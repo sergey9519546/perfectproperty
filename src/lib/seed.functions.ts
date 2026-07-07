@@ -254,6 +254,16 @@ export const runUnderwrite = createServerFn({ method: "POST" }).handler(async ()
       skeptic_flags: u.skeptic_flags, ring: u.ring,
       computed_at: new Date().toISOString(),
       data_source: (p as any).data_source ?? "FIXTURE",
+      mc_profit_p5: (u as any).mc_profit_p5 ?? null,
+      mc_profit_p50: (u as any).mc_profit_p50 ?? null,
+      mc_profit_p95: (u as any).mc_profit_p95 ?? null,
+      mc_p_loss: (u as any).mc_p_loss ?? null,
+      mc_cvar_loss: (u as any).mc_cvar_loss ?? null,
+      mc_dqr: (u as any).mc_dqr ?? null,
+      governor_kappa: (u as any).governor_kappa ?? null,
+      exceedance_rank: (u as any).exceedance_rank ?? null,
+      sigma_arv_log: (u as any).sigma_arv_log ?? null,
+      drift_used_monthly: (u as any).drift_used_monthly ?? null,
     });
   }
 
