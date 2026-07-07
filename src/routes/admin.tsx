@@ -47,6 +47,38 @@ function AdminPage() {
     onError: (e: any) => toast.error(e.message ?? "Probe failed"),
   });
 
+  // ---- Recipe wizard ----
+  const discoverFn = useServerFn(discoverSchema);
+  const saveRecipeFn = useServerFn(saveRecipe);
+  const listRecipesFn = useServerFn(listRecipes);
+  const runRecipeFn = useServerFn(runRecipe);
+  const deleteRecipeFn = useServerFn(deleteRecipe);
+  const recipes = useQuery({ queryKey: ["recipes"], queryFn: () => listRecipesFn() });
+  const [wizard, setWizard] = useState<null | { url: string; candidates: any[]; base_url: string; selectedIdx: number; name: string; target: "distress_events" | "sales" | "parcels" }>(null);
+  const discover = useMutation({
+    mutationFn: (url: string) => discoverFn({ data: { url } }),
+    onSuccess: (r, url) => {
+      if (!r.candidates.length) { toast.error("No repeating containers found — try a listing page"); return; }
+      setWizard({ url, candidates: r.candidates, base_url: r.base_url, selectedIdx: 0, name: `Recipe ${new Date().toISOString().slice(0,10)}`, target: "distress_events" });
+    },
+    onError: (e: any) => toast.error(e.message ?? "Discovery failed"),
+  });
+  const saveRec = useMutation({
+    mutationFn: (payload: any) => saveRecipeFn({ data: payload }),
+    onSuccess: () => { toast.success("Recipe saved"); setWizard(null); qc.invalidateQueries({ queryKey: ["recipes"] }); },
+    onError: (e: any) => toast.error(e.message ?? "Save failed"),
+  });
+  const runRec = useMutation({
+    mutationFn: (id: string) => runRecipeFn({ data: { id, max_rows: 500 } }),
+    onSuccess: (r: any) => { toast.success(`Recipe: ${r.rows} rows extracted · ${r.note}`); qc.invalidateQueries(); },
+    onError: (e: any) => toast.error(e.message ?? "Run failed"),
+  });
+  const delRec = useMutation({
+    mutationFn: (id: string) => deleteRecipeFn({ data: { id } }),
+    onSuccess: () => { toast.success("Recipe deleted"); qc.invalidateQueries({ queryKey: ["recipes"] }); },
+  });
+  const webhookUrl = typeof window !== "undefined" ? `${window.location.origin}/api/public/scrapy-ingest` : "";
+
 
 
   const seed = useMutation({
