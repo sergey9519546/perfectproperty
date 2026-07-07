@@ -1,0 +1,3 @@
+ALTER TABLE public.parcels ALTER COLUMN city DROP NOT NULL;
+ALTER TABLE public.parcels ALTER COLUMN zip DROP NOT NULL;
+ALTER TABLE public.parcels ALTER COLUMN address DROP NOT NULL;

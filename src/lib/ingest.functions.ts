@@ -116,9 +116,18 @@ function normalizeSocrataRow(r: Record<string, any>, src: CountySource) {
   let lat = src.center[0], lng = src.center[1];
   if (r.latitude && r.longitude) { lat = Number(r.latitude); lng = Number(r.longitude); }
   else if (r.location?.latitude && r.location?.longitude) { lat = Number(r.location.latitude); lng = Number(r.location.longitude); }
+  // NYC PLUTO returns `bbl` as a numeric field which arrives as "2032020044.00000000".
+  // Sales use the 10-digit BBL string, so strip the decimal noise here so joins match.
+  let apn = String(r[c.field_apn ?? "id"] ?? crypto.randomUUID());
+  if (c.address_builder === "nyc") apn = apn.replace(/\..*$/, "").replace(/^0+/, "") || apn;
+  // NYC: map the borough letter → real per-county FIPS so sales/parcels agree.
+  const NYC_FIPS: Record<string, string> = { MN: "36061", BX: "36005", BK: "36047", QN: "36081", SI: "36085" };
+  const county_fips = c.address_builder === "nyc" && NYC_FIPS[r.borough as string]
+    ? NYC_FIPS[r.borough as string]!
+    : src.fips;
   return {
-    apn: String(r[c.field_apn ?? "id"] ?? crypto.randomUUID()),
-    county_fips: src.fips,
+    apn,
+    county_fips,
     address, city, state: src.state,
     zip: c.field_zip ? String(r[c.field_zip] ?? "").trim() || null : null,
     lat, lng,
@@ -149,12 +158,26 @@ export const ingestCounty = createServerFn({ method: "POST" })
     const supabase = await adminClient();
     const started = new Date().toISOString();
 
-    // Ensure county row
-    await supabase.from("counties").upsert({
-      fips: src.fips, state: src.state, name: src.name,
+    // Ensure county row(s). For NYC, ensure all 5 boroughs because the PLUTO
+    // normalizer splits parcels across per-borough FIPS.
+    const countyRows = [{ fips: src.fips, state: src.state, name: src.name,
       center_lat: src.center[0], center_lng: src.center[1],
-      last_ingested_at: started, coverage_pct: 100, parcel_count: 0,
-    });
+      last_ingested_at: started, coverage_pct: 100, parcel_count: 0 }];
+    if (src.parcels?.address_builder === "nyc") {
+      const NYC = [
+        { fips: "36061", name: "NYC · Manhattan" },
+        { fips: "36005", name: "NYC · Bronx" },
+        { fips: "36047", name: "NYC · Brooklyn" },
+        { fips: "36081", name: "NYC · Queens" },
+        { fips: "36085", name: "NYC · Staten Island" },
+      ];
+      for (const c of NYC) countyRows.push({
+        fips: c.fips, state: "NY", name: c.name,
+        center_lat: 40.7128, center_lng: -74.006,
+        last_ingested_at: started, coverage_pct: 100, parcel_count: 0,
+      });
+    }
+    for (const row of countyRows) await supabase.from("counties").upsert(row, { onConflict: "fips" });
 
     let parcels: any[] = [];
     let status: "OK" | "PARTIAL" | "FAIL" = "OK";
@@ -182,12 +205,15 @@ export const ingestCounty = createServerFn({ method: "POST" })
     let inserted = 0;
     if (parcels.length) {
       const url = src.parcels?.url ?? null;
-      const stamped = parcels.map((p) => ({
-        ...p,
-        data_source: "LIVE",
-        source_url: url,
-        last_seen_at: new Date().toISOString(),
-      }));
+      // De-dupe on the upsert key so ON CONFLICT DO UPDATE doesn't hit the same row twice.
+      const seen = new Set<string>();
+      const stamped = parcels
+        .map((p) => ({ ...p, data_source: "LIVE", source_url: url, last_seen_at: new Date().toISOString() }))
+        .filter((p) => {
+          const k = `${p.county_fips}|${p.apn}`;
+          if (seen.has(k)) return false;
+          seen.add(k); return true;
+        });
       const CHUNK = 200;
       for (let i = 0; i < stamped.length; i += CHUNK) {
         const chunk = stamped.slice(i, i + CHUNK);
@@ -201,11 +227,14 @@ export const ingestCounty = createServerFn({ method: "POST" })
         }
         inserted += chunk.length;
       }
-      const { count } = await supabase
-        .from("parcels")
-        .select("id", { count: "exact", head: true })
-        .eq("county_fips", src.fips);
-      await supabase.from("counties").update({ parcel_count: count ?? 0 }).eq("fips", src.fips);
+      // Refresh parcel_count on every county touched.
+      const touched = Array.from(new Set(stamped.map((p) => p.county_fips)));
+      for (const fips of touched) {
+        const { count } = await supabase
+          .from("parcels").select("id", { count: "exact", head: true })
+          .eq("county_fips", fips);
+        await supabase.from("counties").update({ parcel_count: count ?? 0 }).eq("fips", fips);
+      }
     }
 
     await supabase.from("ingestion_runs").insert({
@@ -252,7 +281,28 @@ export const scoreAll = createServerFn({ method: "POST" }).handler(async () => {
       owner_is_absentee: p.owner_is_absentee, owner_since: p.owner_since,
       is_listed: p.is_listed, is_vacant: p.is_vacant, state: p.state,
     };
-    const u = underwrite(input, byParcel.get(p.id) ?? [], m);
+
+    // Pull real comps via the pick_comps RPC — only when we have geometry + sqft.
+    let comps: any[] = [];
+    if (p.lat != null && p.lng != null && (p.living_sqft ?? 0) > 100) {
+      const { data: cRows } = await (supabase as any).rpc("pick_comps", {
+        subject_lat: p.lat,
+        subject_lng: p.lng,
+        subject_sqft: p.living_sqft,
+        subject_county: p.county_fips,
+      });
+      comps = (cRows ?? []).map((c: any) => ({
+        ppsf: Number(c.ppsf),
+        distance_km: Number(c.distance_km),
+        sale_id: c.sale_id,
+        address: c.address,
+        sold_at: c.sold_at,
+        sale_price: Number(c.sale_price),
+        living_sqft: c.living_sqft,
+      }));
+    }
+
+    const u = underwrite(input, byParcel.get(p.id) ?? [], m, comps);
     scores.push({
       parcel_id: p.id,
       as_is_value: u.as_is_value, cosmetic_arv: u.cosmetic_arv,
@@ -266,6 +316,9 @@ export const scoreAll = createServerFn({ method: "POST" }).handler(async () => {
       skeptic_flags: u.skeptic_flags, ring: u.ring,
       computed_at: new Date().toISOString(),
       data_source: "LIVE",
+      comps_used: comps,
+      comp_count: u.comp_count,
+      arv_source: u.arv_source,
     });
   }
   // Only wipe LIVE scores; leave fixture scores alone.
@@ -274,7 +327,8 @@ export const scoreAll = createServerFn({ method: "POST" }).handler(async () => {
   for (let i = 0; i < scores.length; i += CHUNK) {
     await supabase.from("parcel_scores").insert(scores.slice(i, i + CHUNK));
   }
-  return { scored: scores.length };
+  const compBacked = scores.filter((s) => s.arv_source === "COMPS").length;
+  return { scored: scores.length, comps_backed: compBacked };
 });
 
 export const listSources = createServerFn({ method: "GET" }).handler(async () => {

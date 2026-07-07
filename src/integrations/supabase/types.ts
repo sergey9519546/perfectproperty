@@ -235,8 +235,11 @@ export type Database = {
       parcel_scores: {
         Row: {
           acquisition_probability: number
+          arv_source: string
           as_is_value: number
           carry_cost: number
+          comp_count: number
+          comps_used: Json
           computed_at: string
           confidence_grade: string
           cosmetic_arv: number
@@ -258,8 +261,11 @@ export type Database = {
         }
         Insert: {
           acquisition_probability: number
+          arv_source?: string
           as_is_value: number
           carry_cost: number
+          comp_count?: number
+          comps_used?: Json
           computed_at?: string
           confidence_grade: string
           cosmetic_arv: number
@@ -281,8 +287,11 @@ export type Database = {
         }
         Update: {
           acquisition_probability?: number
+          arv_source?: string
           as_is_value?: number
           carry_cost?: number
+          comp_count?: number
+          comps_used?: Json
           computed_at?: string
           confidence_grade?: string
           cosmetic_arv?: number
@@ -314,12 +323,12 @@ export type Database = {
       }
       parcels: {
         Row: {
-          address: string
+          address: string | null
           apn: string
           assessed_value: number | null
           bathrooms: number | null
           bedrooms: number | null
-          city: string
+          city: string | null
           condition_grade: string | null
           county_fips: string
           created_at: string
@@ -345,15 +354,15 @@ export type Database = {
           stories: number | null
           updated_at: string
           year_built: number | null
-          zip: string
+          zip: string | null
         }
         Insert: {
-          address: string
+          address?: string | null
           apn: string
           assessed_value?: number | null
           bathrooms?: number | null
           bedrooms?: number | null
-          city: string
+          city?: string | null
           condition_grade?: string | null
           county_fips: string
           created_at?: string
@@ -379,15 +388,15 @@ export type Database = {
           stories?: number | null
           updated_at?: string
           year_built?: number | null
-          zip: string
+          zip?: string | null
         }
         Update: {
-          address?: string
+          address?: string | null
           apn?: string
           assessed_value?: number | null
           bathrooms?: number | null
           bedrooms?: number | null
-          city?: string
+          city?: string | null
           condition_grade?: string | null
           county_fips?: string
           created_at?: string
@@ -413,7 +422,7 @@ export type Database = {
           stories?: number | null
           updated_at?: string
           year_built?: number | null
-          zip?: string
+          zip?: string | null
         }
         Relationships: [
           {
@@ -475,12 +484,104 @@ export type Database = {
           },
         ]
       }
+      sales: {
+        Row: {
+          address: string | null
+          building_class: string | null
+          county_fips: string
+          data_source: string
+          external_apn: string
+          id: string
+          ingested_at: string
+          land_sqft: number | null
+          lat: number | null
+          living_sqft: number | null
+          lng: number | null
+          parcel_id: string | null
+          sale_price: number
+          sold_at: string
+          source_url: string | null
+          year_built: number | null
+        }
+        Insert: {
+          address?: string | null
+          building_class?: string | null
+          county_fips: string
+          data_source?: string
+          external_apn: string
+          id?: string
+          ingested_at?: string
+          land_sqft?: number | null
+          lat?: number | null
+          living_sqft?: number | null
+          lng?: number | null
+          parcel_id?: string | null
+          sale_price: number
+          sold_at: string
+          source_url?: string | null
+          year_built?: number | null
+        }
+        Update: {
+          address?: string | null
+          building_class?: string | null
+          county_fips?: string
+          data_source?: string
+          external_apn?: string
+          id?: string
+          ingested_at?: string
+          land_sqft?: number | null
+          lat?: number | null
+          living_sqft?: number | null
+          lng?: number | null
+          parcel_id?: string | null
+          sale_price?: number
+          sold_at?: string
+          source_url?: string | null
+          year_built?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_county_fips_fkey"
+            columns: ["county_fips"]
+            isOneToOne: false
+            referencedRelation: "counties"
+            referencedColumns: ["fips"]
+          },
+          {
+            foreignKeyName: "sales_parcel_id_fkey"
+            columns: ["parcel_id"]
+            isOneToOne: false
+            referencedRelation: "parcels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      pick_comps: {
+        Args: {
+          max_km?: number
+          max_results?: number
+          months_back?: number
+          sqft_tolerance?: number
+          subject_county: string
+          subject_lat: number
+          subject_lng: number
+          subject_sqft: number
+        }
+        Returns: {
+          address: string
+          distance_km: number
+          living_sqft: number
+          ppsf: number
+          sale_id: string
+          sale_price: number
+          sold_at: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
