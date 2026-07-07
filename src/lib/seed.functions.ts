@@ -25,6 +25,7 @@ const COUNTIES = [
   { fips: "12086", state: "FL", name: "Miami-Dade County", lat: 25.7617, lng: -80.1918, cities: ["Miami", "Hialeah", "Miami Beach", "Homestead", "Miami Gardens", "Coral Gables"] },
   { fips: "12011", state: "FL", name: "Broward County", lat: 26.1224, lng: -80.1373, cities: ["Fort Lauderdale", "Hollywood", "Pembroke Pines", "Coral Springs", "Miramar", "Sunrise"] },
 ];
+const FIXTURE = "FIXTURE";
 
 const STREETS = ["Oak", "Maple", "Cedar", "Sunset", "Ocean", "Palm", "Magnolia", "Pine", "Willow", "Ridge", "Valley", "Hillcrest", "Park", "Lincoln", "Jefferson"];
 const SUFFIX = ["St", "Ave", "Blvd", "Dr", "Ln", "Way", "Ct"];
