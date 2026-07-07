@@ -178,22 +178,34 @@ export const ingestCounty = createServerFn({ method: "POST" })
       }
     }
 
-    // Upsert parcels — key on (county_fips, apn) via delete-then-insert per county
+    // Upsert parcels on (county_fips, apn). NEVER wipe LIVE data; append/refresh.
     let inserted = 0;
     if (parcels.length) {
-      await supabase.from("parcels").delete().eq("county_fips", src.fips);
+      const url = src.parcels?.url ?? null;
+      const stamped = parcels.map((p) => ({
+        ...p,
+        data_source: "LIVE",
+        source_url: url,
+        last_seen_at: new Date().toISOString(),
+      }));
       const CHUNK = 200;
-      for (let i = 0; i < parcels.length; i += CHUNK) {
-        const chunk = parcels.slice(i, i + CHUNK);
-        const { error } = await supabase.from("parcels").insert(chunk);
+      for (let i = 0; i < stamped.length; i += CHUNK) {
+        const chunk = stamped.slice(i, i + CHUNK);
+        const { error } = await supabase
+          .from("parcels")
+          .upsert(chunk, { onConflict: "county_fips,apn" });
         if (error) {
           status = "PARTIAL";
-          note = `Insert error: ${error.message}`;
+          note = `Upsert error: ${error.message}`;
           break;
         }
         inserted += chunk.length;
       }
-      await supabase.from("counties").update({ parcel_count: inserted }).eq("fips", src.fips);
+      const { count } = await supabase
+        .from("parcels")
+        .select("id", { count: "exact", head: true })
+        .eq("county_fips", src.fips);
+      await supabase.from("counties").update({ parcel_count: count ?? 0 }).eq("fips", src.fips);
     }
 
     await supabase.from("ingestion_runs").insert({
