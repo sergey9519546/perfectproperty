@@ -14,7 +14,446 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      counties: {
+        Row: {
+          center_lat: number
+          center_lng: number
+          coverage_pct: number
+          created_at: string
+          fips: string
+          last_ingested_at: string | null
+          name: string
+          parcel_count: number
+          state: string
+        }
+        Insert: {
+          center_lat: number
+          center_lng: number
+          coverage_pct?: number
+          created_at?: string
+          fips: string
+          last_ingested_at?: string | null
+          name: string
+          parcel_count?: number
+          state: string
+        }
+        Update: {
+          center_lat?: number
+          center_lng?: number
+          coverage_pct?: number
+          created_at?: string
+          fips?: string
+          last_ingested_at?: string | null
+          name?: string
+          parcel_count?: number
+          state?: string
+        }
+        Relationships: []
+      }
+      deeds: {
+        Row: {
+          buyer: string | null
+          created_at: string
+          deed_type: string
+          id: string
+          loan_amount: number | null
+          parcel_id: string
+          recorded_at: string
+          sale_price: number | null
+          seller: string | null
+        }
+        Insert: {
+          buyer?: string | null
+          created_at?: string
+          deed_type: string
+          id?: string
+          loan_amount?: number | null
+          parcel_id: string
+          recorded_at: string
+          sale_price?: number | null
+          seller?: string | null
+        }
+        Update: {
+          buyer?: string | null
+          created_at?: string
+          deed_type?: string
+          id?: string
+          loan_amount?: number | null
+          parcel_id?: string
+          recorded_at?: string
+          sale_price?: number | null
+          seller?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deeds_parcel_id_fkey"
+            columns: ["parcel_id"]
+            isOneToOne: false
+            referencedRelation: "parcels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distress_events: {
+        Row: {
+          amount: number | null
+          auction_date: string | null
+          created_at: string
+          details: Json | null
+          event_date: string
+          event_type: string
+          id: string
+          parcel_id: string
+          severity: number
+        }
+        Insert: {
+          amount?: number | null
+          auction_date?: string | null
+          created_at?: string
+          details?: Json | null
+          event_date: string
+          event_type: string
+          id?: string
+          parcel_id: string
+          severity?: number
+        }
+        Update: {
+          amount?: number | null
+          auction_date?: string | null
+          created_at?: string
+          details?: Json | null
+          event_date?: string
+          event_type?: string
+          id?: string
+          parcel_id?: string
+          severity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distress_events_parcel_id_fkey"
+            columns: ["parcel_id"]
+            isOneToOne: false
+            referencedRelation: "parcels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ingestion_runs: {
+        Row: {
+          county_fips: string
+          finished_at: string | null
+          id: string
+          notes: string | null
+          rows_ingested: number
+          source: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          county_fips: string
+          finished_at?: string | null
+          id?: string
+          notes?: string | null
+          rows_ingested?: number
+          source: string
+          started_at?: string
+          status: string
+        }
+        Update: {
+          county_fips?: string
+          finished_at?: string | null
+          id?: string
+          notes?: string | null
+          rows_ingested?: number
+          source?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ingestion_runs_county_fips_fkey"
+            columns: ["county_fips"]
+            isOneToOne: false
+            referencedRelation: "counties"
+            referencedColumns: ["fips"]
+          },
+        ]
+      }
+      listings: {
+        Row: {
+          created_at: string
+          dom: number | null
+          id: string
+          list_price: number
+          listed_at: string
+          original_price: number | null
+          parcel_id: string
+          price_cuts: number | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          dom?: number | null
+          id?: string
+          list_price: number
+          listed_at: string
+          original_price?: number | null
+          parcel_id: string
+          price_cuts?: number | null
+          status: string
+        }
+        Update: {
+          created_at?: string
+          dom?: number | null
+          id?: string
+          list_price?: number
+          listed_at?: string
+          original_price?: number | null
+          parcel_id?: string
+          price_cuts?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listings_parcel_id_fkey"
+            columns: ["parcel_id"]
+            isOneToOne: false
+            referencedRelation: "parcels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parcel_scores: {
+        Row: {
+          acquisition_probability: number
+          as_is_value: number
+          carry_cost: number
+          computed_at: string
+          confidence_grade: string
+          cosmetic_arv: number
+          exit_confidence: number
+          exit_days: number
+          expanded_arv: number
+          full_reno_arv: number
+          gross_profit: number
+          modeled_offer: number
+          parcel_id: string
+          perfect_score: number
+          recommended_scope: string
+          reno_cost: number
+          ring: number
+          risk_adjusted_profit: number
+          selling_cost: number
+          skeptic_flags: Json
+        }
+        Insert: {
+          acquisition_probability: number
+          as_is_value: number
+          carry_cost: number
+          computed_at?: string
+          confidence_grade: string
+          cosmetic_arv: number
+          exit_confidence: number
+          exit_days: number
+          expanded_arv: number
+          full_reno_arv: number
+          gross_profit: number
+          modeled_offer: number
+          parcel_id: string
+          perfect_score: number
+          recommended_scope: string
+          reno_cost: number
+          ring?: number
+          risk_adjusted_profit: number
+          selling_cost: number
+          skeptic_flags?: Json
+        }
+        Update: {
+          acquisition_probability?: number
+          as_is_value?: number
+          carry_cost?: number
+          computed_at?: string
+          confidence_grade?: string
+          cosmetic_arv?: number
+          exit_confidence?: number
+          exit_days?: number
+          expanded_arv?: number
+          full_reno_arv?: number
+          gross_profit?: number
+          modeled_offer?: number
+          parcel_id?: string
+          perfect_score?: number
+          recommended_scope?: string
+          reno_cost?: number
+          ring?: number
+          risk_adjusted_profit?: number
+          selling_cost?: number
+          skeptic_flags?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parcel_scores_parcel_id_fkey"
+            columns: ["parcel_id"]
+            isOneToOne: true
+            referencedRelation: "parcels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parcels: {
+        Row: {
+          address: string
+          apn: string
+          assessed_value: number | null
+          bathrooms: number | null
+          bedrooms: number | null
+          city: string
+          condition_grade: string | null
+          county_fips: string
+          created_at: string
+          estimated_equity: number | null
+          flood_zone: string | null
+          id: string
+          is_listed: boolean
+          is_vacant: boolean
+          lat: number
+          living_sqft: number | null
+          lng: number
+          lot_sqft: number | null
+          owner_is_absentee: boolean
+          owner_is_corporate: boolean
+          owner_name: string | null
+          owner_since: string | null
+          property_type: string
+          school_score: number | null
+          state: string
+          stories: number | null
+          updated_at: string
+          year_built: number | null
+          zip: string
+        }
+        Insert: {
+          address: string
+          apn: string
+          assessed_value?: number | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          city: string
+          condition_grade?: string | null
+          county_fips: string
+          created_at?: string
+          estimated_equity?: number | null
+          flood_zone?: string | null
+          id?: string
+          is_listed?: boolean
+          is_vacant?: boolean
+          lat: number
+          living_sqft?: number | null
+          lng: number
+          lot_sqft?: number | null
+          owner_is_absentee?: boolean
+          owner_is_corporate?: boolean
+          owner_name?: string | null
+          owner_since?: string | null
+          property_type?: string
+          school_score?: number | null
+          state: string
+          stories?: number | null
+          updated_at?: string
+          year_built?: number | null
+          zip: string
+        }
+        Update: {
+          address?: string
+          apn?: string
+          assessed_value?: number | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          city?: string
+          condition_grade?: string | null
+          county_fips?: string
+          created_at?: string
+          estimated_equity?: number | null
+          flood_zone?: string | null
+          id?: string
+          is_listed?: boolean
+          is_vacant?: boolean
+          lat?: number
+          living_sqft?: number | null
+          lng?: number
+          lot_sqft?: number | null
+          owner_is_absentee?: boolean
+          owner_is_corporate?: boolean
+          owner_name?: string | null
+          owner_since?: string | null
+          property_type?: string
+          school_score?: number | null
+          state?: string
+          stories?: number | null
+          updated_at?: string
+          year_built?: number | null
+          zip?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parcels_county_fips_fkey"
+            columns: ["county_fips"]
+            isOneToOne: false
+            referencedRelation: "counties"
+            referencedColumns: ["fips"]
+          },
+        ]
+      }
+      prediction_outcomes: {
+        Row: {
+          actual_profit: number | null
+          actual_sale_price: number | null
+          actual_sold_at: string | null
+          created_at: string
+          error_pct: number | null
+          id: string
+          outcome: string | null
+          parcel_id: string
+          predicted_arv: number
+          predicted_at: string
+          predicted_profit: number
+        }
+        Insert: {
+          actual_profit?: number | null
+          actual_sale_price?: number | null
+          actual_sold_at?: string | null
+          created_at?: string
+          error_pct?: number | null
+          id?: string
+          outcome?: string | null
+          parcel_id: string
+          predicted_arv: number
+          predicted_at: string
+          predicted_profit: number
+        }
+        Update: {
+          actual_profit?: number | null
+          actual_sale_price?: number | null
+          actual_sold_at?: string | null
+          created_at?: string
+          error_pct?: number | null
+          id?: string
+          outcome?: string | null
+          parcel_id?: string
+          predicted_arv?: number
+          predicted_at?: string
+          predicted_profit?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prediction_outcomes_parcel_id_fkey"
+            columns: ["parcel_id"]
+            isOneToOne: false
+            referencedRelation: "parcels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
