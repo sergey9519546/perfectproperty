@@ -68,9 +68,15 @@ function AdminPage() {
     onSuccess: () => { toast.success("Recipe saved"); setWizard(null); qc.invalidateQueries({ queryKey: ["recipes"] }); },
     onError: (e: any) => toast.error(e.message ?? "Save failed"),
   });
+  const [runReport, setRunReport] = useState<{ recipe_id: string; recipe_name: string; result: any } | null>(null);
   const runRec = useMutation({
-    mutationFn: (id: string) => runRecipeFn({ data: { id, max_rows: 500 } }),
-    onSuccess: (r: any) => { toast.success(`Recipe: ${r.rows} rows extracted · ${r.note}`); qc.invalidateQueries(); },
+    mutationFn: (v: { id: string; name: string }) =>
+      runRecipeFn({ data: { id: v.id, max_rows: 500 } }).then((r) => ({ ...v, result: r })),
+    onSuccess: (r: any) => {
+      setRunReport({ recipe_id: r.id, recipe_name: r.name, result: r.result });
+      toast.success(`${r.name}: ${r.result.note}`);
+      qc.invalidateQueries();
+    },
     onError: (e: any) => toast.error(e.message ?? "Run failed"),
   });
   const delRec = useMutation({
