@@ -681,6 +681,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      match_parcel: {
+        Args: {
+          _address: string
+          _apn: string
+          _city?: string
+          _county_fips: string
+        }
+        Returns: string
+      }
+      normalize_address: { Args: { _addr: string }; Returns: string }
+      normalize_address_full: { Args: { _addr: string }; Returns: string }
       pick_comps: {
         Args: {
           max_km?: number
