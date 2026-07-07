@@ -7,9 +7,10 @@ import { seedFixtures, runUnderwrite } from "@/lib/seed.functions";
 import { ingestCounty, scoreAll, listSources } from "@/lib/ingest.functions";
 import { ingestAllNycSales, salesSummary } from "@/lib/sales.functions";
 import { probeUrl, listProbes } from "@/lib/probe.functions";
+import { discoverSchema, saveRecipe, listRecipes, runRecipe, deleteRecipe } from "@/lib/recipes.functions";
 import { PageHead } from "./deals";
 import { toast } from "sonner";
-import { Database, Zap, Globe, ScrollText, Search } from "lucide-react";
+import { Database, Zap, Globe, ScrollText, Search, Wand2, Play, Trash2, Copy } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
