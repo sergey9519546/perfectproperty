@@ -107,6 +107,7 @@ export const seedFixtures = createServerFn({ method: "POST" }).handler(async () 
         owner_since: `${ownerSinceYear}-0${1 + Math.floor(rng() * 9)}-15`,
         assessed_value: assessed, estimated_equity: equity,
         is_listed: listed, is_vacant: vacant,
+        data_source: FIXTURE, source_url: null,
       });
 
       // Deeds — 1..3 historical
