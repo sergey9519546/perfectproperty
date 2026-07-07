@@ -158,12 +158,26 @@ export const ingestCounty = createServerFn({ method: "POST" })
     const supabase = await adminClient();
     const started = new Date().toISOString();
 
-    // Ensure county row
-    await supabase.from("counties").upsert({
-      fips: src.fips, state: src.state, name: src.name,
+    // Ensure county row(s). For NYC, ensure all 5 boroughs because the PLUTO
+    // normalizer splits parcels across per-borough FIPS.
+    const countyRows = [{ fips: src.fips, state: src.state, name: src.name,
       center_lat: src.center[0], center_lng: src.center[1],
-      last_ingested_at: started, coverage_pct: 100, parcel_count: 0,
-    });
+      last_ingested_at: started, coverage_pct: 100, parcel_count: 0 }];
+    if (src.parcels?.address_builder === "nyc") {
+      const NYC = [
+        { fips: "36061", name: "NYC · Manhattan" },
+        { fips: "36005", name: "NYC · Bronx" },
+        { fips: "36047", name: "NYC · Brooklyn" },
+        { fips: "36081", name: "NYC · Queens" },
+        { fips: "36085", name: "NYC · Staten Island" },
+      ];
+      for (const c of NYC) countyRows.push({
+        fips: c.fips, state: "NY", name: c.name,
+        center_lat: 40.7128, center_lng: -74.006,
+        last_ingested_at: started, coverage_pct: 100, parcel_count: 0,
+      });
+    }
+    for (const row of countyRows) await supabase.from("counties").upsert(row, { onConflict: "fips" });
 
     let parcels: any[] = [];
     let status: "OK" | "PARTIAL" | "FAIL" = "OK";
@@ -191,12 +205,15 @@ export const ingestCounty = createServerFn({ method: "POST" })
     let inserted = 0;
     if (parcels.length) {
       const url = src.parcels?.url ?? null;
-      const stamped = parcels.map((p) => ({
-        ...p,
-        data_source: "LIVE",
-        source_url: url,
-        last_seen_at: new Date().toISOString(),
-      }));
+      // De-dupe on the upsert key so ON CONFLICT DO UPDATE doesn't hit the same row twice.
+      const seen = new Set<string>();
+      const stamped = parcels
+        .map((p) => ({ ...p, data_source: "LIVE", source_url: url, last_seen_at: new Date().toISOString() }))
+        .filter((p) => {
+          const k = `${p.county_fips}|${p.apn}`;
+          if (seen.has(k)) return false;
+          seen.add(k); return true;
+        });
       const CHUNK = 200;
       for (let i = 0; i < stamped.length; i += CHUNK) {
         const chunk = stamped.slice(i, i + CHUNK);
@@ -210,11 +227,14 @@ export const ingestCounty = createServerFn({ method: "POST" })
         }
         inserted += chunk.length;
       }
-      const { count } = await supabase
-        .from("parcels")
-        .select("id", { count: "exact", head: true })
-        .eq("county_fips", src.fips);
-      await supabase.from("counties").update({ parcel_count: count ?? 0 }).eq("fips", src.fips);
+      // Refresh parcel_count on every county touched.
+      const touched = Array.from(new Set(stamped.map((p) => p.county_fips)));
+      for (const fips of touched) {
+        const { count } = await supabase
+          .from("parcels").select("id", { count: "exact", head: true })
+          .eq("county_fips", fips);
+        await supabase.from("counties").update({ parcel_count: count ?? 0 }).eq("fips", fips);
+      }
     }
 
     await supabase.from("ingestion_runs").insert({
