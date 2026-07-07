@@ -34,6 +34,18 @@ function AdminPage() {
   const cov = useQuery({ queryKey: ["coverage"], queryFn: () => covFn() });
   const sources = useQuery({ queryKey: ["sources"], queryFn: () => sourcesFn() });
   const sales = useQuery({ queryKey: ["sales-summary"], queryFn: () => salesSumFn() });
+  const probeFn = useServerFn(probeUrl);
+  const probesFn = useServerFn(listProbes);
+  const probes = useQuery({ queryKey: ["probes"], queryFn: () => probesFn() });
+  const [probeInput, setProbeInput] = useState("");
+  const [probeTier, setProbeTier] = useState<"auto" | "plain" | "zyte" | "browser">("auto");
+  const [probeResult, setProbeResult] = useState<any>(null);
+  const probe = useMutation({
+    mutationFn: (v: { url: string; tier: any }) => probeFn({ data: { url: v.url, tier: v.tier, force: false, ttl_hours: 24 } }),
+    onSuccess: (r) => { setProbeResult(r); toast.success(`Probe ${r.status} · ${r.tier} · ${(r.bytes/1024).toFixed(1)}KB`); qc.invalidateQueries({ queryKey: ["probes"] }); },
+    onError: (e: any) => toast.error(e.message ?? "Probe failed"),
+  });
+
 
 
   const seed = useMutation({
