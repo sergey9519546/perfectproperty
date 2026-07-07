@@ -92,8 +92,9 @@ function DealsPage() {
 export function PageHead({ title, sub }: { title: string; sub: string }) {
   return (
     <div>
-      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-      <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{sub}</p>
+      <div className="eyebrow mb-2">Live deal desk</div>
+      <h1 className="display text-4xl md:text-5xl leading-[1.05]">{title}</h1>
+      <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{sub}</p>
     </div>
   );
 }
