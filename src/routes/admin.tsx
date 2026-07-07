@@ -689,7 +689,7 @@ function AdminPage() {
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: React.ReactNode; tone?: "warn" }) {
+function Stat({ label, value, tone }: { label: string; value: any; tone?: "warn" }) {
   return (
     <div>
       <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{label}</div>
