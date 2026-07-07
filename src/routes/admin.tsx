@@ -7,9 +7,10 @@ import { seedFixtures, runUnderwrite } from "@/lib/seed.functions";
 import { ingestCounty, scoreAll, listSources } from "@/lib/ingest.functions";
 import { ingestAllNycSales, salesSummary } from "@/lib/sales.functions";
 import { probeUrl, listProbes } from "@/lib/probe.functions";
+import { discoverSchema, saveRecipe, listRecipes, runRecipe, deleteRecipe } from "@/lib/recipes.functions";
 import { PageHead } from "./deals";
 import { toast } from "sonner";
-import { Database, Zap, Globe, ScrollText, Search } from "lucide-react";
+import { Database, Zap, Globe, ScrollText, Search, Wand2, Play, Trash2, Copy } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -45,6 +46,38 @@ function AdminPage() {
     onSuccess: (r) => { setProbeResult(r); toast.success(`Probe ${r.status} · ${r.tier} · ${(r.bytes/1024).toFixed(1)}KB`); qc.invalidateQueries({ queryKey: ["probes"] }); },
     onError: (e: any) => toast.error(e.message ?? "Probe failed"),
   });
+
+  // ---- Recipe wizard ----
+  const discoverFn = useServerFn(discoverSchema);
+  const saveRecipeFn = useServerFn(saveRecipe);
+  const listRecipesFn = useServerFn(listRecipes);
+  const runRecipeFn = useServerFn(runRecipe);
+  const deleteRecipeFn = useServerFn(deleteRecipe);
+  const recipes = useQuery({ queryKey: ["recipes"], queryFn: () => listRecipesFn() });
+  const [wizard, setWizard] = useState<null | { url: string; candidates: any[]; base_url: string; selectedIdx: number; name: string; target: "distress_events" | "sales" | "parcels" }>(null);
+  const discover = useMutation({
+    mutationFn: (url: string) => discoverFn({ data: { url } }),
+    onSuccess: (r, url) => {
+      if (!r.candidates.length) { toast.error("No repeating containers found — try a listing page"); return; }
+      setWizard({ url, candidates: r.candidates, base_url: r.base_url, selectedIdx: 0, name: `Recipe ${new Date().toISOString().slice(0,10)}`, target: "distress_events" });
+    },
+    onError: (e: any) => toast.error(e.message ?? "Discovery failed"),
+  });
+  const saveRec = useMutation({
+    mutationFn: (payload: any) => saveRecipeFn({ data: payload }),
+    onSuccess: () => { toast.success("Recipe saved"); setWizard(null); qc.invalidateQueries({ queryKey: ["recipes"] }); },
+    onError: (e: any) => toast.error(e.message ?? "Save failed"),
+  });
+  const runRec = useMutation({
+    mutationFn: (id: string) => runRecipeFn({ data: { id, max_rows: 500 } }),
+    onSuccess: (r: any) => { toast.success(`Recipe: ${r.rows} rows extracted · ${r.note}`); qc.invalidateQueries(); },
+    onError: (e: any) => toast.error(e.message ?? "Run failed"),
+  });
+  const delRec = useMutation({
+    mutationFn: (id: string) => deleteRecipeFn({ data: { id } }),
+    onSuccess: () => { toast.success("Recipe deleted"); qc.invalidateQueries({ queryKey: ["recipes"] }); },
+  });
+  const webhookUrl = typeof window !== "undefined" ? `${window.location.origin}/api/public/scrapy-ingest` : "";
 
 
 
@@ -206,6 +239,14 @@ function AdminPage() {
                 <span className="text-muted-foreground">HTTP: <span className="text-foreground">{probeResult.http_status}</span></span>
                 <span className="text-muted-foreground">{(probeResult.bytes / 1024).toFixed(1)} KB</span>
                 <span className="text-muted-foreground">{probeResult.duration_ms} ms</span>
+                <button
+                  onClick={() => discover.mutate(probeInput || probeResult.final_url)}
+                  disabled={discover.isPending}
+                  className="ml-auto inline-flex items-center gap-1 rounded-md bg-opportunity px-2 py-1 text-[11px] font-medium text-black disabled:opacity-50"
+                >
+                  <Wand2 className="h-3 w-3" />
+                  {discover.isPending ? "Discovering…" : "Discover schema"}
+                </button>
               </div>
               {probeResult.title && <div className="mt-2 font-medium">{probeResult.title}</div>}
               <div className="mt-1 truncate text-[11px] text-muted-foreground">{probeResult.final_url}</div>
@@ -267,6 +308,157 @@ function AdminPage() {
           )}
         </div>
       </section>
+
+      {wizard && (() => {
+        const cand = wizard.candidates[wizard.selectedIdx];
+        return (
+          <section className="mt-8">
+            <div className="rounded-lg border border-opportunity/50 bg-surface p-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-[11px] uppercase tracking-widest text-opportunity">Schema wizard · approve extraction</h2>
+                <button onClick={() => setWizard(null)} className="text-[11px] text-muted-foreground hover:text-foreground">Close ✕</button>
+              </div>
+              <div className="mt-1 truncate text-[11px] text-muted-foreground">{wizard.url}</div>
+
+              <div className="mt-3">
+                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Candidate containers ({wizard.candidates.length})</div>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {wizard.candidates.map((c: any, i: number) => (
+                    <button key={i} onClick={() => setWizard({ ...wizard, selectedIdx: i })}
+                      className={`rounded-md border px-2 py-1 text-[11px] ${i === wizard.selectedIdx ? "border-opportunity bg-opportunity/10" : "border-border bg-surface-2"}`}>
+                      <span className="font-mono">{c.container_selector}</span>
+                      <span className="ml-2 text-muted-foreground">×{c.sample_count} · s{c.score}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Fields ({cand.fields.length})</div>
+                  <div className="mt-1 max-h-72 overflow-y-auto rounded border border-border bg-surface-2 p-2">
+                    {cand.fields.map((f: any, i: number) => (
+                      <div key={i} className="flex items-start gap-2 border-b border-border/50 py-1 text-[11px] last:border-0">
+                        <input
+                          value={f.name}
+                          onChange={(e) => { const nc = { ...cand }; nc.fields = [...cand.fields]; nc.fields[i] = { ...f, name: e.target.value }; const cs = [...wizard.candidates]; cs[wizard.selectedIdx] = nc; setWizard({ ...wizard, candidates: cs }); }}
+                          className="w-28 rounded border border-border bg-background px-1 py-0.5 font-mono"
+                        />
+                        <select
+                          value={f.type}
+                          onChange={(e) => { const nc = { ...cand }; nc.fields = [...cand.fields]; nc.fields[i] = { ...f, type: e.target.value }; const cs = [...wizard.candidates]; cs[wizard.selectedIdx] = nc; setWizard({ ...wizard, candidates: cs }); }}
+                          className="rounded border border-border bg-background px-1 py-0.5"
+                        >
+                          <option value="text">text</option><option value="date">date</option><option value="money">money</option><option value="url">url</option><option value="number">number</option>
+                        </select>
+                        <div className="flex-1 truncate text-muted-foreground" title={f.sample}>{f.sample}</div>
+                        <button onClick={() => { const nc = { ...cand }; nc.fields = cand.fields.filter((_: any, j: number) => j !== i); const cs = [...wizard.candidates]; cs[wizard.selectedIdx] = nc; setWizard({ ...wizard, candidates: cs }); }}
+                          className="text-skeptic hover:text-skeptic/70">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Sample row</div>
+                  <pre className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap rounded border border-border bg-surface-2 p-2 text-[10px]">{cand.sample_row_text}</pre>
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <input value={wizard.name} onChange={(e) => setWizard({ ...wizard, name: e.target.value })}
+                  className="w-64 rounded-md border border-border bg-background px-2 py-1 text-[12px]" placeholder="Recipe name" />
+                <select value={wizard.target} onChange={(e) => setWizard({ ...wizard, target: e.target.value as any })}
+                  className="rounded-md border border-border bg-background px-2 py-1 text-[12px]">
+                  <option value="distress_events">→ distress_events</option>
+                  <option value="sales">→ sales</option>
+                  <option value="parcels">→ parcels</option>
+                </select>
+                <button
+                  onClick={() => saveRec.mutate({
+                    name: wizard.name, target_table: wizard.target, source_url: wizard.url,
+                    container_selector: cand.container_selector, fields: cand.fields,
+                  })}
+                  disabled={saveRec.isPending}
+                  className="rounded-md bg-primary px-3 py-1 text-[12px] font-medium text-primary-foreground disabled:opacity-50"
+                >
+                  {saveRec.isPending ? "Saving…" : "Save recipe"}
+                </button>
+              </div>
+            </div>
+          </section>
+        );
+      })()}
+
+      <section className="mt-8">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[11px] uppercase tracking-widest text-muted-foreground">Saved recipes</h2>
+          <span className="text-[10px] uppercase tracking-widest text-muted-foreground">{recipes.data?.length ?? 0} total</span>
+        </div>
+        <div className="mt-2 overflow-hidden rounded-lg border border-border bg-surface">
+          <table className="w-full text-[12px]">
+            <thead className="bg-surface-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 text-left">Name</th>
+                <th className="px-3 py-2 text-left">Target</th>
+                <th className="px-3 py-2 text-left">Source URL</th>
+                <th className="px-3 py-2 text-left">Selector</th>
+                <th className="px-3 py-2 text-right">Fields</th>
+                <th className="px-3 py-2 text-right">Last run</th>
+                <th className="px-3 py-2 text-right"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {(recipes.data ?? []).map((r: any) => (
+                <tr key={r.id} className="border-t border-border">
+                  <td className="px-3 py-2 font-medium">{r.name}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{r.target_table}</td>
+                  <td className="max-w-[280px] truncate px-3 py-2 text-muted-foreground" title={r.source_url}>{r.source_url}</td>
+                  <td className="max-w-[220px] truncate px-3 py-2 font-mono text-[10px] text-muted-foreground" title={r.container_selector}>{r.container_selector}</td>
+                  <td className="num px-3 py-2 text-right">{(r.fields ?? []).length}</td>
+                  <td className="num px-3 py-2 text-right text-muted-foreground">
+                    {r.last_run_at ? `${r.last_run_rows ?? 0} · ${new Date(r.last_run_at).toLocaleDateString()}` : "—"}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <button onClick={() => runRec.mutate(r.id)} disabled={runRec.isPending} className="mr-1 inline-flex items-center gap-1 rounded bg-primary/90 px-2 py-1 text-[11px] text-primary-foreground disabled:opacity-50">
+                      <Play className="h-3 w-3" /> Run
+                    </button>
+                    <button onClick={() => confirm(`Delete ${r.name}?`) && delRec.mutate(r.id)} className="rounded border border-border p-1 text-skeptic hover:bg-skeptic/10">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {(recipes.data?.length ?? 0) === 0 && (
+                <tr><td colSpan={7} className="px-3 py-6 text-center text-[11px] text-muted-foreground">No recipes yet — probe a URL and click "Discover schema".</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="text-[11px] uppercase tracking-widest text-muted-foreground">Scrapy Cloud ingest webhook</h2>
+        <div className="mt-2 rounded-lg border border-border bg-surface p-3">
+          <div className="text-[12px] text-muted-foreground">
+            External Scrapy spiders (e.g. generated by Zyte's <code>/scrape</code> plugin) POST items here.
+            Signed with HMAC-SHA256(<code>SCRAPY_INGEST_SECRET</code>, raw body) in the <code>x-signature</code> header.
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <code className="flex-1 truncate rounded border border-border bg-background px-2 py-1 text-[11px]">{webhookUrl}</code>
+            <button onClick={() => { navigator.clipboard.writeText(webhookUrl); toast.success("Webhook URL copied"); }}
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-surface-2 px-2 py-1 text-[11px] hover:bg-surface">
+              <Copy className="h-3 w-3" /> Copy
+            </button>
+          </div>
+          <div className="mt-2 text-[11px] text-muted-foreground">
+            Full drop-in Scrapy pipeline in <code>docs/scrapy.md</code>. Recipes accepted:
+            <span className="ml-1 font-mono text-foreground">foreclosure · probate · code_violation · sale · auction · parcel</span>
+          </div>
+        </div>
+      </section>
+
+
 
 
 
