@@ -1,0 +1,12 @@
+ALTER TABLE public.parcels
+  ADD COLUMN IF NOT EXISTS data_source TEXT NOT NULL DEFAULT 'FIXTURE',
+  ADD COLUMN IF NOT EXISTS source_url TEXT,
+  ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now();
+
+ALTER TABLE public.deeds ADD COLUMN IF NOT EXISTS data_source TEXT NOT NULL DEFAULT 'FIXTURE';
+ALTER TABLE public.distress_events ADD COLUMN IF NOT EXISTS data_source TEXT NOT NULL DEFAULT 'FIXTURE';
+ALTER TABLE public.listings ADD COLUMN IF NOT EXISTS data_source TEXT NOT NULL DEFAULT 'FIXTURE';
+ALTER TABLE public.parcel_scores ADD COLUMN IF NOT EXISTS data_source TEXT NOT NULL DEFAULT 'FIXTURE';
+
+CREATE INDEX IF NOT EXISTS parcels_source_idx ON public.parcels(data_source);
+CREATE INDEX IF NOT EXISTS scores_source_idx ON public.parcel_scores(data_source);
