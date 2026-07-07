@@ -289,11 +289,20 @@ export type Database = {
           confidence_grade: string
           cosmetic_arv: number
           data_source: string
+          drift_used_monthly: number | null
+          exceedance_rank: number | null
           exit_confidence: number
           exit_days: number
           expanded_arv: number
           full_reno_arv: number
+          governor_kappa: number | null
           gross_profit: number
+          mc_cvar_loss: number | null
+          mc_dqr: number | null
+          mc_p_loss: number | null
+          mc_profit_p5: number | null
+          mc_profit_p50: number | null
+          mc_profit_p95: number | null
           modeled_offer: number
           parcel_id: string
           perfect_score: number
@@ -302,6 +311,7 @@ export type Database = {
           ring: number
           risk_adjusted_profit: number
           selling_cost: number
+          sigma_arv_log: number | null
           skeptic_flags: Json
         }
         Insert: {
@@ -315,11 +325,20 @@ export type Database = {
           confidence_grade: string
           cosmetic_arv: number
           data_source?: string
+          drift_used_monthly?: number | null
+          exceedance_rank?: number | null
           exit_confidence: number
           exit_days: number
           expanded_arv: number
           full_reno_arv: number
+          governor_kappa?: number | null
           gross_profit: number
+          mc_cvar_loss?: number | null
+          mc_dqr?: number | null
+          mc_p_loss?: number | null
+          mc_profit_p5?: number | null
+          mc_profit_p50?: number | null
+          mc_profit_p95?: number | null
           modeled_offer: number
           parcel_id: string
           perfect_score: number
@@ -328,6 +347,7 @@ export type Database = {
           ring?: number
           risk_adjusted_profit: number
           selling_cost: number
+          sigma_arv_log?: number | null
           skeptic_flags?: Json
         }
         Update: {
@@ -341,11 +361,20 @@ export type Database = {
           confidence_grade?: string
           cosmetic_arv?: number
           data_source?: string
+          drift_used_monthly?: number | null
+          exceedance_rank?: number | null
           exit_confidence?: number
           exit_days?: number
           expanded_arv?: number
           full_reno_arv?: number
+          governor_kappa?: number | null
           gross_profit?: number
+          mc_cvar_loss?: number | null
+          mc_dqr?: number | null
+          mc_p_loss?: number | null
+          mc_profit_p5?: number | null
+          mc_profit_p50?: number | null
+          mc_profit_p95?: number | null
           modeled_offer?: number
           parcel_id?: string
           perfect_score?: number
@@ -354,6 +383,7 @@ export type Database = {
           ring?: number
           risk_adjusted_profit?: number
           selling_cost?: number
+          sigma_arv_log?: number | null
           skeptic_flags?: Json
         }
         Relationships: [
