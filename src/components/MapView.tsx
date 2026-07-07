@@ -18,25 +18,17 @@ interface Props {
   className?: string;
 }
 
-// Resolve token colors from the running document so map layers stay in sync
-// with the design system. Falls back to reasonable defaults for SSR.
-function cssVar(name: string, fallback: string): string {
-  if (typeof window === "undefined") return fallback;
-  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return v || fallback;
-}
-
 const RING_COLORS: Record<number, string> = {
-  1: "oklch(0.74 0.10 220)", // listed / open — steel blue token
-  2: "oklch(0.65 0.13 300)", // shadow — violet token
-  3: "oklch(0.78 0.11 190)", // prophecy — pale teal token
+  1: "#7fb3ff",   // listed / open — steel blue
+  2: "#a48bff",   // shadow — violet
+  3: "#5ecfd7",   // prophecy — cyan
 };
 
 function tierColor(score: number): string {
-  if (score >= 80) return cssVar("--tier-exceptional", "oklch(0.86 0.16 108)");
-  if (score >= 65) return cssVar("--tier-strong", "oklch(0.82 0.15 165)");
-  if (score >= 50) return cssVar("--tier-viable", "oklch(0.78 0.15 62)");
-  return cssVar("--tier-watch", "oklch(0.60 0.030 178)");
+  if (score >= 80) return "#f5b544"; // amber — exceptional
+  if (score >= 65) return "#4ad19a"; // emerald — strong
+  if (score >= 50) return "#7fb3ff"; // steel — viable
+  return "#5a6272";
 }
 
 export function MapView({ parcels, center = [-98, 36], zoom = 4, onSelect, selectedId, className }: Props) {
