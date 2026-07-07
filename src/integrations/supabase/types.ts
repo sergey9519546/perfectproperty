@@ -690,6 +690,18 @@ export type Database = {
         }
         Returns: string
       }
+      match_parcel_debug: {
+        Args: {
+          _address: string
+          _apn: string
+          _city?: string
+          _county_fips: string
+        }
+        Returns: {
+          method: string
+          parcel_id: string
+        }[]
+      }
       normalize_address: { Args: { _addr: string }; Returns: string }
       normalize_address_full: { Args: { _addr: string }; Returns: string }
       pick_comps: {
