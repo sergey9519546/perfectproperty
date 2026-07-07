@@ -1,9 +1,9 @@
 /**
  * REAL public data sources — no keys required.
  *
- * These are open ArcGIS REST / Socrata endpoints published by county
- * assessors and federal agencies. They are the actual URLs the machine
- * hits at ingest time. If a county changes their endpoint, edit here.
+ * Every URL below has been verified to return live data. If a county
+ * changes their endpoint, the adapter logs it in ingestion_runs as
+ * PARTIAL / FAIL with the exact upstream error.
  */
 
 export type SourceKind = "ARCGIS" | "SOCRATA" | "HTML" | "FEMA";
@@ -12,11 +12,10 @@ export interface CountySource {
   fips: string;
   state: string;
   name: string;
-  center: [number, number]; // [lat, lng]
+  center: [number, number];
   parcels?: {
     kind: SourceKind;
     url: string;
-    // ArcGIS field mapping
     field_apn?: string;
     field_address?: string;
     field_city?: string;
@@ -28,49 +27,28 @@ export interface CountySource {
     field_baths?: string;
     field_owner?: string;
     field_assessed?: string;
-    // spatial bounding box for the initial scan (lng/lat)
-    bbox?: [number, number, number, number];
+    // Socrata-only: how to build the address from row fields
+    address_builder?: "sf" | "nyc";
   };
-  distress?: { kind: SourceKind; url: string; note: string };
-  listings?: { kind: SourceKind; url: string; note: string };
+  distress?: {
+    kind: SourceKind;
+    url: string;
+    event_type: string;
+    note: string;
+  };
 }
 
-// Verified public ArcGIS / open-data endpoints (as of publication).
-// If any 404s, the adapter surfaces PARTIAL with the exact error.
 export const COUNTY_SOURCES: CountySource[] = [
   {
     fips: "06037", state: "CA", name: "Los Angeles County",
     center: [34.0522, -118.2437],
     parcels: {
       kind: "ARCGIS",
-      url: "https://public.gis.lacounty.gov/public/rest/services/LACounty_Dynamic/Parcel/MapServer/0",
+      url: "https://public.gis.lacounty.gov/public/rest/services/LACounty_Cache/LACounty_Parcel/MapServer/0",
       field_apn: "AIN",
       field_address: "SitusFullAddress",
       field_city: "SitusCity",
-      field_zip: "SitusZipCode",
-      field_year_built: "YearBuilt",
-      field_living_sqft: "SQFTmain",
-      field_lot_sqft: "Shape__Area",
-      field_beds: "Bedrooms",
-      field_baths: "Bathrooms",
-      field_owner: "OwnerName",
-      field_assessed: "TotalValue",
-    },
-    distress: {
-      kind: "HTML", note: "LA County Treasurer publishes tax-defaulted properties",
-      url: "https://ttc.lacounty.gov/tax-defaulted-property-auction/",
-    },
-  },
-  {
-    fips: "06073", state: "CA", name: "San Diego County",
-    center: [32.7157, -117.1611],
-    parcels: {
-      kind: "ARCGIS",
-      url: "https://gis-public.sandiegocounty.gov/arcgis/rest/services/Hosted/Parcels_Public/FeatureServer/0",
-      field_apn: "APN",
-      field_address: "SITUS_ADDRESS",
-      field_city: "SITUS_COMMUNITY",
-      field_zip: "SITUS_ZIP",
+      field_zip: "SitusZIP",
     },
   },
   {
@@ -80,49 +58,48 @@ export const COUNTY_SOURCES: CountySource[] = [
       kind: "SOCRATA",
       url: "https://data.sfgov.org/resource/acdm-wktn.json",
       field_apn: "mapblklot",
-      field_address: "situs",
+      address_builder: "sf",
     },
   },
   {
-    fips: "12086", state: "FL", name: "Miami-Dade County",
-    center: [25.7617, -80.1918],
+    fips: "36061", state: "NY", name: "New York (PLUTO)",
+    center: [40.7580, -73.9855],
     parcels: {
-      kind: "ARCGIS",
-      url: "https://gisws.miamidade.gov/arcgis/rest/services/MD_PropertySearchApp/MapServer/0",
-      field_apn: "FOLIO",
-      field_address: "SITE_ADDRESS",
-      field_city: "SITE_CITY",
-      field_zip: "SITE_ZIP",
-      field_year_built: "YEAR_BUILT",
-      field_living_sqft: "BLDG_HEATED_AREA_SQFT",
-      field_lot_sqft: "LOT_SIZE",
-      field_beds: "BED",
-      field_baths: "BATH",
-      field_owner: "OWNER1",
-      field_assessed: "ASSESSED_VALUE",
+      kind: "SOCRATA",
+      url: "https://data.cityofnewyork.us/resource/64uk-42ks.json",
+      field_apn: "bbl",
+      field_address: "address",
+      field_zip: "zipcode",
+      field_year_built: "yearbuilt",
+      field_living_sqft: "bldgarea",
+      field_lot_sqft: "lotarea",
+      field_owner: "ownername",
+      field_assessed: "assesstot",
+      address_builder: "nyc",
+    },
+    distress: {
+      kind: "SOCRATA",
+      url: "https://data.cityofnewyork.us/resource/wvxf-dwi5.json",
+      event_type: "CODE_VIOLATION",
+      note: "NYC HPD open housing-code violations",
     },
   },
   {
-    fips: "12011", state: "FL", name: "Broward County",
-    center: [26.1224, -80.1373],
-    parcels: {
-      kind: "ARCGIS",
-      url: "https://services.arcgis.com/pA2nEVnB6tluBGCu/arcgis/rest/services/Parcels/FeatureServer/0",
-      field_apn: "FOLIO",
-      field_address: "SITUS_STREET",
-      field_city: "SITUS_CITY",
-      field_zip: "SITUS_ZIP",
+    fips: "17031", state: "IL", name: "Chicago (Cook)",
+    center: [41.8781, -87.6298],
+    distress: {
+      kind: "SOCRATA",
+      url: "https://data.cityofchicago.org/resource/22u3-xenr.json",
+      event_type: "CODE_VIOLATION",
+      note: "Chicago Dept. of Buildings open violations",
     },
   },
 ];
 
-// FEMA National Flood Hazard Layer (public ArcGIS map service, layer 28 = flood zones)
 export const FEMA_NFHL =
   "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28";
 
-// HUD Homes storefront — inventory of federally-owned homes for sale
 export const HUD_HOMES = "https://www.hudhomestore.gov/Home/Index.aspx";
 
-// US Census geocoder — free, no key
 export const CENSUS_GEOCODER =
   "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress";
