@@ -116,24 +116,83 @@ export const runRecipe = createServerFn({ method: "POST" })
       base_url: r.final_url,
     }).slice(0, data.max_rows);
 
-    // For distress_events / sales / parcels we need to project extracted rows
-    // to real table columns. Users won't get magic joins to parcels yet — we
-    // stash the raw row in `details` (distress) or return it as preview only
-    // for sales/parcels (which need a parcel FK we can't invent here).
+    // Route extracted rows to the target table. distress_events uses the
+    // match_parcel() DB function to fuzzy-join scraped address → parcel_id.
+    // sales gets a direct insert. parcels is upsert on (county_fips, apn).
     let inserted = 0;
+    let unmatched = 0;
     let status: "OK" | "PARTIAL" | "FAIL" = "OK";
     let note = `Extracted ${rows.length} rows from ${rec.source_url}`;
 
+    function pick(row: any, ...keys: string[]): any {
+      for (const k of keys) {
+        for (const rk of Object.keys(row)) {
+          if (rk.toLowerCase() === k.toLowerCase() || rk.toLowerCase().includes(k.toLowerCase())) {
+            const v = row[rk];
+            if (v != null && v !== "") return v;
+          }
+        }
+      }
+      return null;
+    }
+
     if (rec.target_table === "distress_events") {
-      // Distress needs a parcel_id — without APN matching, we can't insert
-      // real rows yet. We store the raw payload as an ingestion note so the
-      // user can see exactly what would land, and skip the write. A future
-      // pass will fuzzy-match address → parcel_id.
-      status = "PARTIAL";
-      note = `Extracted ${rows.length} distress rows (preview only — address→parcel matcher not wired). First row: ${JSON.stringify(rows[0] ?? {}).slice(0, 400)}`;
+      const eventType = rec.name.toLowerCase().includes("probate") ? "PROBATE"
+        : rec.name.toLowerCase().includes("code") ? "CODE_VIOLATION"
+        : rec.name.toLowerCase().includes("tax") ? "TAX_LIEN"
+        : "FORECLOSURE";
+      const toInsert: any[] = [];
+      for (const row of rows) {
+        const address = pick(row, "address", "property_address", "situs");
+        const apn = pick(row, "apn", "parcel", "folio", "pin");
+        const city = pick(row, "city", "municipality");
+        const countyFips = pick(row, "county_fips") ?? null;
+        if (!address && !apn) { unmatched++; continue; }
+        const { data: pid } = await (supabase as any).rpc("match_parcel", {
+          _county_fips: countyFips, _apn: apn ? String(apn) : null,
+          _address: address ? String(address) : null, _city: city ? String(city) : null,
+        });
+        if (!pid) { unmatched++; continue; }
+        toInsert.push({
+          parcel_id: pid,
+          event_type: eventType,
+          severity: 3,
+          amount: pick(row, "amount", "price", "balance") ?? null,
+          event_date: pick(row, "date", "filing_date", "event_date") ?? started.slice(0, 10),
+          auction_date: pick(row, "auction_date", "sale_date") ?? null,
+          details: row,
+          data_source: "RECIPE",
+        });
+      }
+      if (toInsert.length) {
+        const { error: ie } = await supabase.from("distress_events").insert(toInsert);
+        if (ie) { status = "FAIL"; note = `Insert failed: ${ie.message}`; }
+        else { inserted = toInsert.length; }
+      }
+      status = inserted > 0 ? "OK" : "PARTIAL";
+      note = `Extracted ${rows.length} · matched & inserted ${inserted} · unmatched ${unmatched}`;
+    } else if (rec.target_table === "sales") {
+      const toInsert = rows.map((row) => ({
+        county_fips: String(pick(row, "county_fips") ?? "UNKNOWN"),
+        apn: pick(row, "apn", "parcel", "folio") ? String(pick(row, "apn", "parcel", "folio")) : null,
+        address: pick(row, "address"),
+        sold_at: pick(row, "sold_at", "sale_date", "date") ?? started.slice(0, 10),
+        sale_price: pick(row, "sale_price", "price", "amount"),
+        living_sqft: pick(row, "living_sqft", "sqft"),
+        buyer: pick(row, "buyer"), seller: pick(row, "seller"),
+        data_source: "RECIPE",
+      })).filter((r) => r.sale_price != null);
+      if (toInsert.length) {
+        const { error: ie } = await supabase.from("sales").insert(toInsert as any);
+        if (ie) { status = "FAIL"; note = `Insert failed: ${ie.message}`; }
+        else { inserted = toInsert.length; }
+      }
+      status = inserted > 0 ? "OK" : "PARTIAL";
+      note = `Extracted ${rows.length} · inserted ${inserted} sales · skipped ${rows.length - inserted} (missing price)`;
     } else {
+      // parcels — needs county_fips + apn to be useful. Otherwise preview only.
       status = "PARTIAL";
-      note = `Extracted ${rows.length} ${rec.target_table} rows (preview only — target-table mapper not wired). First row: ${JSON.stringify(rows[0] ?? {}).slice(0, 400)}`;
+      note = `Extracted ${rows.length} rows (parcels target requires county_fips + apn in the recipe fields). Sample: ${JSON.stringify(rows[0] ?? {}).slice(0, 300)}`;
     }
 
     await supabase.from("adapter_recipes").update({
@@ -146,5 +205,6 @@ export const runRecipe = createServerFn({ method: "POST" })
       started_at: started, finished_at: new Date().toISOString(),
     });
 
-    return { ok: true, rows: rows.length, inserted, preview: rows.slice(0, 5), note };
+    return { ok: true, rows: rows.length, inserted, unmatched, preview: rows.slice(0, 5), note };
   });
+
