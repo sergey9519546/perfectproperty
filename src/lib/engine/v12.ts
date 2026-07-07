@@ -66,8 +66,7 @@ export function arvTodayComps(
       sqft: c.sqft, beds: c.beds, baths: c.baths,
       garage: c.garage, lot: c.lot, age: c.age,
     };
-    const dLn = hedonicAdjustLog(subject, compHedonic, betas);
-    return Math.log(positive(c.price)) + c.drift_adjustment + dLn;
+    return hedonicAdjustLog(Math.log(positive(c.price)), compHedonic, subject, betas, c.drift_adjustment);
   });
   const weights = comps.map((c) => positive(c.weight));
   return Math.exp(weightedMedian(adjustedLog, weights));
