@@ -443,6 +443,106 @@ function AdminPage() {
         </div>
       </section>
 
+      {runReport && (() => {
+        const res = runReport.result ?? {};
+        const mb = res.match_breakdown ?? { apn_county: 0, addr_county: 0, addr_city: 0 };
+        const totalMatched = (mb.apn_county ?? 0) + (mb.addr_county ?? 0) + (mb.addr_city ?? 0);
+        const denom = totalMatched + (res.unmatched ?? 0);
+        const pct = (n: number) => denom > 0 ? Math.round((n / denom) * 100) : 0;
+        const reasons: Record<string, number> = res.unmatched_reasons ?? {};
+        const samples: any[] = res.unmatched_samples ?? [];
+        const reasonLabels: Record<string, string> = {
+          no_address_or_apn: "No address or APN in row",
+          no_county_or_city_scope: "Missing county FIPS + city (can't scope match)",
+          apn_not_found_in_county: "APN not in county parcels",
+          address_not_found: "Address didn't normalize to a parcel",
+        };
+        return (
+          <section className="mt-8">
+            <div className="flex items-center justify-between">
+              <h2 className="text-[11px] uppercase tracking-widest text-muted-foreground">
+                Last run · {runReport.recipe_name}
+              </h2>
+              <button onClick={() => setRunReport(null)} className="text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground">Dismiss</button>
+            </div>
+            <div className="mt-2 rounded-lg border border-border bg-surface p-4">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <Stat label="Extracted" value={res.rows ?? 0} />
+                <Stat label="Inserted" value={res.inserted ?? 0} />
+                <Stat label="Unmatched" value={res.unmatched ?? 0} tone={res.unmatched > 0 ? "warn" : undefined} />
+                <Stat label="Target" value={res.target_table ?? "—"} />
+              </div>
+
+              {res.target_table === "distress_events" && (
+                <>
+                  <div className="mt-4">
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Match confidence</div>
+                    <div className="mt-2 overflow-hidden rounded border border-border">
+                      <div className="flex h-6 w-full text-[10px]">
+                        <ConfBar label={`APN+County ${mb.apn_county}`} pct={pct(mb.apn_county)} className="bg-emerald-500/80 text-white" title="Highest confidence: exact APN match within county" />
+                        <ConfBar label={`Addr+County ${mb.addr_county}`} pct={pct(mb.addr_county)} className="bg-primary/80 text-primary-foreground" title="High confidence: normalized address + county" />
+                        <ConfBar label={`Addr+City ${mb.addr_city}`} pct={pct(mb.addr_city)} className="bg-amber-500/80 text-white" title="Medium confidence: normalized address + city (no county)" />
+                        <ConfBar label={`Unmatched ${res.unmatched}`} pct={pct(res.unmatched)} className="bg-skeptic/70 text-white" title="No parcel resolved" />
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
+                      <span><span className="mr-1 inline-block h-2 w-2 rounded bg-emerald-500/80" />APN+County (highest)</span>
+                      <span><span className="mr-1 inline-block h-2 w-2 rounded bg-primary/80" />Addr+County (high)</span>
+                      <span><span className="mr-1 inline-block h-2 w-2 rounded bg-amber-500/80" />Addr+City (medium)</span>
+                      <span><span className="mr-1 inline-block h-2 w-2 rounded bg-skeptic/70" />Unmatched</span>
+                    </div>
+                  </div>
+
+                  {Object.keys(reasons).length > 0 && (
+                    <div className="mt-4">
+                      <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Why unmatched</div>
+                      <div className="mt-2 space-y-1">
+                        {Object.entries(reasons).sort((a, b) => b[1] - a[1]).map(([k, n]) => (
+                          <div key={k} className="flex items-center justify-between rounded border border-border bg-surface-2 px-2 py-1 text-[11px]">
+                            <span>{reasonLabels[k] ?? k}</span>
+                            <span className="num font-mono text-muted-foreground">{n}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {samples.length > 0 && (
+                        <div className="mt-3">
+                          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Unmatched samples</div>
+                          <div className="mt-1 overflow-hidden rounded border border-border">
+                            <table className="w-full text-[11px]">
+                              <thead className="bg-surface-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+                                <tr>
+                                  <th className="px-2 py-1 text-left">Address</th>
+                                  <th className="px-2 py-1 text-left">APN</th>
+                                  <th className="px-2 py-1 text-left">City</th>
+                                  <th className="px-2 py-1 text-left">Reason</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {samples.map((s, i) => (
+                                  <tr key={i} className="border-t border-border">
+                                    <td className="px-2 py-1 font-mono">{s.address ?? "—"}</td>
+                                    <td className="px-2 py-1 font-mono">{s.apn ?? "—"}</td>
+                                    <td className="px-2 py-1">{s.city ?? "—"}</td>
+                                    <td className="px-2 py-1 text-muted-foreground">{reasonLabels[s.reason] ?? s.reason}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="mt-3 text-[11px] text-muted-foreground">{res.note}</div>
+            </div>
+          </section>
+        );
+      })()}
+
+
       <section className="mt-8">
         <h2 className="text-[11px] uppercase tracking-widest text-muted-foreground">Scrapy Cloud ingest webhook</h2>
         <div className="mt-2 rounded-lg border border-border bg-surface p-3">
