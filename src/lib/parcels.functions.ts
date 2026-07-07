@@ -68,24 +68,38 @@ export const getDossier = createServerFn({ method: "POST" })
 
 export const getCoverage = createServerFn({ method: "GET" }).handler(async () => {
   const supabase = serverClient();
-  const [counties, runs, scores, outcomes] = await Promise.all([
+  const [counties, runs, scores, outcomes, liveByCounty, fixtureByCounty] = await Promise.all([
     supabase.from("counties").select("*").order("state").order("name"),
     supabase.from("ingestion_runs").select("*").order("started_at", { ascending: false }).limit(30),
-    supabase.from("parcel_scores").select("perfect_score, ring, confidence_grade"),
+    supabase.from("parcel_scores").select("perfect_score, ring, confidence_grade, data_source"),
     supabase.from("prediction_outcomes").select("outcome, error_pct, predicted_profit, actual_profit"),
+    supabase.from("parcels").select("county_fips").eq("data_source", "LIVE"),
+    supabase.from("parcels").select("county_fips").eq("data_source", "FIXTURE"),
   ]);
   const s = scores.data ?? [];
+  // Rank tiers computed over LIVE parcels only — fixture doesn't count.
+  const sLive = s.filter((x: any) => x.data_source === "LIVE");
   const tiers = {
-    exceptional: s.filter((x) => x.perfect_score >= 80).length,
-    strong: s.filter((x) => x.perfect_score >= 65 && x.perfect_score < 80).length,
-    viable: s.filter((x) => x.perfect_score >= 50 && x.perfect_score < 65).length,
-    watch: s.filter((x) => x.perfect_score < 50).length,
+    exceptional: sLive.filter((x) => x.perfect_score >= 80).length,
+    strong: sLive.filter((x) => x.perfect_score >= 65 && x.perfect_score < 80).length,
+    viable: sLive.filter((x) => x.perfect_score >= 50 && x.perfect_score < 65).length,
+    watch: sLive.filter((x) => x.perfect_score < 50).length,
   };
   const rings = {
-    r1: s.filter((x) => x.ring === 1).length,
-    r2: s.filter((x) => x.ring === 2).length,
-    r3: s.filter((x) => x.ring === 3).length,
+    r1: sLive.filter((x) => x.ring === 1).length,
+    r2: sLive.filter((x) => x.ring === 2).length,
+    r3: sLive.filter((x) => x.ring === 3).length,
   };
+  const liveCounts: Record<string, number> = {};
+  const fxCounts: Record<string, number> = {};
+  for (const r of liveByCounty.data ?? []) liveCounts[r.county_fips] = (liveCounts[r.county_fips] ?? 0) + 1;
+  for (const r of fixtureByCounty.data ?? []) fxCounts[r.county_fips] = (fxCounts[r.county_fips] ?? 0) + 1;
+  const countiesEnriched = (counties.data ?? []).map((c: any) => ({
+    ...c,
+    live_parcels: liveCounts[c.fips] ?? 0,
+    fixture_parcels: fxCounts[c.fips] ?? 0,
+  }));
+
   const o = outcomes.data ?? [];
   const wins = o.filter((x) => x.outcome === "WIN").length;
   const losses = o.filter((x) => x.outcome === "LOSS").length;
@@ -94,11 +108,13 @@ export const getCoverage = createServerFn({ method: "GET" }).handler(async () =>
     ? o.reduce((a, b) => a + Math.abs(Number(b.error_pct ?? 0)), 0) / o.length
     : 0;
   return {
-    counties: counties.data ?? [],
+    counties: countiesEnriched,
     runs: runs.data ?? [],
     tiers,
     rings,
-    total_parcels: s.length,
+    total_parcels: sLive.length,
+    total_fixture_parcels: s.length - sLive.length,
+    live_totals: { parcels: (liveByCounty.data ?? []).length, scored: sLive.length },
     accuracy: {
       total: o.length,
       wins,
