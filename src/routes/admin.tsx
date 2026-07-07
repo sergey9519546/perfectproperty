@@ -1,13 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { getCoverage } from "@/lib/parcels.functions";
 import { seedFixtures, runUnderwrite } from "@/lib/seed.functions";
 import { ingestCounty, scoreAll, listSources } from "@/lib/ingest.functions";
 import { ingestAllNycSales, salesSummary } from "@/lib/sales.functions";
+import { probeUrl, listProbes } from "@/lib/probe.functions";
 import { PageHead } from "./deals";
 import { toast } from "sonner";
-import { Database, Zap, Globe, ScrollText } from "lucide-react";
+import { Database, Zap, Globe, ScrollText, Search } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
