@@ -137,6 +137,5 @@ export const listProbes = createServerFn({ method: "GET" }).handler(async () => 
     .select("*").order("started_at", { ascending: false }).limit(25);
   const { count: cached } = await supabase.from("probe_cache")
     .select("url", { count: "exact", head: true });
-  const { data: hasKey } = { data: !!process.env.ZYTE_API_KEY };
-  return { runs: runs ?? [], cached: cached ?? 0, zyte_key_present: hasKey };
+  return { runs: runs ?? [], cached: cached ?? 0, zyte_key_present: !!process.env.ZYTE_API_KEY };
 });
