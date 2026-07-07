@@ -217,20 +217,25 @@ export const ingestCounty = createServerFn({ method: "POST" })
     return { fips: src.fips, name: src.name, fetched: parcels.length, inserted, status, note };
   });
 
-// Underwrite everything currently in the parcels table using the engine.
+// Score only LIVE parcels. Fixture scoring is handled by runUnderwrite.
 export const scoreAll = createServerFn({ method: "POST" }).handler(async () => {
   const supabase = await adminClient();
-  const { data: parcels, error } = await supabase.from("parcels").select("*");
+  const { data: parcels, error } = await supabase
+    .from("parcels").select("*").eq("data_source", "LIVE");
   if (error) throw new Error(error.message);
-  const { data: distress } = await supabase.from("distress_events").select("*");
+  const parcelIds = (parcels ?? []).map((p) => p.id);
   const byParcel = new Map<string, DistressInput[]>();
-  for (const d of distress ?? []) {
-    const arr = byParcel.get(d.parcel_id) ?? [];
-    arr.push({
-      event_type: d.event_type, severity: d.severity, amount: d.amount,
-      event_date: d.event_date, auction_date: d.auction_date,
-    });
-    byParcel.set(d.parcel_id, arr);
+  if (parcelIds.length) {
+    const { data: distress } = await supabase
+      .from("distress_events").select("*").in("parcel_id", parcelIds);
+    for (const d of distress ?? []) {
+      const arr = byParcel.get(d.parcel_id) ?? [];
+      arr.push({
+        event_type: d.event_type, severity: d.severity, amount: d.amount,
+        event_date: d.event_date, auction_date: d.auction_date,
+      });
+      byParcel.set(d.parcel_id, arr);
+    }
   }
 
   const scores: any[] = [];
@@ -260,9 +265,11 @@ export const scoreAll = createServerFn({ method: "POST" }).handler(async () => {
       perfect_score: u.perfect_score, confidence_grade: u.confidence_grade,
       skeptic_flags: u.skeptic_flags, ring: u.ring,
       computed_at: new Date().toISOString(),
+      data_source: "LIVE",
     });
   }
-  await supabase.from("parcel_scores").delete().gt("as_is_value", -1);
+  // Only wipe LIVE scores; leave fixture scores alone.
+  await supabase.from("parcel_scores").delete().eq("data_source", "LIVE");
   const CHUNK = 200;
   for (let i = 0; i < scores.length; i += CHUNK) {
     await supabase.from("parcel_scores").insert(scores.slice(i, i + CHUNK));
