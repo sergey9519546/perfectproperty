@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      adapter_recipes: {
+        Row: {
+          container_selector: string
+          created_at: string
+          fields: Json
+          id: string
+          last_run_at: string | null
+          last_run_rows: number | null
+          name: string
+          notes: string | null
+          source_url: string
+          target_table: string
+          updated_at: string
+          url_pattern: string | null
+        }
+        Insert: {
+          container_selector: string
+          created_at?: string
+          fields?: Json
+          id?: string
+          last_run_at?: string | null
+          last_run_rows?: number | null
+          name: string
+          notes?: string | null
+          source_url: string
+          target_table: string
+          updated_at?: string
+          url_pattern?: string | null
+        }
+        Update: {
+          container_selector?: string
+          created_at?: string
+          fields?: Json
+          id?: string
+          last_run_at?: string | null
+          last_run_rows?: number | null
+          name?: string
+          notes?: string | null
+          source_url?: string
+          target_table?: string
+          updated_at?: string
+          url_pattern?: string | null
+        }
+        Relationships: []
+      }
       counties: {
         Row: {
           center_lat: number
