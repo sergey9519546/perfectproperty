@@ -112,9 +112,20 @@ function ValueLadder({ d }: { d: D }) {
     { label: "Expanded ARV", value: Number(s.expanded_arv) },
   ];
   const max = Math.max(...rungs.map((r) => r.value));
+  const arvSource = (s as any).arv_source ?? "HEURISTIC";
+  const compCount = Number((s as any).comp_count ?? 0);
+  const comps = ((s as any).comps_used as any[]) ?? [];
   return (
     <section>
       <SectionHead icon={<Building2 className="h-3.5 w-3.5" />} title="Value Ladder" />
+      <div className="mt-1 flex items-center gap-2 text-[10px] uppercase tracking-widest">
+        <span className="rounded-full px-2 py-0.5" style={{
+          color: arvSource === "COMPS" ? "var(--profit-strong)" : "var(--muted-foreground)",
+          backgroundColor: arvSource === "COMPS" ? "color-mix(in oklab, var(--profit-strong) 15%, transparent)" : "var(--surface-2)",
+        }}>
+          {arvSource === "COMPS" ? `ARV from ${compCount} real comps` : "ARV from heuristic (no comps yet)"}
+        </span>
+      </div>
       <div className="mt-2 space-y-1.5">
         {rungs.map((r) => {
           const isRec = (s.recommended_scope === "COSMETIC" && r.label === "Cosmetic ARV") ||
@@ -139,6 +150,35 @@ function ValueLadder({ d }: { d: D }) {
         <MiniStat label="Carry" v={fmt$(Number(s.carry_cost))} />
         <MiniStat label="Selling" v={fmt$(Number(s.selling_cost))} />
       </div>
+      {comps.length > 0 && (
+        <div className="mt-4">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Comps used</div>
+          <div className="mt-1 overflow-hidden rounded-md border border-border">
+            <table className="w-full text-[11px]">
+              <thead className="bg-surface-2 text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-1 text-left">Address</th>
+                  <th className="px-2 py-1 text-right">Sold</th>
+                  <th className="px-2 py-1 text-right">Price</th>
+                  <th className="px-2 py-1 text-right">$/sf</th>
+                  <th className="px-2 py-1 text-right">Dist</th>
+                </tr>
+              </thead>
+              <tbody>
+                {comps.slice(0, 8).map((c: any, i: number) => (
+                  <tr key={c.sale_id ?? i} className="border-t border-border">
+                    <td className="truncate px-2 py-1">{c.address ?? "—"}</td>
+                    <td className="num px-2 py-1 text-right text-muted-foreground">{String(c.sold_at ?? "").slice(0, 7)}</td>
+                    <td className="num px-2 py-1 text-right">{fmt$(Number(c.sale_price))}</td>
+                    <td className="num px-2 py-1 text-right">${Math.round(Number(c.ppsf))}</td>
+                    <td className="num px-2 py-1 text-right text-muted-foreground">{Number(c.distance_km).toFixed(2)}km</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

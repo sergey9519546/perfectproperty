@@ -4,9 +4,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCoverage } from "@/lib/parcels.functions";
 import { seedFixtures, runUnderwrite } from "@/lib/seed.functions";
 import { ingestCounty, scoreAll, listSources } from "@/lib/ingest.functions";
+import { ingestAllNycSales, salesSummary } from "@/lib/sales.functions";
 import { PageHead } from "./deals";
 import { toast } from "sonner";
-import { Database, Zap, Globe } from "lucide-react";
+import { Database, Zap, Globe, ScrollText } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -25,9 +26,13 @@ function AdminPage() {
   const ingestFn = useServerFn(ingestCounty);
   const scoreFn = useServerFn(scoreAll);
   const sourcesFn = useServerFn(listSources);
+  const salesFn = useServerFn(ingestAllNycSales);
+  const salesSumFn = useServerFn(salesSummary);
   const qc = useQueryClient();
   const cov = useQuery({ queryKey: ["coverage"], queryFn: () => covFn() });
   const sources = useQuery({ queryKey: ["sources"], queryFn: () => sourcesFn() });
+  const sales = useQuery({ queryKey: ["sales-summary"], queryFn: () => salesSumFn() });
+
 
   const seed = useMutation({
     mutationFn: () => seedFn(),
@@ -66,8 +71,19 @@ function AdminPage() {
   });
   const score = useMutation({
     mutationFn: () => scoreFn(),
-    onSuccess: (r) => { toast.success(`Scored ${r.scored} real parcels`); qc.invalidateQueries(); },
+    onSuccess: (r: any) => { toast.success(`Scored ${r.scored} real parcels · ${r.comps_backed ?? 0} backed by real comps`); qc.invalidateQueries(); },
   });
+  const salesMut = useMutation({
+    mutationFn: () => salesFn(),
+    onSuccess: (rs: any[]) => {
+      const total = rs.reduce((a, r) => a + (r.inserted ?? 0), 0);
+      const matched = rs.reduce((a, r) => a + (r.matched_to_parcels ?? 0), 0);
+      toast.success(`NYC sales: ${total.toLocaleString()} rows · ${matched.toLocaleString()} linked to parcels`);
+      qc.invalidateQueries();
+    },
+    onError: (e: any) => toast.error(e.message ?? "Sales ingest failed"),
+  });
+
 
   const adapters = [
     { name: "Parcels + Assessor", source: "PARCELS", status: "LIVE — county ArcGIS/Socrata", real: "LA · SD · SF · Miami-Dade · Broward" },
@@ -88,9 +104,13 @@ function AdminPage() {
           <Globe className="h-4 w-4" />
           {ingestAll.isPending ? "Scanning live sources…" : "Scan all live public sources"}
         </button>
+        <button onClick={() => salesMut.mutate()} disabled={salesMut.isPending} className="inline-flex items-center gap-2 rounded-md bg-opportunity px-4 py-2 text-sm font-medium text-black disabled:opacity-50">
+          <ScrollText className="h-4 w-4" />
+          {salesMut.isPending ? "Fetching NYC sales…" : "Ingest real NYC sales (5 boroughs)"}
+        </button>
         <button onClick={() => score.mutate()} disabled={score.isPending} className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:opacity-50">
           <Zap className="h-4 w-4" />
-          {score.isPending ? "Scoring…" : "Underwrite real parcels"}
+          {score.isPending ? "Scoring…" : "Underwrite real parcels (uses comps)"}
         </button>
         <button onClick={() => seed.mutate()} disabled={seed.isPending} className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:opacity-50">
           <Database className="h-4 w-4" />
@@ -128,13 +148,20 @@ function AdminPage() {
             <span className="rounded-full bg-skeptic/15 px-2 py-0.5 text-[10px] uppercase tracking-widest text-skeptic">Honesty banner</span>
             <span className="text-[12px] text-muted-foreground">what the app actually knows right now</span>
           </div>
-          <div className="mt-3 grid gap-4 md:grid-cols-3">
+          <div className="mt-3 grid gap-4 md:grid-cols-4">
             <div>
               <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Real (LIVE) parcels</div>
               <div className="mt-1 text-2xl font-semibold text-profit-strong">
                 {(cov.data?.live_totals?.parcels ?? 0).toLocaleString()}
               </div>
               <div className="text-[11px] text-muted-foreground">Scored: {(cov.data?.live_totals?.scored ?? 0).toLocaleString()}</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Real comps ingested</div>
+              <div className="mt-1 text-2xl font-semibold text-opportunity">
+                {(sales.data?.total ?? 0).toLocaleString()}
+              </div>
+              <div className="text-[11px] text-muted-foreground">Linked to parcels: {(sales.data?.linked_to_parcels ?? 0).toLocaleString()}</div>
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Demo (FIXTURE) parcels</div>
@@ -146,7 +173,7 @@ function AdminPage() {
             <div>
               <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Graded predictions</div>
               <div className="mt-1 text-2xl font-semibold">{(cov.data?.accuracy?.total ?? 0).toLocaleString()}</div>
-              <div className="text-[11px] text-muted-foreground">Real closed-sale outcomes only. Accuracy dashboard stays empty until deeds arrive.</div>
+              <div className="text-[11px] text-muted-foreground">Real closed-sale outcomes only.</div>
             </div>
           </div>
         </div>

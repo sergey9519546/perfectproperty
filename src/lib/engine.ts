@@ -49,21 +49,48 @@ export interface MarketContext {
 // ---------------------------------------------------------------------------
 // Value ladder — ARV at each renovation scope
 // ---------------------------------------------------------------------------
-export function computeValueLadder(p: ParcelInput, m: MarketContext) {
+export interface Comp {
+  ppsf: number;
+  distance_km?: number;
+  sale_id?: string;
+  address?: string | null;
+  sold_at?: string;
+  sale_price?: number;
+  living_sqft?: number | null;
+}
+
+// Trimmed mean of comp $/sqft (drop hi/lo when >= 5 comps).
+function trimmedMeanPpsf(comps: Comp[]): number | null {
+  const vals = comps.map((c) => Number(c.ppsf)).filter((v) => Number.isFinite(v) && v > 20 && v < 4000).sort((a, b) => a - b);
+  if (vals.length < 3) return null;
+  const cut = vals.length >= 5 ? 1 : 0;
+  const kept = vals.slice(cut, vals.length - cut);
+  return kept.reduce((a, b) => a + b, 0) / kept.length;
+}
+
+export function computeValueLadder(p: ParcelInput, m: MarketContext, comps: Comp[] = []) {
   const sqft = p.living_sqft ?? 1200;
   const cond = conditionMultiplier(p.condition_grade);
   const loc = locationMultiplier(p);
 
-  const asIsPpsf = m.median_ppsf * 0.62 * cond * loc;
-  const cosmeticPpsf = m.median_ppsf * 0.92 * loc;
-  const fullPpsf = m.median_ppsf * 1.02 * loc;
-  const expandedPpsf = m.median_ppsf * 1.12 * loc;
+  const compPpsf = trimmedMeanPpsf(comps);
+  const marketPpsf = compPpsf ?? m.median_ppsf;
+  const arvSource: "COMPS" | "HEURISTIC" = compPpsf != null ? "COMPS" : "HEURISTIC";
+
+  // When comps are available, drop the conservative "market" fudge — comp mean IS the market.
+  const asIsPpsf = marketPpsf * (compPpsf != null ? 0.72 : 0.62) * cond * loc;
+  const cosmeticPpsf = marketPpsf * (compPpsf != null ? 0.98 : 0.92) * loc;
+  const fullPpsf = marketPpsf * (compPpsf != null ? 1.06 : 1.02) * loc;
+  const expandedPpsf = marketPpsf * (compPpsf != null ? 1.15 : 1.12) * loc;
 
   return {
     as_is_value: round(asIsPpsf * sqft),
     cosmetic_arv: round(cosmeticPpsf * sqft),
     full_reno_arv: round(fullPpsf * sqft),
     expanded_arv: round(expandedPpsf * sqft),
+    market_ppsf: round(marketPpsf),
+    arv_source: arvSource,
+    comp_count: compPpsf != null ? comps.length : 0,
   };
 }
 
@@ -202,6 +229,9 @@ export interface UnderwriteResult {
   cosmetic_arv: number;
   full_reno_arv: number;
   expanded_arv: number;
+  market_ppsf: number;
+  arv_source: "COMPS" | "HEURISTIC";
+  comp_count: number;
   recommended_scope: Scope;
   reno_cost: number;
   carry_cost: number;
@@ -224,8 +254,9 @@ export function underwrite(
   p: ParcelInput,
   distress: DistressInput[],
   m: MarketContext,
+  comps: Comp[] = [],
 ): UnderwriteResult {
-  const ladder = computeValueLadder(p, m);
+  const ladder = computeValueLadder(p, m, comps);
   const scope = recommendedScope(p);
   const arv = arvForScope(ladder, scope);
   const reno = computeRenoCost(p, scope);

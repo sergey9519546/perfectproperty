@@ -252,7 +252,28 @@ export const scoreAll = createServerFn({ method: "POST" }).handler(async () => {
       owner_is_absentee: p.owner_is_absentee, owner_since: p.owner_since,
       is_listed: p.is_listed, is_vacant: p.is_vacant, state: p.state,
     };
-    const u = underwrite(input, byParcel.get(p.id) ?? [], m);
+
+    // Pull real comps via the pick_comps RPC — only when we have geometry + sqft.
+    let comps: any[] = [];
+    if (p.lat != null && p.lng != null && (p.living_sqft ?? 0) > 100) {
+      const { data: cRows } = await (supabase as any).rpc("pick_comps", {
+        subject_lat: p.lat,
+        subject_lng: p.lng,
+        subject_sqft: p.living_sqft,
+        subject_county: p.county_fips,
+      });
+      comps = (cRows ?? []).map((c: any) => ({
+        ppsf: Number(c.ppsf),
+        distance_km: Number(c.distance_km),
+        sale_id: c.sale_id,
+        address: c.address,
+        sold_at: c.sold_at,
+        sale_price: Number(c.sale_price),
+        living_sqft: c.living_sqft,
+      }));
+    }
+
+    const u = underwrite(input, byParcel.get(p.id) ?? [], m, comps);
     scores.push({
       parcel_id: p.id,
       as_is_value: u.as_is_value, cosmetic_arv: u.cosmetic_arv,
@@ -266,6 +287,9 @@ export const scoreAll = createServerFn({ method: "POST" }).handler(async () => {
       skeptic_flags: u.skeptic_flags, ring: u.ring,
       computed_at: new Date().toISOString(),
       data_source: "LIVE",
+      comps_used: comps,
+      comp_count: u.comp_count,
+      arv_source: u.arv_source,
     });
   }
   // Only wipe LIVE scores; leave fixture scores alone.
@@ -274,7 +298,8 @@ export const scoreAll = createServerFn({ method: "POST" }).handler(async () => {
   for (let i = 0; i < scores.length; i += CHUNK) {
     await supabase.from("parcel_scores").insert(scores.slice(i, i + CHUNK));
   }
-  return { scored: scores.length };
+  const compBacked = scores.filter((s) => s.arv_source === "COMPS").length;
+  return { scored: scores.length, comps_backed: compBacked };
 });
 
 export const listSources = createServerFn({ method: "GET" }).handler(async () => {
