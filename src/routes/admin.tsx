@@ -22,8 +22,12 @@ function AdminPage() {
   const covFn = useServerFn(getCoverage);
   const seedFn = useServerFn(seedFixtures);
   const uwFn = useServerFn(runUnderwrite);
+  const ingestFn = useServerFn(ingestCounty);
+  const scoreFn = useServerFn(scoreAll);
+  const sourcesFn = useServerFn(listSources);
   const qc = useQueryClient();
   const cov = useQuery({ queryKey: ["coverage"], queryFn: () => covFn() });
+  const sources = useQuery({ queryKey: ["sources"], queryFn: () => sourcesFn() });
 
   const seed = useMutation({
     mutationFn: () => seedFn(),
@@ -35,13 +39,44 @@ function AdminPage() {
     onSuccess: (r) => { toast.success(`Underwrote ${r.scored} parcels · ${r.outcomes} historical outcomes graded`); qc.invalidateQueries(); },
     onError: (e: any) => toast.error(e.message ?? "Underwrite failed"),
   });
+  const ingest = useMutation({
+    mutationFn: (fips: string) => ingestFn({ data: { county_fips: fips, max_parcels: 300, enrich_flood: true } }),
+    onSuccess: (r) => {
+      if (r.status === "OK") toast.success(`${r.name}: ingested ${r.inserted} real parcels`);
+      else toast.error(`${r.name}: ${r.note}`);
+      qc.invalidateQueries();
+    },
+    onError: (e: any) => toast.error(e.message ?? "Ingest failed"),
+  });
+  const ingestAll = useMutation({
+    mutationFn: async () => {
+      const list = (sources.data ?? []).filter((s: any) => s.parcels);
+      const results = [] as any[];
+      for (const s of list) {
+        try { results.push(await ingestFn({ data: { county_fips: s.fips, max_parcels: 250, enrich_flood: true } })); }
+        catch (e: any) { results.push({ name: s.name, status: "FAIL", note: e.message }); }
+      }
+      return results;
+    },
+    onSuccess: (rs: any[]) => {
+      const ok = rs.filter((r) => r.status === "OK").length;
+      toast.success(`Scanned ${rs.length} counties · ${ok} live`);
+      qc.invalidateQueries();
+    },
+  });
+  const score = useMutation({
+    mutationFn: () => scoreFn(),
+    onSuccess: (r) => { toast.success(`Scored ${r.scored} real parcels`); qc.invalidateQueries(); },
+  });
 
   const adapters = [
-    { name: "Parcels + Assessor", source: "PARCELS", status: "Fixture adapter (CA·FL)", real: "County GIS / Regrid / ATTOM" },
-    { name: "Recorder / Deeds", source: "DEEDS", status: "Fixture adapter", real: "County recorder scrape or DataTree" },
-    { name: "Distress Signals", source: "DISTRESS", status: "Fixture adapter", real: "Foreclosure lists, tax rolls, probate, code violations" },
-    { name: "MLS Feed", source: "MLS", status: "Fixture adapter", real: "RESO API / Trestle (requires licensed broker)" },
-    { name: "Aggregator", source: "AGGREGATOR", status: "—", real: "ATTOM, PropStream, Estated" },
+    { name: "Parcels + Assessor", source: "PARCELS", status: "LIVE — county ArcGIS/Socrata", real: "LA · SD · SF · Miami-Dade · Broward" },
+    { name: "FEMA Flood Zones", source: "FEMA", status: "LIVE — hazards.fema.gov NFHL", real: "Sampled during parcel enrichment" },
+    { name: "Recorder / Deeds", source: "DEEDS", status: "Fixture", real: "County recorder scrape (per-county HTML)" },
+    { name: "Distress Signals", source: "DISTRESS", status: "Fixture", real: "LA Treasurer tax-defaulted list, foreclosure dockets, probate court, code violations" },
+    { name: "HUD Homes", source: "HUD", status: "URL wired", real: "hudhomestore.gov storefront" },
+    { name: "MLS Feed", source: "MLS", status: "Fixture", real: "RESO / Trestle — requires licensed broker" },
+    { name: "Aggregator", source: "AGGREGATOR", status: "—", real: "ATTOM / PropStream / Estated" },
   ];
 
   return (
