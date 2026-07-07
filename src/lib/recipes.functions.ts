@@ -117,12 +117,27 @@ export const runRecipe = createServerFn({ method: "POST" })
     }).slice(0, data.max_rows);
 
     // Route extracted rows to the target table. distress_events uses the
-    // match_parcel() DB function to fuzzy-join scraped address → parcel_id.
-    // sales gets a direct insert. parcels is upsert on (county_fips, apn).
+    // match_parcel_debug() DB function to fuzzy-join scraped address → parcel_id
+    // AND report which strategy hit (apn_county / addr_county / addr_city).
     let inserted = 0;
     let unmatched = 0;
     let status: "OK" | "PARTIAL" | "FAIL" = "OK";
     let note = `Extracted ${rows.length} rows from ${rec.source_url}`;
+    const matchBreakdown: Record<"apn_county" | "addr_county" | "addr_city", number> =
+      { apn_county: 0, addr_county: 0, addr_city: 0 };
+    const unmatchedReasons: Record<string, number> = {};
+    const unmatchedSamples: Array<{ address: string | null; apn: string | null; city: string | null; reason: string }> = [];
+    function bumpReason(reason: string, sample: { address: any; apn: any; city: any }) {
+      unmatchedReasons[reason] = (unmatchedReasons[reason] ?? 0) + 1;
+      if (unmatchedSamples.length < 5) {
+        unmatchedSamples.push({
+          address: sample.address ? String(sample.address) : null,
+          apn: sample.apn ? String(sample.apn) : null,
+          city: sample.city ? String(sample.city) : null,
+          reason,
+        });
+      }
+    }
 
     function pick(row: any, ...keys: string[]): any {
       for (const k of keys) {
@@ -147,12 +162,27 @@ export const runRecipe = createServerFn({ method: "POST" })
         const apn = pick(row, "apn", "parcel", "folio", "pin");
         const city = pick(row, "city", "municipality");
         const countyFips = pick(row, "county_fips") ?? null;
-        if (!address && !apn) { unmatched++; continue; }
-        const { data: pid } = await (supabase as any).rpc("match_parcel", {
+        if (!address && !apn) {
+          bumpReason("no_address_or_apn", { address, apn, city });
+          unmatched++; continue;
+        }
+        const { data: debugRows } = await (supabase as any).rpc("match_parcel_debug", {
           _county_fips: countyFips, _apn: apn ? String(apn) : null,
           _address: address ? String(address) : null, _city: city ? String(city) : null,
         });
-        if (!pid) { unmatched++; continue; }
+        const hit = Array.isArray(debugRows) ? debugRows[0] : null;
+        const pid: string | null = hit?.parcel_id ?? null;
+        const method: string | null = hit?.method ?? null;
+        if (!pid) {
+          const reason = !countyFips && !city ? "no_county_or_city_scope"
+            : !address ? "apn_not_found_in_county"
+            : "address_not_found";
+          bumpReason(reason, { address, apn, city });
+          unmatched++; continue;
+        }
+        if (method === "apn_county" || method === "addr_county" || method === "addr_city") {
+          matchBreakdown[method]++;
+        }
         toInsert.push({
           parcel_id: pid,
           event_type: eventType,
@@ -160,7 +190,7 @@ export const runRecipe = createServerFn({ method: "POST" })
           amount: pick(row, "amount", "price", "balance") ?? null,
           event_date: pick(row, "date", "filing_date", "event_date") ?? started.slice(0, 10),
           auction_date: pick(row, "auction_date", "sale_date") ?? null,
-          details: row,
+          details: { ...row, _match_method: method },
           data_source: "RECIPE",
         });
       }
@@ -169,8 +199,9 @@ export const runRecipe = createServerFn({ method: "POST" })
         if (ie) { status = "FAIL"; note = `Insert failed: ${ie.message}`; }
         else { inserted = toInsert.length; }
       }
-      status = inserted > 0 ? "OK" : "PARTIAL";
-      note = `Extracted ${rows.length} · matched & inserted ${inserted} · unmatched ${unmatched}`;
+      status = inserted > 0 ? (unmatched > 0 ? "PARTIAL" : "OK") : "PARTIAL";
+      const conf = `APN+county ${matchBreakdown.apn_county} · addr+county ${matchBreakdown.addr_county} · addr+city ${matchBreakdown.addr_city}`;
+      note = `Extracted ${rows.length} · matched ${inserted} (${conf}) · unmatched ${unmatched}`;
     } else if (rec.target_table === "sales") {
       const toInsert = rows.map((row) => ({
         county_fips: String(pick(row, "county_fips") ?? "UNKNOWN"),
@@ -190,7 +221,6 @@ export const runRecipe = createServerFn({ method: "POST" })
       status = inserted > 0 ? "OK" : "PARTIAL";
       note = `Extracted ${rows.length} · inserted ${inserted} sales · skipped ${rows.length - inserted} (missing price)`;
     } else {
-      // parcels — needs county_fips + apn to be useful. Otherwise preview only.
       status = "PARTIAL";
       note = `Extracted ${rows.length} rows (parcels target requires county_fips + apn in the recipe fields). Sample: ${JSON.stringify(rows[0] ?? {}).slice(0, 300)}`;
     }
@@ -205,6 +235,17 @@ export const runRecipe = createServerFn({ method: "POST" })
       started_at: started, finished_at: new Date().toISOString(),
     });
 
-    return { ok: true, rows: rows.length, inserted, unmatched, preview: rows.slice(0, 5), note };
+    return {
+      ok: true,
+      rows: rows.length,
+      inserted,
+      unmatched,
+      preview: rows.slice(0, 5),
+      note,
+      target_table: rec.target_table,
+      match_breakdown: matchBreakdown,
+      unmatched_reasons: unmatchedReasons,
+      unmatched_samples: unmatchedSamples,
+    };
   });
 
