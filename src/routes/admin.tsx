@@ -84,15 +84,43 @@ function AdminPage() {
       <PageHead title="Ingestion" sub="Every data adapter, every coverage number, every underwrite run. This is the operator's control panel for the pipeline described in Layer 1." />
 
       <div className="mt-6 flex flex-wrap gap-3">
-        <button onClick={() => seed.mutate()} disabled={seed.isPending} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
+        <button onClick={() => ingestAll.mutate()} disabled={ingestAll.isPending} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50">
+          <Globe className="h-4 w-4" />
+          {ingestAll.isPending ? "Scanning live sources…" : "Scan all live public sources"}
+        </button>
+        <button onClick={() => score.mutate()} disabled={score.isPending} className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:opacity-50">
+          <Zap className="h-4 w-4" />
+          {score.isPending ? "Scoring…" : "Underwrite real parcels"}
+        </button>
+        <button onClick={() => seed.mutate()} disabled={seed.isPending} className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:opacity-50">
           <Database className="h-4 w-4" />
-          {seed.isPending ? "Ingesting…" : "Re-ingest fixture data (CA + FL)"}
+          {seed.isPending ? "Ingesting…" : "Load fixtures (demo)"}
         </button>
         <button onClick={() => uw.mutate()} disabled={uw.isPending} className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:opacity-50">
           <Zap className="h-4 w-4" />
-          {uw.isPending ? "Scoring…" : "Run nightly underwrite"}
+          {uw.isPending ? "Scoring…" : "Fixture underwrite"}
         </button>
       </div>
+
+      <section className="mt-8">
+        <h2 className="text-[11px] uppercase tracking-widest text-muted-foreground">Live public data sources</h2>
+        <div className="mt-2 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+          {(sources.data ?? []).map((s: any) => (
+            <div key={s.fips} className="rounded-lg border border-border bg-surface p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="text-[13px] font-medium">{s.state} · {s.name}</div>
+                  <div className="mt-0.5 text-[10px] uppercase tracking-widest text-muted-foreground">{s.parcels?.kind ?? "—"}</div>
+                </div>
+                <button onClick={() => ingest.mutate(s.fips)} disabled={ingest.isPending} className="rounded-md bg-primary/90 px-2.5 py-1 text-[11px] font-medium text-primary-foreground disabled:opacity-50">
+                  Fetch live
+                </button>
+              </div>
+              <div className="mt-2 truncate text-[10px] text-muted-foreground" title={s.parcels?.url}>{s.parcels?.url ?? "no parcel endpoint"}</div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <section>
