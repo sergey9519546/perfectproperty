@@ -250,6 +250,21 @@ export interface UnderwriteResult {
   offer_curve: { offer: number; profit: number; probability: number }[];
 }
 
+import * as v11 from "./engine/v11";
+
+/**
+ * v11 upgrade — the underwrite orchestrator now runs the canon:
+ *
+ *   1. Value ladder (comps → weighted median / heuristic fallback)
+ *   2. Latent-factor Monte Carlo (0H.3, 0H.5): profit_p5/p50/p95, P(loss), CVaR
+ *   3. Skeptic — clustered noisy-OR (0E.3.10)
+ *   4. Governor + exceedance rank (0E.3.11 / 0H.10.4)
+ *   5. Safe score — weighted geometric mean of unit factors (0H.10.5)
+ *   6. Hard gates before promotion
+ *
+ * Legacy fields (gross_profit, risk_adjusted_profit, exit_days, perfect_score)
+ * are preserved for existing callers.
+ */
 export function underwrite(
   p: ParcelInput,
   distress: DistressInput[],
@@ -264,28 +279,93 @@ export function underwrite(
   const acq = computeAcquisition(p, distress, ladder.as_is_value);
   const exit = computeExit(m);
 
-  const carry_cost = round(acq.modeled_offer * 0.11 * (exit.exit_days / 365) + 3800); // hard money + insurance + utils
+  const carry_cost = round(acq.modeled_offer * 0.11 * (exit.exit_days / 365) + 3800);
   const selling_cost = round(arv * 0.06);
   const gross_profit = round(arv - acq.modeled_offer - reno - carry_cost - selling_cost);
+  const marginPct = arv > 0 ? gross_profit / arv : 0;
 
-  const risk_adjusted_profit = round(
-    gross_profit * acq.acquisition_probability * exit.exit_confidence,
+  // --- (2) Monte Carlo profit distribution ---------------------------------
+  // Log-space ARV uncertainty; drift from market momentum as sign-safe monthly log.
+  const compPpsfs = comps.map((c) => Number(c.ppsf)).filter((v) => Number.isFinite(v) && v > 0);
+  const logPpsfs = compPpsfs.map((x) => Math.log(x));
+  const meanLog = logPpsfs.length ? logPpsfs.reduce((a, b) => a + b, 0) / logPpsfs.length : 0;
+  const sigmaLogDisp = logPpsfs.length > 1
+    ? Math.sqrt(logPpsfs.map((x) => (x - meanLog) ** 2).reduce((a, b) => a + b, 0) / (logPpsfs.length - 1))
+    : 0.18;
+  const nEff = Math.max(compPpsfs.length, 3);
+  const sigma_arv_log = v11.sigmaArvLog({ sigmaLogDisp, nEff, sigmaSysLogBacktest: 0 });
+  const monthlyDrift = Math.log(1 + m.momentum * 0.02); // ≈2%/yr scaled by momentum
+  const drift_used = v11.conservativeDrift(
+    { mu: monthlyDrift, sigma: 0.015 },
+    m.pending_ratio * 2 - 1, // pending ratio as leading signal proxy in [-1,1]
+  );
+  // Rehab PERT band around the deterministic cost.
+  const rehabL = reno * 0.85, rehabM = reno, rehabH = reno * 1.35;
+  const mc = v11.runMonteCarlo({
+    arv_today: arv,
+    drift_used_monthly: drift_used,
+    sigma_arv_log,
+    purchase_price: acq.modeled_offer,
+    rehab_scope: { L: rehabL, M: rehabM, H: rehabH },
+    rehab_scope_next: { L: rehabM, M: rehabH, H: rehabH * 1.4 },
+    p_jump: 0.15,
+    sigma_rehab_log_exec: 0.12,
+    hold_base_months: exit.exit_days / 30,
+    sigma_hold_exec: 1.2,
+    sigma_hold_market: 0.8,
+    hold_floor_months: 1,
+    carry_rate_annual: 0.11,
+    fixed_carry: 3800,
+    selling_cost_pct: 0.06,
+    loan_cost_of: (base, hold) => base * 0.02 + base * 0.115 * (hold / 12),
+    other_costs: 0,
+    n_draws: 800,
+    seed: Math.max(1, Math.floor(arv || 1)),
+  });
+
+  // --- (3) Skeptic (clustered noisy-OR) -----------------------------------
+  const defects: v11.DefectProb[] = [];
+  if (p.flood_zone && ["AE", "VE", "A"].includes(p.flood_zone)) defects.push({ cluster: "WATER", p: 0.4 });
+  if (p.condition_grade === "D") defects.push({ cluster: "STRUCTURE", p: 0.45 });
+  if ((p.year_built ?? 2000) < 1955) defects.push({ cluster: "STRUCTURE", p: 0.25 });
+  const taxAmt = distress.find((d) => d.event_type === "TAX_LIEN")?.amount ?? 0;
+  if (taxAmt > 25000) defects.push({ cluster: "LEGAL", p: Math.min(0.6, taxAmt / 100000) });
+  if ((ladder.comp_count ?? 0) < 3) defects.push({ cluster: "DATA_QUALITY", p: 0.5 });
+  const sigmaMarginPct = sigma_arv_log; // in log-price / margin space, close enough
+  const suspZ = marginPct > 0.45 ? (marginPct - 0.30) / Math.max(sigmaMarginPct, 0.05) : 0;
+  const F_surv = v11.skepticFactor(defects, suspZ);
+  const skeptic_flags = buildSkepticFlags(p, distress, marginPct);
+
+  // --- (4) Governor + exceedance rank ------------------------------------
+  const marginGov = v11.governorMargin(
+    marginPct,
+    Math.max(sigma_arv_log, 0.05),
+    m.momentum * 0.05, // crude "market-typical margin" prior
+    0.12,
+  );
+  const F_profit = v11.exceedanceRank(marginGov.mu, marginGov.sigma, 0.03, 0.10);
+
+  // --- (5) Safe score ------------------------------------------------------
+  const confidence = v11.clip01(1 - sigma_arv_log / Math.log(2));
+  const F_acq = v11.clip01(acq.acquisition_probability);
+  const F_exit = v11.clip01(v11.exitFactor(exit.exit_days, 45));
+  const F_conf = v11.clip01(confidence);
+  const F_gov = v11.clip01(1 - Math.abs(marginPct - marginGov.mu) / 0.20);
+  const scored = v11.safeScore(
+    { F_profit, F_acq, F_exit, F_surv, F_conf, F_gov },
+    { profit: 0.34, acq: 0.20, exit: 0.14, surv: 0.14, conf: 0.10, gov: 0.08 },
+    {
+      profit_p5: mc.profit_p5, loss_floor: -25_000,
+      p_loss: mc.P_loss, loss_prob_ceiling: 0.60,
+      confidence, confidence_floor: 0.15,
+    },
   );
 
-  const skeptic = skepticVerdict(p, distress, gross_profit, arv);
-
-  // Raw score: margin% weighted by acquisition & exit
-  const marginPct = arv > 0 ? gross_profit / arv : 0;
-  const raw = clamp(marginPct * 100, -20, 60) * 1.4 + acq.acquisition_probability * 30 +
-    (1 - exit.exit_days / 180) * 20 - skeptic.length * 6;
-
-  const uncertainty = clamp(0.15 + skeptic.length * 0.08 + (m.ppsf_stddev / (m.median_ppsf || 1)), 0.1, 0.85);
-  const tempered = governor(raw, uncertainty);
-  const perfect_score = clamp(Math.round(tempered), 0, 100);
-
+  const perfect_score = clamp(Math.round(scored.score), 0, 100);
+  const risk_adjusted_profit = round(mc.expected_profit);
+  const uncertainty = clamp(sigma_arv_log / Math.log(2), 0.1, 0.85);
   const grade = confidenceGrade(uncertainty, distress.length, p.is_listed);
 
-  // Ring routing
   let ring: Ring = 1;
   if (!p.is_listed && distress.length > 0) ring = 2;
   const prophecySignal = distress.some((d) => d.event_type === "FORECLOSURE_NOD" && !distress.some((x) => x.event_type === "AUCTION_SCHEDULED"));
@@ -294,7 +374,6 @@ export function underwrite(
   const offer_curve = [-0.08, -0.04, 0, 0.05, 0.1].map((delta) => {
     const offer = round(acq.modeled_offer * (1 + delta));
     const profit = round(arv - offer - reno - carry_cost - selling_cost);
-    // probability curve: lower offer → lower probability
     const probability = clamp(acq.acquisition_probability * (1 + delta * 3), 0.01, 0.98);
     return { offer, profit, probability: round2(probability) };
   });
@@ -313,12 +392,37 @@ export function underwrite(
     risk_adjusted_profit,
     perfect_score,
     confidence_grade: grade,
-    skeptic_flags: skeptic,
+    skeptic_flags: scored.rejected ? [`Rejected: ${scored.reason}`, ...skeptic_flags] : skeptic_flags,
     motivation_flags: acq.motivationFlags,
     ring,
     offer_curve,
+    // v11 diagnostics (typed as any to avoid breaking existing consumers)
+    ...({
+      mc_profit_p5: round(mc.profit_p5),
+      mc_profit_p50: round(mc.profit_p50),
+      mc_profit_p95: round(mc.profit_p95),
+      mc_p_loss: round2(mc.P_loss),
+      mc_cvar_loss: round(mc.cvar_loss_05),
+      mc_dqr: mc.dqr != null ? round2(mc.dqr) : null,
+      governor_kappa: round2(marginGov.kappa_model),
+      exceedance_rank: round2(F_profit),
+      sigma_arv_log: round2(sigma_arv_log),
+      drift_used_monthly: round2(drift_used * 100) / 100,
+    } as any),
   };
 }
+
+function buildSkepticFlags(p: ParcelInput, distress: DistressInput[], marginPct: number): string[] {
+  const flags: string[] = [];
+  if (p.flood_zone && ["AE", "VE", "A"].includes(p.flood_zone)) flags.push("FEMA high-risk flood zone");
+  if (p.condition_grade === "D") flags.push("Condition grade D — deep unknowns");
+  if ((p.year_built ?? 2000) < 1955) flags.push("Pre-1955 build — hidden systems risk");
+  const taxAmt = distress.find((d) => d.event_type === "TAX_LIEN")?.amount ?? 0;
+  if (taxAmt > 25000) flags.push(`Tax lien of $${Math.round(taxAmt / 1000)}k must be cleared`);
+  if (marginPct > 0.45) flags.push("Extreme apparent margin — market signal suggests hidden defect");
+  return flags;
+}
+
 
 // ---------------------------------------------------------------------------
 // Market context by county — normally learned from deed history.
