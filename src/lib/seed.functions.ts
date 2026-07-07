@@ -52,15 +52,13 @@ export const seedFixtures = createServerFn({ method: "POST" }).handler(async () 
     }
   }
   await supabase.from("ingestion_runs").delete().eq("source", "FIXTURE_SEED");
-  await supabase.from("counties").delete().neq("fips", "___");
-
-  // Counties
+  // Counties — upsert so we never nuke real ingested counties
   const countyRows = COUNTIES.map((c) => ({
     fips: c.fips, state: c.state, name: c.name,
     center_lat: c.lat, center_lng: c.lng,
     parcel_count: 0, last_ingested_at: new Date().toISOString(), coverage_pct: 100,
   }));
-  await supabase.from("counties").insert(countyRows);
+  await supabase.from("counties").upsert(countyRows, { onConflict: "fips" });
 
   const PARCELS_PER_COUNTY = 90;
   const allParcels: any[] = [];
