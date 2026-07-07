@@ -9,8 +9,38 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ShadowRouteImport } from './routes/shadow'
+import { Route as ProphecyRouteImport } from './routes/prophecy'
+import { Route as DealsRouteImport } from './routes/deals'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AccuracyRouteImport } from './routes/accuracy'
 import { Route as IndexRouteImport } from './routes/index'
 
+const ShadowRoute = ShadowRouteImport.update({
+  id: '/shadow',
+  path: '/shadow',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProphecyRoute = ProphecyRouteImport.update({
+  id: '/prophecy',
+  path: '/prophecy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DealsRoute = DealsRouteImport.update({
+  id: '/deals',
+  path: '/deals',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccuracyRoute = AccuracyRouteImport.update({
+  id: '/accuracy',
+  path: '/accuracy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -19,28 +49,90 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/accuracy': typeof AccuracyRoute
+  '/admin': typeof AdminRoute
+  '/deals': typeof DealsRoute
+  '/prophecy': typeof ProphecyRoute
+  '/shadow': typeof ShadowRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/accuracy': typeof AccuracyRoute
+  '/admin': typeof AdminRoute
+  '/deals': typeof DealsRoute
+  '/prophecy': typeof ProphecyRoute
+  '/shadow': typeof ShadowRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/accuracy': typeof AccuracyRoute
+  '/admin': typeof AdminRoute
+  '/deals': typeof DealsRoute
+  '/prophecy': typeof ProphecyRoute
+  '/shadow': typeof ShadowRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/accuracy' | '/admin' | '/deals' | '/prophecy' | '/shadow'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/accuracy' | '/admin' | '/deals' | '/prophecy' | '/shadow'
+  id:
+    | '__root__'
+    | '/'
+    | '/accuracy'
+    | '/admin'
+    | '/deals'
+    | '/prophecy'
+    | '/shadow'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccuracyRoute: typeof AccuracyRoute
+  AdminRoute: typeof AdminRoute
+  DealsRoute: typeof DealsRoute
+  ProphecyRoute: typeof ProphecyRoute
+  ShadowRoute: typeof ShadowRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/shadow': {
+      id: '/shadow'
+      path: '/shadow'
+      fullPath: '/shadow'
+      preLoaderRoute: typeof ShadowRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/prophecy': {
+      id: '/prophecy'
+      path: '/prophecy'
+      fullPath: '/prophecy'
+      preLoaderRoute: typeof ProphecyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/deals': {
+      id: '/deals'
+      path: '/deals'
+      fullPath: '/deals'
+      preLoaderRoute: typeof DealsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/accuracy': {
+      id: '/accuracy'
+      path: '/accuracy'
+      fullPath: '/accuracy'
+      preLoaderRoute: typeof AccuracyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -53,6 +145,11 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccuracyRoute: AccuracyRoute,
+  AdminRoute: AdminRoute,
+  DealsRoute: DealsRoute,
+  ProphecyRoute: ProphecyRoute,
+  ShadowRoute: ShadowRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
