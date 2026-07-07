@@ -157,7 +157,7 @@ function AdminPage() {
           <Globe className="h-4 w-4" />
           {ingestAll.isPending ? "Scanning live sources…" : "Scan all live public sources"}
         </button>
-        <button onClick={() => salesMut.mutate()} disabled={salesMut.isPending} className="inline-flex items-center gap-2 rounded-md bg-opportunity px-4 py-2 text-sm font-medium text-black disabled:opacity-50">
+        <button onClick={() => salesMut.mutate()} disabled={salesMut.isPending} className="inline-flex items-center gap-2 rounded-md bg-opportunity px-4 py-2 text-sm font-medium text-background disabled:opacity-50">
           <ScrollText className="h-4 w-4" />
           {salesMut.isPending ? "Fetching NYC sales…" : "Ingest real NYC sales (5 boroughs)"}
         </button>
@@ -248,7 +248,7 @@ function AdminPage() {
                 <button
                   onClick={() => discover.mutate(probeInput || probeResult.final_url)}
                   disabled={discover.isPending}
-                  className="ml-auto inline-flex items-center gap-1 rounded-md bg-opportunity px-2 py-1 text-[11px] font-medium text-black disabled:opacity-50"
+                  className="ml-auto inline-flex items-center gap-1 rounded-md bg-opportunity px-2 py-1 text-[11px] font-medium text-background disabled:opacity-50"
                 >
                   <Wand2 className="h-3 w-3" />
                   {discover.isPending ? "Discovering…" : "Discover schema"}
@@ -479,17 +479,17 @@ function AdminPage() {
                     <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Match confidence</div>
                     <div className="mt-2 overflow-hidden rounded border border-border">
                       <div className="flex h-6 w-full text-[10px]">
-                        <ConfBar label={`APN+County ${mb.apn_county}`} pct={pct(mb.apn_county)} className="bg-emerald-500/80 text-white" title="Highest confidence: exact APN match within county" />
+                        <ConfBar label={`APN+County ${mb.apn_county}`} pct={pct(mb.apn_county)} className="bg-profit-strong/85 text-background" title="Highest confidence: exact APN match within county" />
                         <ConfBar label={`Addr+County ${mb.addr_county}`} pct={pct(mb.addr_county)} className="bg-primary/80 text-primary-foreground" title="High confidence: normalized address + county" />
-                        <ConfBar label={`Addr+City ${mb.addr_city}`} pct={pct(mb.addr_city)} className="bg-amber-500/80 text-white" title="Medium confidence: normalized address + city (no county)" />
-                        <ConfBar label={`Unmatched ${res.unmatched}`} pct={pct(res.unmatched)} className="bg-skeptic/70 text-white" title="No parcel resolved" />
+                        <ConfBar label={`Addr+City ${mb.addr_city}`} pct={pct(mb.addr_city)} className="bg-opportunity/85 text-background" title="Medium confidence: normalized address + city (no county)" />
+                        <ConfBar label={`Unmatched ${res.unmatched}`} pct={pct(res.unmatched)} className="bg-skeptic/75 text-background" title="No parcel resolved" />
                       </div>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
-                      <span><span className="mr-1 inline-block h-2 w-2 rounded bg-emerald-500/80" />APN+County (highest)</span>
+                      <span><span className="mr-1 inline-block h-2 w-2 rounded bg-profit-strong/85" />APN+County (highest)</span>
                       <span><span className="mr-1 inline-block h-2 w-2 rounded bg-primary/80" />Addr+County (high)</span>
-                      <span><span className="mr-1 inline-block h-2 w-2 rounded bg-amber-500/80" />Addr+City (medium)</span>
-                      <span><span className="mr-1 inline-block h-2 w-2 rounded bg-skeptic/70" />Unmatched</span>
+                      <span><span className="mr-1 inline-block h-2 w-2 rounded bg-opportunity/85" />Addr+City (medium)</span>
+                      <span><span className="mr-1 inline-block h-2 w-2 rounded bg-skeptic/75" />Unmatched</span>
                     </div>
                   </div>
 
