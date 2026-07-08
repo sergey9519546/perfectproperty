@@ -349,7 +349,9 @@ export function underwrite(
     other_costs: 0,
     n_draws: 800,
     seed: Math.max(1, Math.floor(arv || 1)),
+    return_draws: true,
   });
+
 
   // --- (3) Skeptic (clustered noisy-OR) -----------------------------------
   const defects: v11.DefectProb[] = [];
