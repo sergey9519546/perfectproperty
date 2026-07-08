@@ -264,6 +264,23 @@ export const runUnderwrite = createServerFn({ method: "POST" }).handler(async ()
       exceedance_rank: (u as any).exceedance_rank ?? null,
       sigma_arv_log: (u as any).sigma_arv_log ?? null,
       drift_used_monthly: (u as any).drift_used_monthly ?? null,
+      arv_today: u.arv_today ?? null,
+      arv_exit_p5: u.arv_exit_p5 ?? null,
+      arv_exit_p50: u.arv_exit_p50 ?? null,
+      arv_exit_p95: u.arv_exit_p95 ?? null,
+      lightgbm_divergence: u.lightgbm_divergence ?? null,
+      primary_rank: u.primary_rank ?? null,
+      retail_score: u.retail_score ?? null,
+      survival_factor: u.survival_factor ?? null,
+      pd_credit: u.pd_credit ?? null,
+      pd_project: u.pd_project ?? null,
+      pd_exit: u.pd_exit ?? null,
+      ead: u.ead ?? null,
+      lgd: u.lgd ?? null,
+      expected_loss: u.expected_loss ?? null,
+      risk_adjusted_profit_credit: u.risk_adjusted_profit_credit ?? null,
+      raroc: u.raroc ?? null,
+      gate_status: u.gate_status ?? null,
     });
   }
 

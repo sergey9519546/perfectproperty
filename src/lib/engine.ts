@@ -248,9 +248,37 @@ export interface UnderwriteResult {
   motivation_flags: string[];
   ring: Ring;
   offer_curve: { offer: number; profit: number; probability: number }[];
+  // ---- v12 valuation + risk + credit + gates (all optional for back-compat) ----
+  arv_today?: number;
+  arv_exit_p5?: number;
+  arv_exit_p50?: number;
+  arv_exit_p95?: number;
+  lightgbm_divergence?: number;
+  primary_rank?: number;         // P(true_margin >= floor)
+  retail_score?: number;         // 0..100, geometric-mean of 4 factors
+  survival_factor?: number;      // clustered noisy-OR survival
+  pd_credit?: number;
+  pd_project?: number;
+  pd_exit?: number;
+  ead?: number;
+  lgd?: number;
+  expected_loss?: number;
+  risk_adjusted_profit_credit?: number;
+  raroc?: number;
+  gate_status?: {
+    passed: number[];
+    map_glow: boolean;
+    prophecy_ranking: boolean;
+    institutional_credit: boolean;
+    capital_allocation: boolean;
+    public_performance_claim: boolean;
+  };
 }
 
 import * as v11 from "./engine/v11";
+import * as v12 from "./engine/v12";
+import * as credit from "./engine/credit";
+
 
 /**
  * v11 upgrade — the underwrite orchestrator now runs the canon:
@@ -321,7 +349,9 @@ export function underwrite(
     other_costs: 0,
     n_draws: 800,
     seed: Math.max(1, Math.floor(arv || 1)),
+    return_draws: true,
   });
+
 
   // --- (3) Skeptic (clustered noisy-OR) -----------------------------------
   const defects: v11.DefectProb[] = [];
@@ -378,6 +408,82 @@ export function underwrite(
     return { offer, profit, probability: round2(probability) };
   });
 
+  // --- (6) v12 layer: exit distribution, primary rank, retail score, survival --
+  const draws = mc.draws?.profits ?? [];
+  const arvExits = mc.draws?.arvExits ?? [];
+  const cost_basis = acq.modeled_offer + reno;
+  const primary_rank = draws.length
+    ? v12.primaryRankFromMC(draws, cost_basis, 0.10)
+    : 0;
+  const v12Defects: v12.V12Defect[] = defects
+    .filter((d) => d.cluster !== "DATA_QUALITY")
+    .map((d) => ({ cluster: d.cluster as v12.V12RiskCluster, p: d.p }));
+  const survival_factor = v12.survivalFactorV12(v12Defects, { WATER: 0.6, LEGAL: 0.5 });
+  const retail_score = v12.retailScore({
+    F1_margin_exceedance: primary_rank,
+    F2_p_accept: acq.acquisition_probability,
+    F3_p_sale_90d: v12.fExit90d(1 / Math.max(exit.exit_days, 1)),
+    F4_survival: survival_factor,
+  });
+  const sortedExits = [...arvExits].sort((a, b) => a - b);
+  const qExit = (pct: number) =>
+    sortedExits.length ? sortedExits[Math.min(sortedExits.length - 1, Math.floor(pct * sortedExits.length))] : arv;
+  const arv_today = arv;
+  const arv_exit_p5 = qExit(0.05);
+  const arv_exit_p50 = qExit(0.50);
+  const arv_exit_p95 = qExit(0.95);
+  const lightgbm_divergence = 0; // placeholder — no anchor model trained yet
+
+  // --- (7) Credit layer -----------------------------------------------------
+  const hazardFeatures: credit.HazardFeatures = {
+    borrower_experience: 0.5,
+    verified_liquidity_buffer: 0.4,
+    rehab_complexity: scope === "EXPANDED" ? 0.8 : scope === "FULL" ? 0.5 : 0.2,
+    market_stress: clamp(-m.momentum, -1, 1),
+    lien_depth: taxAmt > 0 ? 0.6 : 0.2,
+    prior_default: 0,
+    draw_variance: 0.3,
+    covenant_breach_flag: 0,
+  };
+  const monthsH = Math.max(3, Math.round(exit.exit_days / 30));
+  const pd_credit = credit.pdCreditStationary(hazardFeatures, monthsH);
+  const pd_project = clamp(pd_credit * 0.8, 0, 1);
+  const pd_exit = clamp((1 - v12.fExit90d(1 / Math.max(exit.exit_days, 1))) * 0.5, 0, 1);
+  const ead = credit.exposureAtDefault({
+    outstanding_principal: acq.modeled_offer,
+    approved_undrawn_rehab_available: reno,
+    accrued_interest: acq.modeled_offer * 0.02,
+    capitalized_fees: acq.modeled_offer * 0.01,
+    extension_fees: 0,
+    protective_advances: 0,
+    expected_carry_to_resolution: carry_cost,
+  });
+  const lgd = credit.lgd({
+    ARV: arv, ARV_shock: -0.15, liquidation_haircut: 0.85,
+    foreclosure_cost: 15_000, liquidation_carry_cost: carry_cost * 0.5,
+    senior_claims: taxAmt, selling_cost: selling_cost, legal_workout_cost: 8_000,
+  }, ead);
+  const expected_loss = credit.expectedLoss(pd_credit, lgd, ead);
+  const risk_adjusted_profit_credit = credit.riskAdjustedProfit({
+    E_profit_no_default: mc.expected_profit,
+    EL: expected_loss,
+    capital_charge: ead * 0.02,
+    liquidity_charge: ead * 0.005,
+    servicing_and_workout_cost: 2500,
+  });
+  const raroc = risk_adjusted_profit_credit / Math.max(ead * 0.10, 1); // EC ≈ 10% of EAD stub
+
+  // --- (8) Gates 0-8 --------------------------------------------------------
+  const passed = new Set<number>();
+  passed.add(0); passed.add(1); // seeded infra + entity resolution assumed live
+  if (ladder.comp_count >= 3) passed.add(2);
+  // Gate 3 (falsifier) not yet passed — locks Prophecy / institutional surfaces
+  // Gates 4-8 remain locked pending business milestones
+  const trust = v12.gate3TrustLock(passed);
+  const gate_status = { passed: [...passed].sort((a, b) => a - b), ...trust };
+
+
+
   return {
     ...ladder,
     recommended_scope: scope,
@@ -394,8 +500,26 @@ export function underwrite(
     confidence_grade: grade,
     skeptic_flags: scored.rejected ? [`Rejected: ${scored.reason}`, ...skeptic_flags] : skeptic_flags,
     motivation_flags: acq.motivationFlags,
-    ring,
+    ring: trust.prophecy_ranking ? ring : Math.min(ring, 2) as Ring,
     offer_curve,
+    // v12 outputs
+    arv_today: round(arv_today),
+    arv_exit_p5: round(arv_exit_p5),
+    arv_exit_p50: round(arv_exit_p50),
+    arv_exit_p95: round(arv_exit_p95),
+    lightgbm_divergence,
+    primary_rank: round2(primary_rank),
+    retail_score: round2(retail_score),
+    survival_factor: round2(survival_factor),
+    pd_credit: round2(pd_credit),
+    pd_project: round2(pd_project),
+    pd_exit: round2(pd_exit),
+    ead: round(ead),
+    lgd: round2(lgd),
+    expected_loss: round(expected_loss),
+    risk_adjusted_profit_credit: round(risk_adjusted_profit_credit),
+    raroc: round2(raroc),
+    gate_status,
     // v11 diagnostics (typed as any to avoid breaking existing consumers)
     ...({
       mc_profit_p5: round(mc.profit_p5),
@@ -411,6 +535,7 @@ export function underwrite(
     } as any),
   };
 }
+
 
 function buildSkepticFlags(p: ParcelInput, distress: DistressInput[], marginPct: number): string[] {
   const flags: string[] = [];
