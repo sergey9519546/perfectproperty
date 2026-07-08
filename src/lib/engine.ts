@@ -248,9 +248,37 @@ export interface UnderwriteResult {
   motivation_flags: string[];
   ring: Ring;
   offer_curve: { offer: number; profit: number; probability: number }[];
+  // ---- v12 valuation + risk + credit + gates (all optional for back-compat) ----
+  arv_today?: number;
+  arv_exit_p5?: number;
+  arv_exit_p50?: number;
+  arv_exit_p95?: number;
+  lightgbm_divergence?: number;
+  primary_rank?: number;         // P(true_margin >= floor)
+  retail_score?: number;         // 0..100, geometric-mean of 4 factors
+  survival_factor?: number;      // clustered noisy-OR survival
+  pd_credit?: number;
+  pd_project?: number;
+  pd_exit?: number;
+  ead?: number;
+  lgd?: number;
+  expected_loss?: number;
+  risk_adjusted_profit_credit?: number;
+  raroc?: number;
+  gate_status?: {
+    passed: number[];
+    map_glow: boolean;
+    prophecy_ranking: boolean;
+    institutional_credit: boolean;
+    capital_allocation: boolean;
+    public_performance_claim: boolean;
+  };
 }
 
 import * as v11 from "./engine/v11";
+import * as v12 from "./engine/v12";
+import * as credit from "./engine/credit";
+
 
 /**
  * v11 upgrade — the underwrite orchestrator now runs the canon:
