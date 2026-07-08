@@ -387,8 +387,10 @@ export interface MCResults {
   arv_exit_p50: number;
   hold_p50_months: number;
   rehab_p50: number;
+  /** Raw per-draw arrays. Populated only when `return_draws` is set. */
+  draws?: { profits: number[]; arvExits: number[]; holds: number[]; rehabs: number[] };
 }
-export function runMonteCarlo(m: MCInputs): MCResults {
+export function runMonteCarlo(m: MCInputs & { return_draws?: boolean }): MCResults {
   const rng = makeRng(m.seed ?? 1);
   const profits: number[] = new Array(m.n_draws);
   const arvExits: number[] = new Array(m.n_draws);
@@ -431,8 +433,10 @@ export function runMonteCarlo(m: MCInputs): MCResults {
     arv_exit_p50: median(arvExits),
     hold_p50_months: median(holds),
     rehab_p50: median(rehabs),
+    ...(m.return_draws ? { draws: { profits, arvExits, holds, rehabs } } : {}),
   };
 }
+
 
 // =============================================================================
 // 0H.10.5  Safe score composition — weighted geometric mean of unit factors
