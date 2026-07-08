@@ -500,8 +500,26 @@ export function underwrite(
     confidence_grade: grade,
     skeptic_flags: scored.rejected ? [`Rejected: ${scored.reason}`, ...skeptic_flags] : skeptic_flags,
     motivation_flags: acq.motivationFlags,
-    ring,
+    ring: trust.prophecy_ranking ? ring : Math.min(ring, 2) as Ring,
     offer_curve,
+    // v12 outputs
+    arv_today: round(arv_today),
+    arv_exit_p5: round(arv_exit_p5),
+    arv_exit_p50: round(arv_exit_p50),
+    arv_exit_p95: round(arv_exit_p95),
+    lightgbm_divergence,
+    primary_rank: round2(primary_rank),
+    retail_score: round2(retail_score),
+    survival_factor: round2(survival_factor),
+    pd_credit: round2(pd_credit),
+    pd_project: round2(pd_project),
+    pd_exit: round2(pd_exit),
+    ead: round(ead),
+    lgd: round2(lgd),
+    expected_loss: round(expected_loss),
+    risk_adjusted_profit_credit: round(risk_adjusted_profit_credit),
+    raroc: round2(raroc),
+    gate_status,
     // v11 diagnostics (typed as any to avoid breaking existing consumers)
     ...({
       mc_profit_p5: round(mc.profit_p5),
@@ -517,6 +535,7 @@ export function underwrite(
     } as any),
   };
 }
+
 
 function buildSkepticFlags(p: ParcelInput, distress: DistressInput[], marginPct: number): string[] {
   const flags: string[] = [];
