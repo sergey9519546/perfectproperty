@@ -95,6 +95,65 @@ export type Database = {
         }
         Relationships: []
       }
+      decision_audit: {
+        Row: {
+          compliance_flags: Json
+          decision_id: string
+          hash: string
+          id: string
+          input_snapshot: Json
+          model_version: string
+          output_snapshot: Json
+          parcel_id: string | null
+          policy_version: string
+          previous_hash: string
+          reason_codes: Json
+          seq: number
+          ts: string
+          user_id: string | null
+        }
+        Insert: {
+          compliance_flags?: Json
+          decision_id: string
+          hash: string
+          id?: string
+          input_snapshot: Json
+          model_version: string
+          output_snapshot: Json
+          parcel_id?: string | null
+          policy_version: string
+          previous_hash: string
+          reason_codes?: Json
+          seq?: number
+          ts?: string
+          user_id?: string | null
+        }
+        Update: {
+          compliance_flags?: Json
+          decision_id?: string
+          hash?: string
+          id?: string
+          input_snapshot?: Json
+          model_version?: string
+          output_snapshot?: Json
+          parcel_id?: string | null
+          policy_version?: string
+          previous_hash?: string
+          reason_codes?: Json
+          seq?: number
+          ts?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decision_audit_parcel_id_fkey"
+            columns: ["parcel_id"]
+            isOneToOne: false
+            referencedRelation: "parcels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deeds: {
         Row: {
           buyer: string | null
@@ -280,7 +339,11 @@ export type Database = {
       parcel_scores: {
         Row: {
           acquisition_probability: number
+          arv_exit_p5: number | null
+          arv_exit_p50: number | null
+          arv_exit_p95: number | null
           arv_source: string
+          arv_today: number | null
           as_is_value: number
           carry_cost: number
           comp_count: number
@@ -290,13 +353,18 @@ export type Database = {
           cosmetic_arv: number
           data_source: string
           drift_used_monthly: number | null
+          ead: number | null
           exceedance_rank: number | null
           exit_confidence: number
           exit_days: number
           expanded_arv: number
+          expected_loss: number | null
           full_reno_arv: number
+          gate_status: Json | null
           governor_kappa: number | null
           gross_profit: number
+          lgd: number | null
+          lightgbm_divergence: number | null
           mc_cvar_loss: number | null
           mc_dqr: number | null
           mc_p_loss: number | null
@@ -305,18 +373,30 @@ export type Database = {
           mc_profit_p95: number | null
           modeled_offer: number
           parcel_id: string
+          pd_credit: number | null
+          pd_exit: number | null
+          pd_project: number | null
           perfect_score: number
+          primary_rank: number | null
+          raroc: number | null
           recommended_scope: string
           reno_cost: number
+          retail_score: number | null
           ring: number
           risk_adjusted_profit: number
+          risk_adjusted_profit_credit: number | null
           selling_cost: number
           sigma_arv_log: number | null
           skeptic_flags: Json
+          survival_factor: number | null
         }
         Insert: {
           acquisition_probability: number
+          arv_exit_p5?: number | null
+          arv_exit_p50?: number | null
+          arv_exit_p95?: number | null
           arv_source?: string
+          arv_today?: number | null
           as_is_value: number
           carry_cost: number
           comp_count?: number
@@ -326,13 +406,18 @@ export type Database = {
           cosmetic_arv: number
           data_source?: string
           drift_used_monthly?: number | null
+          ead?: number | null
           exceedance_rank?: number | null
           exit_confidence: number
           exit_days: number
           expanded_arv: number
+          expected_loss?: number | null
           full_reno_arv: number
+          gate_status?: Json | null
           governor_kappa?: number | null
           gross_profit: number
+          lgd?: number | null
+          lightgbm_divergence?: number | null
           mc_cvar_loss?: number | null
           mc_dqr?: number | null
           mc_p_loss?: number | null
@@ -341,18 +426,30 @@ export type Database = {
           mc_profit_p95?: number | null
           modeled_offer: number
           parcel_id: string
+          pd_credit?: number | null
+          pd_exit?: number | null
+          pd_project?: number | null
           perfect_score: number
+          primary_rank?: number | null
+          raroc?: number | null
           recommended_scope: string
           reno_cost: number
+          retail_score?: number | null
           ring?: number
           risk_adjusted_profit: number
+          risk_adjusted_profit_credit?: number | null
           selling_cost: number
           sigma_arv_log?: number | null
           skeptic_flags?: Json
+          survival_factor?: number | null
         }
         Update: {
           acquisition_probability?: number
+          arv_exit_p5?: number | null
+          arv_exit_p50?: number | null
+          arv_exit_p95?: number | null
           arv_source?: string
+          arv_today?: number | null
           as_is_value?: number
           carry_cost?: number
           comp_count?: number
@@ -362,13 +459,18 @@ export type Database = {
           cosmetic_arv?: number
           data_source?: string
           drift_used_monthly?: number | null
+          ead?: number | null
           exceedance_rank?: number | null
           exit_confidence?: number
           exit_days?: number
           expanded_arv?: number
+          expected_loss?: number | null
           full_reno_arv?: number
+          gate_status?: Json | null
           governor_kappa?: number | null
           gross_profit?: number
+          lgd?: number | null
+          lightgbm_divergence?: number | null
           mc_cvar_loss?: number | null
           mc_dqr?: number | null
           mc_p_loss?: number | null
@@ -377,14 +479,22 @@ export type Database = {
           mc_profit_p95?: number | null
           modeled_offer?: number
           parcel_id?: string
+          pd_credit?: number | null
+          pd_exit?: number | null
+          pd_project?: number | null
           perfect_score?: number
+          primary_rank?: number | null
+          raroc?: number | null
           recommended_scope?: string
           reno_cost?: number
+          retail_score?: number | null
           ring?: number
           risk_adjusted_profit?: number
+          risk_adjusted_profit_credit?: number | null
           selling_cost?: number
           sigma_arv_log?: number | null
           skeptic_flags?: Json
+          survival_factor?: number | null
         }
         Relationships: [
           {
