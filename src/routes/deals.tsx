@@ -99,3 +99,130 @@ export function PageHead({ title, sub }: { title: string; sub: string }) {
     </div>
   );
 }
+
+const SCENARIOS: Record<string, StressScenario> = {
+  base: {
+    ARV_shock: 0, rehab_multiplier: 1, hold_months_additive: 0, hold_multiplier: 1,
+    rate_shock: 0, PD_multiplier: 1, LGD_multiplier: 1,
+    financing_available: true, warehouse_haircut: 0,
+    insurance_cost_shock: 0, liquidity_exit_shock: 0,
+  },
+  arv15: {
+    ARV_shock: -0.15, rehab_multiplier: 1, hold_months_additive: 0, hold_multiplier: 1,
+    rate_shock: 0, PD_multiplier: 1.4, LGD_multiplier: 1.2,
+    financing_available: true, warehouse_haircut: 0,
+    insurance_cost_shock: 0, liquidity_exit_shock: 0.05,
+  },
+  rate200: {
+    ARV_shock: 0, rehab_multiplier: 1, hold_months_additive: 0, hold_multiplier: 1,
+    rate_shock: 0.20, PD_multiplier: 1.2, LGD_multiplier: 1.0,
+    financing_available: true, warehouse_haircut: 0,
+    insurance_cost_shock: 0, liquidity_exit_shock: 0,
+  },
+  hold3: {
+    ARV_shock: 0, rehab_multiplier: 1, hold_months_additive: 3, hold_multiplier: 1,
+    rate_shock: 0, PD_multiplier: 1.15, LGD_multiplier: 1.0,
+    financing_available: true, warehouse_haircut: 0,
+    insurance_cost_shock: 0.05, liquidity_exit_shock: 0,
+  },
+};
+
+function StressPanel({ rows }: { rows: any[] }) {
+  const [key, setKey] = useState<keyof typeof SCENARIOS>("arv15");
+  const scenario = SCENARIOS[key];
+
+  const { deals, weights, perDeal } = useMemo(() => {
+    const deals: DealBase[] = [];
+    const weights: number[] = [];
+    const perDeal: Array<{ id: string; addr: string; base: number; stressed: number; delta: number }> = [];
+    for (const r of rows) {
+      const arv = Number(
+        r.recommended_scope === "COSMETIC" ? r.cosmetic_arv :
+        r.recommended_scope === "FULL" ? r.full_reno_arv :
+        r.recommended_scope === "EXPANDED" ? r.expanded_arv :
+        r.risk_adjusted_profit,
+      );
+      const P = Number(r.modeled_offer ?? 0);
+      const R = Number(r.reno_cost ?? 0);
+      const exit_days = Number(r.exit_days ?? 90);
+      if (!Number.isFinite(arv) || !arv) continue;
+      const d: DealBase = {
+        ARV: arv, P, R,
+        H_base: Math.max(1, exit_days / 30),
+        base_rate: 0.11, base_insurance: 180,
+        base_selling_cost: Number(r.selling_cost ?? arv * 0.06),
+        base_loan_cost_per_month: (P * 0.11) / 12,
+        base_carry_cost_per_month: Number(r.carry_cost ?? 3800) / Math.max(1, exit_days / 30),
+        EAD: Number(r.ead ?? P + R),
+        PD_credit: Number(r.pd_credit ?? 0.05),
+        LGD: Number(r.lgd ?? 0.4),
+        E_profit_base: Number(r.risk_adjusted_profit_credit ?? r.gross_profit ?? 0),
+      };
+      deals.push(d);
+      weights.push(1);
+      const s = stressedDeal(d, scenario);
+      perDeal.push({
+        id: r.parcel_id,
+        addr: r.parcels?.address ?? "—",
+        base: d.E_profit_base,
+        stressed: s.EProfit,
+        delta: s.EProfit - d.E_profit_base,
+      });
+    }
+    return { deals, weights, perDeal };
+  }, [rows, scenario]);
+
+  const portfolioLoss = portfolioStressLossMean(deals, weights, scenario);
+  const totalBase = perDeal.reduce((a, r) => a + r.base, 0);
+  const totalStressed = perDeal.reduce((a, r) => a + r.stressed, 0);
+
+  const buttons: Array<{ k: keyof typeof SCENARIOS; label: string }> = [
+    { k: "base", label: "Base" },
+    { k: "arv15", label: "-15% ARV" },
+    { k: "rate200", label: "Rate +200bps" },
+    { k: "hold3", label: "+3 mo hold" },
+  ];
+
+  return (
+    <div className="mt-6 rounded-lg border border-border bg-surface p-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Portfolio stress test</div>
+          <div className="mt-0.5 text-[13px] text-foreground">Applied across {deals.length} deals.</div>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {buttons.map((b) => (
+            <button
+              key={b.k}
+              onClick={() => setKey(b.k)}
+              className="rounded-md border px-2.5 py-1 text-[12px]"
+              style={{
+                borderColor: key === b.k ? "color-mix(in oklab, var(--opportunity) 45%, transparent)" : "var(--border)",
+                background: key === b.k ? "color-mix(in oklab, var(--opportunity) 12%, transparent)" : "var(--surface-2)",
+                color: key === b.k ? "var(--opportunity)" : "var(--foreground)",
+              }}
+            >
+              {b.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <MiniBox label="Base E[Profit]" v={fmt$(totalBase)} />
+        <MiniBox label="Stressed E[Profit]" v={fmt$(totalStressed)} tone={totalStressed < totalBase ? "skeptic" : "profit"} />
+        <MiniBox label="Portfolio loss" v={fmt$(portfolioLoss)} tone="skeptic" />
+        <MiniBox label="Delta / deal (avg)" v={fmt$(perDeal.length ? (totalStressed - totalBase) / perDeal.length : 0)} />
+      </div>
+    </div>
+  );
+}
+
+function MiniBox({ label, v, tone }: { label: string; v: string; tone?: "skeptic" | "profit" }) {
+  const color = tone === "skeptic" ? "var(--skeptic)" : tone === "profit" ? "var(--profit-strong)" : undefined;
+  return (
+    <div className="rounded-md border border-border bg-surface-2 px-3 py-2">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="num mt-0.5 text-[14px] font-semibold" style={{ color }}>{v}</div>
+    </div>
+  );
+}
