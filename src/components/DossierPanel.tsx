@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getDossier } from "@/lib/parcels.functions";
 import { fmt$, pct, tierLabel } from "@/lib/format";
-import { X, TrendingUp, AlertTriangle, Building2, ScrollText, Zap, Activity } from "lucide-react";
+import { X, TrendingUp, AlertTriangle, Building2, ScrollText, Zap, Activity, ShieldCheck, Lock } from "lucide-react";
 
 interface Props {
   parcelId: string | null;
