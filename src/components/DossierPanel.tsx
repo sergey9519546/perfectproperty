@@ -36,6 +36,9 @@ export function DossierPanel({ parcelId, onClose }: Props) {
           <ScoreStrip d={q.data} />
           <ValueLadder d={q.data} />
           <MonteCarloBlock d={q.data} />
+          <V12RiskBlock d={q.data} />
+          <CreditBlock d={q.data} />
+          <GatesBlock d={q.data} />
           <OfferCurve d={q.data} />
           <ExitForecast d={q.data} />
           <SkepticBlock d={q.data} />
