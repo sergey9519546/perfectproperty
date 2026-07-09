@@ -619,6 +619,75 @@ export type Database = {
           },
         ]
       }
+      portfolio_metrics: {
+        Row: {
+          breach_reasons: Json
+          calibration_flag: boolean | null
+          calibration_intercept: number | null
+          calibration_slope: number | null
+          computed_at: string
+          cvar_95: number | null
+          ec: number | null
+          el: number | null
+          hhi_county: number | null
+          hhi_scope: number | null
+          id: string
+          lcr: number | null
+          n_deals: number
+          psi: number | null
+          psi_band: string | null
+          raroc: number | null
+          risk_appetite_breached: boolean
+          scope: string
+          summary: Json
+          var_95: number | null
+        }
+        Insert: {
+          breach_reasons?: Json
+          calibration_flag?: boolean | null
+          calibration_intercept?: number | null
+          calibration_slope?: number | null
+          computed_at?: string
+          cvar_95?: number | null
+          ec?: number | null
+          el?: number | null
+          hhi_county?: number | null
+          hhi_scope?: number | null
+          id?: string
+          lcr?: number | null
+          n_deals?: number
+          psi?: number | null
+          psi_band?: string | null
+          raroc?: number | null
+          risk_appetite_breached?: boolean
+          scope?: string
+          summary?: Json
+          var_95?: number | null
+        }
+        Update: {
+          breach_reasons?: Json
+          calibration_flag?: boolean | null
+          calibration_intercept?: number | null
+          calibration_slope?: number | null
+          computed_at?: string
+          cvar_95?: number | null
+          ec?: number | null
+          el?: number | null
+          hhi_county?: number | null
+          hhi_scope?: number | null
+          id?: string
+          lcr?: number | null
+          n_deals?: number
+          psi?: number | null
+          psi_band?: string | null
+          raroc?: number | null
+          risk_appetite_breached?: boolean
+          scope?: string
+          summary?: Json
+          var_95?: number | null
+        }
+        Relationships: []
+      }
       prediction_outcomes: {
         Row: {
           actual_profit: number | null

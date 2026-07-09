@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getDossier } from "@/lib/parcels.functions";
 import { fmt$, pct, tierLabel } from "@/lib/format";
-import { X, TrendingUp, AlertTriangle, Building2, ScrollText, Zap, Activity } from "lucide-react";
+import { X, TrendingUp, AlertTriangle, Building2, ScrollText, Zap, Activity, ShieldCheck, Lock } from "lucide-react";
 
 interface Props {
   parcelId: string | null;
@@ -36,6 +36,9 @@ export function DossierPanel({ parcelId, onClose }: Props) {
           <ScoreStrip d={q.data} />
           <ValueLadder d={q.data} />
           <MonteCarloBlock d={q.data} />
+          <V12RiskBlock d={q.data} />
+          <CreditBlock d={q.data} />
+          <GatesBlock d={q.data} />
           <OfferCurve d={q.data} />
           <ExitForecast d={q.data} />
           <SkepticBlock d={q.data} />
@@ -385,5 +388,123 @@ function MiniStat({ label, v }: { label: string; v: React.ReactNode }) {
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className="mt-0.5 text-[13px] text-foreground">{v}</div>
     </div>
+  );
+}
+
+function V12RiskBlock({ d }: { d: D }) {
+  const s: any = d.score; if (!s) return null;
+  const primary = Number(s.primary_rank ?? NaN);
+  const retail = Number(s.retail_score ?? NaN);
+  const surv = Number(s.survival_factor ?? NaN);
+  const arvT = Number(s.arv_today ?? NaN);
+  const p5 = Number(s.arv_exit_p5 ?? NaN);
+  const p50 = Number(s.arv_exit_p50 ?? NaN);
+  const p95 = Number(s.arv_exit_p95 ?? NaN);
+  const div = Number(s.lightgbm_divergence ?? NaN);
+  if (!Number.isFinite(primary) && !Number.isFinite(arvT)) return null;
+  return (
+    <section>
+      <SectionHead icon={<Activity className="h-3.5 w-3.5" />} title="Risk — v12 exit distribution" />
+      <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+        <MiniStat label="ARV today" v={<span className="num">{Number.isFinite(arvT) ? fmt$(arvT) : "—"}</span>} />
+        <MiniStat label="ARV exit P50" v={<span className="num">{Number.isFinite(p50) ? fmt$(p50) : "—"}</span>} />
+        <MiniStat label="Divergence" v={<span className="num">{Number.isFinite(div) ? div.toFixed(2) : "—"}</span>} />
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+        <MiniStat label="ARV exit P5" v={<span className="num">{Number.isFinite(p5) ? fmt$(p5) : "—"}</span>} />
+        <MiniStat label="ARV exit P95" v={<span className="num text-profit-strong">{Number.isFinite(p95) ? fmt$(p95) : "—"}</span>} />
+        <MiniStat label="Survival" v={<span className="num">{Number.isFinite(surv) ? surv.toFixed(2) : "—"}</span>} />
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+        <MiniStat label="Primary rank" v={<span className="num">{Number.isFinite(primary) ? pct(primary) : "—"}</span>} />
+        <MiniStat label="Retail score" v={<span className="num">{Number.isFinite(retail) ? retail.toFixed(0) : "—"}</span>} />
+      </div>
+    </section>
+  );
+}
+
+function CreditBlock({ d }: { d: D }) {
+  const s: any = d.score; if (!s) return null;
+  const pdC = Number(s.pd_credit ?? NaN);
+  if (!Number.isFinite(pdC)) return null;
+  const pdP = Number(s.pd_project ?? NaN);
+  const pdE = Number(s.pd_exit ?? NaN);
+  const ead = Number(s.ead ?? NaN);
+  const lgd = Number(s.lgd ?? NaN);
+  const el = Number(s.expected_loss ?? NaN);
+  const rap = Number(s.risk_adjusted_profit_credit ?? NaN);
+  const raroc = Number(s.raroc ?? NaN);
+  return (
+    <section>
+      <SectionHead icon={<ShieldCheck className="h-3.5 w-3.5" />} title="Credit — PD · EAD · LGD · EL" />
+      <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+        <MiniStat label="PD credit" v={<span className="num">{pct(pdC)}</span>} />
+        <MiniStat label="PD project" v={<span className="num">{Number.isFinite(pdP) ? pct(pdP) : "—"}</span>} />
+        <MiniStat label="PD exit" v={<span className="num">{Number.isFinite(pdE) ? pct(pdE) : "—"}</span>} />
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+        <MiniStat label="EAD" v={<span className="num">{Number.isFinite(ead) ? fmt$(ead) : "—"}</span>} />
+        <MiniStat label="LGD" v={<span className="num">{Number.isFinite(lgd) ? pct(lgd) : "—"}</span>} />
+        <MiniStat label="Expected loss" v={<span className="num" style={{ color: "var(--skeptic)" }}>{Number.isFinite(el) ? fmt$(el) : "—"}</span>} />
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+        <MiniStat label="Risk-adj profit (credit)" v={<span className="num" style={{ color: rap > 0 ? "var(--profit-strong)" : "var(--skeptic)" }}>{Number.isFinite(rap) ? fmt$(rap) : "—"}</span>} />
+        <MiniStat label="RAROC" v={<span className="num">{Number.isFinite(raroc) ? `${(raroc * 100).toFixed(1)}%` : "—"}</span>} />
+      </div>
+    </section>
+  );
+}
+
+function GatesBlock({ d }: { d: D }) {
+  const s: any = d.score; if (!s) return null;
+  const gs = s.gate_status;
+  if (!gs) return null;
+  const passed: number[] = gs.passed ?? [];
+  const flags: Array<[string, boolean]> = [
+    ["Map glow", !!gs.map_glow],
+    ["Prophecy ranking", !!gs.prophecy_ranking],
+    ["Institutional credit", !!gs.institutional_credit],
+    ["Capital allocation", !!gs.capital_allocation],
+    ["Public performance claim", !!gs.public_performance_claim],
+  ];
+  return (
+    <section>
+      <SectionHead icon={<Lock className="h-3.5 w-3.5" />} title="Gates 0–8" />
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((n) => {
+          const ok = passed.includes(n);
+          return (
+            <span
+              key={n}
+              className="rounded-md px-2 py-1 text-[11px]"
+              style={{
+                border: `1px solid ${ok ? "color-mix(in oklab, var(--profit-strong) 40%, transparent)" : "var(--border)"}`,
+                backgroundColor: ok ? "color-mix(in oklab, var(--profit-strong) 12%, transparent)" : "var(--surface-2)",
+                color: ok ? "var(--profit-strong)" : "var(--muted-foreground)",
+              }}
+            >
+              G{n}{ok ? " ✓" : ""}
+            </span>
+          );
+        })}
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+        {flags.map(([label, on]) => (
+          <div
+            key={label}
+            className="rounded-md border px-3 py-2"
+            style={{
+              borderColor: on ? "color-mix(in oklab, var(--profit-strong) 30%, transparent)" : "var(--border)",
+              backgroundColor: on ? "color-mix(in oklab, var(--profit-strong) 8%, transparent)" : "var(--surface-2)",
+            }}
+          >
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+            <div className="mt-0.5 text-[12px]" style={{ color: on ? "var(--profit-strong)" : "var(--muted-foreground)" }}>
+              {on ? "unlocked" : "locked"}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
