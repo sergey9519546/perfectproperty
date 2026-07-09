@@ -114,6 +114,7 @@ function TopNav() {
             { to: "/shadow", label: "Shadow Market" },
             { to: "/prophecy", label: "Prophecy" },
             { to: "/accuracy", label: "Accuracy" },
+            { to: "/monitoring", label: "Monitoring" },
             { to: "/admin", label: "Ingestion" },
           ].map((l) => (
             <Link

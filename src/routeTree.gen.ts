@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ShadowRouteImport } from './routes/shadow'
 import { Route as ProphecyRouteImport } from './routes/prophecy'
+import { Route as MonitoringRouteImport } from './routes/monitoring'
 import { Route as DealsRouteImport } from './routes/deals'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccuracyRouteImport } from './routes/accuracy'
@@ -27,6 +28,11 @@ const ShadowRoute = ShadowRouteImport.update({
 const ProphecyRoute = ProphecyRouteImport.update({
   id: '/prophecy',
   path: '/prophecy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MonitoringRoute = MonitoringRouteImport.update({
+  id: '/monitoring',
+  path: '/monitoring',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DealsRoute = DealsRouteImport.update({
@@ -70,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/accuracy': typeof AccuracyRoute
   '/admin': typeof AdminRoute
   '/deals': typeof DealsRoute
+  '/monitoring': typeof MonitoringRoute
   '/prophecy': typeof ProphecyRoute
   '/shadow': typeof ShadowRoute
   '/api/public/run-monitoring': typeof ApiPublicRunMonitoringRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByTo {
   '/accuracy': typeof AccuracyRoute
   '/admin': typeof AdminRoute
   '/deals': typeof DealsRoute
+  '/monitoring': typeof MonitoringRoute
   '/prophecy': typeof ProphecyRoute
   '/shadow': typeof ShadowRoute
   '/api/public/run-monitoring': typeof ApiPublicRunMonitoringRoute
@@ -93,6 +101,7 @@ export interface FileRoutesById {
   '/accuracy': typeof AccuracyRoute
   '/admin': typeof AdminRoute
   '/deals': typeof DealsRoute
+  '/monitoring': typeof MonitoringRoute
   '/prophecy': typeof ProphecyRoute
   '/shadow': typeof ShadowRoute
   '/api/public/run-monitoring': typeof ApiPublicRunMonitoringRoute
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
     | '/accuracy'
     | '/admin'
     | '/deals'
+    | '/monitoring'
     | '/prophecy'
     | '/shadow'
     | '/api/public/run-monitoring'
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/accuracy'
     | '/admin'
     | '/deals'
+    | '/monitoring'
     | '/prophecy'
     | '/shadow'
     | '/api/public/run-monitoring'
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/accuracy'
     | '/admin'
     | '/deals'
+    | '/monitoring'
     | '/prophecy'
     | '/shadow'
     | '/api/public/run-monitoring'
@@ -140,6 +152,7 @@ export interface RootRouteChildren {
   AccuracyRoute: typeof AccuracyRoute
   AdminRoute: typeof AdminRoute
   DealsRoute: typeof DealsRoute
+  MonitoringRoute: typeof MonitoringRoute
   ProphecyRoute: typeof ProphecyRoute
   ShadowRoute: typeof ShadowRoute
   ApiPublicRunMonitoringRoute: typeof ApiPublicRunMonitoringRoute
@@ -161,6 +174,13 @@ declare module '@tanstack/react-router' {
       path: '/prophecy'
       fullPath: '/prophecy'
       preLoaderRoute: typeof ProphecyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/monitoring': {
+      id: '/monitoring'
+      path: '/monitoring'
+      fullPath: '/monitoring'
+      preLoaderRoute: typeof MonitoringRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/deals': {
@@ -220,6 +240,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccuracyRoute: AccuracyRoute,
   AdminRoute: AdminRoute,
   DealsRoute: DealsRoute,
+  MonitoringRoute: MonitoringRoute,
   ProphecyRoute: ProphecyRoute,
   ShadowRoute: ShadowRoute,
   ApiPublicRunMonitoringRoute: ApiPublicRunMonitoringRoute,
