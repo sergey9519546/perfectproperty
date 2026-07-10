@@ -69,6 +69,7 @@ export type Database = {
           error: string | null
           id: string
           job_id: string
+          max_attempts: number
           parcel_id: string | null
           processed_at: string | null
           state: string
@@ -84,6 +85,7 @@ export type Database = {
           error?: string | null
           id?: string
           job_id: string
+          max_attempts?: number
           parcel_id?: string | null
           processed_at?: string | null
           state: string
@@ -99,6 +101,7 @@ export type Database = {
           error?: string | null
           id?: string
           job_id?: string
+          max_attempts?: number
           parcel_id?: string | null
           processed_at?: string | null
           state?: string
