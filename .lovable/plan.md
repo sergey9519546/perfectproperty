@@ -1,48 +1,84 @@
-# Next 10 Steps
+## Goal
 
-The v12 / credit / monitoring / warehouse modules exist as pure math libraries but nothing in the app calls them yet. These tasks wire them into the pipeline, the DB, and the UI in dependency order.
+Make parcels work end-to-end: add Realie as a live parcel/comps source, harden the existing ingest → score → dossier pipeline, and fix the bugs I find along the way.
 
-## Backend / engine wiring
+## What Realie will do for us
 
-1. **Wire v12 valuation into `src/lib/engine.ts`**
-   Replace the v11 ARV path with `arvTodayComps` + `sampleArvExit`, plumb `driftUsed` and `lightgbmDivergence`, and expose the new fields (`arv_today`, `arv_exit_p5/p50/p95`, `drift_used`, `divergence`) on the underwrite result.
+Realie (`https://app.realie.ai/api`, `REALIE_API_KEY` already stored) gives us four endpoints we actually need:
 
-2. **Enforce Gate 0–8 staging (`gate3TrustLock`)**
-   Add a `gate_status` object to every underwrite return; block map glow / Prophecy ranking / institutional scoring behind the gate flags. Central helper `computeGates(deal, dataQuality)`.
+| Endpoint | Uses in our app |
+|---|---|
+| `GET /public/property/address` | Single-address lookup for the "Add parcel" flow and dossier refresh |
+| `GET /public/property/parcelId` | Refresh a known parcel by APN when county GIS data is stale |
+| `GET /public/property/location` (lat/lng) | Discover neighboring parcels in a ring around a subject |
+| `GET /public/premium/comparables` | Comps for ARV — replaces empty results from `pick_comps` when the local `sales` table is thin |
 
-3. **Monte-Carlo risk block**
-   Run `primaryRankFromMC`, `downsideDisplay` (P5/P50/P95, P(loss), CVaR), `retailScore`, and `survivalFactorV12` inside `engine.ts` and persist the summary on the deal row.
+CLI (`realie lookup ...`) is not usable in production — the Cloudflare Worker runtime has no `child_process`. We call the HTTP API server-side instead.
 
-4. **Credit layer per deal**
-   Compute `PDSplit`, `EAD`, `LGD`, `EL`, `RAP` in `engine.ts` using `HAZARD_COEFS_DEFAULT` seeded from deal features; store on the deal.
+## Plan
 
-5. **DB migration for new columns + `decision_audit` table**
-   Add columns for v12 valuation, gate status, MC risk, and credit outputs to `deals`. Create `decision_audit` (hash-chained via `appendDecision`) with proper `GRANT`s and RLS.
+### 1. New Realie adapter — `src/lib/adapters/realie.ts`
 
-## Server functions / jobs
+Thin fetch wrapper:
+- `realieLookupAddress({ address, state, unit? })`
+- `realieLookupParcelId({ parcelId, state, county })`
+- `realieLocationSearch({ lat, lng, radius, limit })`
+- `realieComparables({ lat, lng, beds_min, beds_max, sqft_min, sqft_max, months_back })`
 
-6. **`underwrite.functions.ts` server fn**
-   New `createServerFn` that takes a `deal_id`, runs the full v12 + credit pipeline, writes results, and appends a `decision_audit` row. Called from the deal page and from batch jobs.
+Each function reads `process.env.REALIE_API_KEY` inside the call (not at module scope — Worker env is per-request), attaches `Authorization: Bearer …`, throws typed errors on non-2xx, and normalizes the response into the shapes our engine already consumes (`ParcelInput`, comps rows with `{ ppsf, distance_km, sale_price, living_sqft, sold_at, address }`).
 
-7. **Portfolio + monitoring nightly job**
-   Cron route under `src/routes/api/public/run-monitoring.ts` (bearer-secret, same pattern as `run-recipes.ts`) that computes `portfolioLossStats`, `hhi`, `lcr`, PSI, calibration, and `riskAppetiteBreached`, writing to a new `portfolio_metrics` table.
+Register `REALIE` in `SourceKind` and add a `provider: "REALIE"` branch alongside ARCGIS/SOCRATA in `sources.ts` for counties where we prefer Realie over the county GIS (e.g. Travis TX where no ArcGIS is wired).
 
-## UI surfaces
+### 2. Server functions — `src/lib/parcels.functions.ts`
 
-8. **Dossier panel: risk + credit tabs**
-   Extend `src/components/DossierPanel.tsx` with tabs for Valuation (P5/P50/P95, divergence), Risk (primary rank, CVaR, survival), Credit (PD split, EL, RAP), and Gates (which of 0–8 passed).
+Add two new server fns next to the existing `listRankedParcels` / `getDossier`:
 
-9. **Admin monitoring dashboard**
-   New route `src/routes/monitoring.tsx` rendering the latest `portfolio_metrics` row: PSI bands, calibration slope, HHI, LCR, EL/VaR/CVaR/EC/RAROC, risk-appetite breach reasons.
+- `lookupParcelByAddress({ address, state, city?, county_fips? })`
+  - Hits Realie address lookup, upserts into `parcels` (using existing `match_parcel` RPC to dedupe against county+APN or normalized address), runs the underwrite pipeline, upserts `parcel_scores`, appends a `decision_audit` row (same chain as `rerunUnderwrite`), returns `{ parcel_id, perfect_score }`.
+- `refreshDossierFromRealie({ parcel_id })`
+  - Re-hits Realie by APN (or by address if APN missing), updates parcel + score in place. Same audit append.
 
-10. **Stress-test panel on deals page**
-    In `src/routes/deals.tsx`, add a scenarios selector (base / -15% ARV / rate+200bps / hold+3mo) using `stressedDeal` and `portfolioStressLossMean`; show per-deal `EProfit` delta and portfolio loss.
+Both go through the existing `underwrite()` engine — no engine changes for correctness, only for the input-source path.
 
-## Technical notes
+### 3. Comps fallback in the engine path
 
-- Tasks 1–4 are all inside `engine.ts` and share a single return-shape refactor; do them in one pass to avoid churning callers twice.
-- Task 5 must land before 6/7 or the writes fail.
-- Task 6 is the only new server-fn; tasks 8–10 read what it wrote (no direct engine calls from components).
-- All new tables need `GRANT`s + RLS per project rules; `decision_audit` is service-role write, authenticated read-own.
+In `underwrite.functions.ts` (`rerunUnderwrite`) and `ingest.functions.ts` scoring path: if `pick_comps` RPC returns fewer than 3 rows AND the parcel has lat/lng, call `realieComparables()` and merge results into the `compsClean` array before passing to `underwrite()`. This directly kills the empty-ARV / `arv_source = "MODEL"` cases we see today.
 
-Confirm this ordering (or tell me which of the 10 to drop / reorder) and I'll start with tasks 1–5 as one batch.
+### 4. Bug sweep on the parcels pipeline
+
+I'll audit and fix in one batch:
+
+- `src/lib/ingest.functions.ts` — verify all `Number(...)` coercions guard against `NaN` before insert; verify the `parcel_scores` upsert includes every v12 column we added (some new fields may be dropped silently), and ensure `data_source: "LIVE"` never gets stamped on failed underwrites.
+- `src/lib/parcels.functions.ts` `listRankedParcels` — the `parcels!inner(...)` join with `.eq("parcels.county_fips", …)` is correct, but confirm the `min_score`/`min_profit`/`max_offer` filters don't shadow the ORDER BY (they don't, but I'll double-check the query builder call order).
+- `src/lib/parcels.functions.ts` `getDossier` — currently errors when `parcel_scores` row is missing (`.single()` throws). Switch to `.maybeSingle()` and let the UI render "not scored yet" instead of a 500.
+- `src/components/DossierPanel.tsx` — guard the new V12/Credit/Gates blocks against `null` score.
+- `src/routes/deals.tsx` `StressPanel` — ARV fallback currently uses `r.risk_adjusted_profit` when scope is missing, which is a category error (RAP is not an ARV). Fall back to `full_reno_arv || cosmetic_arv || as_is_value` instead.
+- Confirm `src/routes/api/public/scrapy-ingest.ts` still writes the v12 columns; if not, wire the same shape as `rerunUnderwrite`.
+
+### 5. UI — one small addition on `src/routes/deals.tsx`
+
+An "Add by address" input above the table:
+- Calls `lookupParcelByAddress`
+- On success, invalidates the list query and opens the dossier for the new `parcel_id`
+- Shows the Realie error verbatim on failure (no PII in it)
+
+No other UI redesign — the existing dossier / stress panel / monitoring stays.
+
+### 6. Verification (after build mode)
+
+- `tsgo` typecheck.
+- `stack_modern--invoke-server-function` on `lookupParcelByAddress` with a known Austin TX address; check that a `parcels` row + `parcel_scores` row + `decision_audit` row appear.
+- `psql -c "select count(*) from parcel_scores where arv_source='COMPS'"` before/after to confirm the comps-fallback lifts coverage.
+- Load `/deals`, open the new parcel's dossier, screenshot via Playwright to confirm the V12/Credit/Gates blocks render with real numbers.
+
+## Not doing
+
+- Not touching the underwriting math, gate logic, monitoring cron, or `parcel_scores` schema.
+- Not shelling out to the `realie` CLI (would fail in production).
+- Not adding a batch Realie backfill job in this pass — one-address-at-a-time + comps fallback first; batch later if you want it.
+
+## Notes for the technical reviewer
+
+- Realie's REST base is `https://app.realie.ai/api`, endpoints under `/public/property/*` and `/public/premium/comparables`. Auth is a bearer token in the `Authorization` header.
+- `REALIE_API_KEY` must be read inside handlers, not at module top-level — Worker env injection is per-request.
+- Realie calls happen only from server functions and `_authenticated` loaders; the key is never exposed to the client.

@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { listRankedParcels } from "@/lib/parcels.functions";
+import { listRankedParcels, lookupParcelByAddress } from "@/lib/parcels.functions";
 import { DossierPanel } from "@/components/DossierPanel";
 import { fmt$, tierLabel, ringLabel } from "@/lib/format";
 import { stressedDeal, portfolioStressLossMean, type StressScenario, type DealBase } from "@/lib/engine/credit";
@@ -36,6 +36,7 @@ function DealsPage() {
           </label>
           <span className="text-muted-foreground">Showing {q.data?.length ?? 0} {includeFixture ? "parcels (live + demo)" : "LIVE parcels"}.</span>
         </div>
+        <RealieLookup onCreated={(id) => setSelected(id)} />
         <StressPanel rows={q.data ?? []} />
         <div className="mt-6 overflow-hidden rounded-lg border border-border bg-surface">
           <table className="w-full text-[13px]">
@@ -140,7 +141,7 @@ function StressPanel({ rows }: { rows: any[] }) {
         r.recommended_scope === "COSMETIC" ? r.cosmetic_arv :
         r.recommended_scope === "FULL" ? r.full_reno_arv :
         r.recommended_scope === "EXPANDED" ? r.expanded_arv :
-        r.risk_adjusted_profit,
+        (r.full_reno_arv ?? r.cosmetic_arv ?? r.as_is_value ?? 0),
       );
       const P = Number(r.modeled_offer ?? 0);
       const R = Number(r.reno_cost ?? 0);
@@ -224,5 +225,60 @@ function MiniBox({ label, v, tone }: { label: string; v: string; tone?: "skeptic
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className="num mt-0.5 text-[14px] font-semibold" style={{ color }}>{v}</div>
     </div>
+  );
+}
+
+function RealieLookup({ onCreated }: { onCreated: (id: string) => void }) {
+  const lookup = useServerFn(lookupParcelByAddress);
+  const qc = useQueryClient();
+  const [address, setAddress] = useState("");
+  const [state, setState] = useState("TX");
+  const [city, setCity] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!address.trim() || !state.trim()) return;
+    setBusy(true); setErr(null);
+    try {
+      const r = await lookup({ data: { address: address.trim(), state: state.trim().toUpperCase(), city: city.trim() || undefined } });
+      await qc.invalidateQueries({ queryKey: ["ranked-all"] });
+      onCreated(r.parcel_id);
+      setAddress("");
+    } catch (e: any) {
+      setErr(e?.message ?? "Lookup failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="mt-6 flex flex-wrap items-end gap-2 rounded-lg border border-border bg-surface p-4">
+      <div className="flex-1 min-w-[220px]">
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Add parcel by address (Realie)</div>
+        <input
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          placeholder="123 Main St"
+          className="mt-1 w-full rounded-md border border-border bg-surface-2 px-3 py-1.5 text-[13px] outline-none focus:border-foreground"
+        />
+      </div>
+      <div>
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">State</div>
+        <input value={state} onChange={(e) => setState(e.target.value)} maxLength={2}
+          className="mt-1 w-16 rounded-md border border-border bg-surface-2 px-2 py-1.5 text-[13px] uppercase outline-none focus:border-foreground" />
+      </div>
+      <div>
+        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">City (optional)</div>
+        <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Austin"
+          className="mt-1 w-40 rounded-md border border-border bg-surface-2 px-2 py-1.5 text-[13px] outline-none focus:border-foreground" />
+      </div>
+      <button type="submit" disabled={busy}
+        className="rounded-md border border-border bg-surface-2 px-3 py-1.5 text-[12px] hover:bg-surface disabled:opacity-50">
+        {busy ? "Underwriting…" : "Lookup + underwrite"}
+      </button>
+      {err && <div className="w-full text-[12px] text-skeptic">{err}</div>}
+    </form>
   );
 }
