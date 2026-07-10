@@ -20,6 +20,7 @@ import { Route as ApiPublicScrapyIngestRouteImport } from './routes/api/public/s
 import { Route as ApiPublicRunRecipesRouteImport } from './routes/api/public/run-recipes'
 import { Route as ApiPublicRunMonitoringRouteImport } from './routes/api/public/run-monitoring'
 import { Route as ApiPublicRunBulkLookupsRouteImport } from './routes/api/public/run-bulk-lookups'
+import { Route as ApiPublicRerunUnderwriteRouteImport } from './routes/api/public/rerun-underwrite'
 
 const ShadowRoute = ShadowRouteImport.update({
   id: '/shadow',
@@ -76,6 +77,12 @@ const ApiPublicRunBulkLookupsRoute = ApiPublicRunBulkLookupsRouteImport.update({
   path: '/api/public/run-bulk-lookups',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicRerunUnderwriteRoute =
+  ApiPublicRerunUnderwriteRouteImport.update({
+    id: '/api/public/rerun-underwrite',
+    path: '/api/public/rerun-underwrite',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -85,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/monitoring': typeof MonitoringRoute
   '/prophecy': typeof ProphecyRoute
   '/shadow': typeof ShadowRoute
+  '/api/public/rerun-underwrite': typeof ApiPublicRerunUnderwriteRoute
   '/api/public/run-bulk-lookups': typeof ApiPublicRunBulkLookupsRoute
   '/api/public/run-monitoring': typeof ApiPublicRunMonitoringRoute
   '/api/public/run-recipes': typeof ApiPublicRunRecipesRoute
@@ -98,6 +106,7 @@ export interface FileRoutesByTo {
   '/monitoring': typeof MonitoringRoute
   '/prophecy': typeof ProphecyRoute
   '/shadow': typeof ShadowRoute
+  '/api/public/rerun-underwrite': typeof ApiPublicRerunUnderwriteRoute
   '/api/public/run-bulk-lookups': typeof ApiPublicRunBulkLookupsRoute
   '/api/public/run-monitoring': typeof ApiPublicRunMonitoringRoute
   '/api/public/run-recipes': typeof ApiPublicRunRecipesRoute
@@ -112,6 +121,7 @@ export interface FileRoutesById {
   '/monitoring': typeof MonitoringRoute
   '/prophecy': typeof ProphecyRoute
   '/shadow': typeof ShadowRoute
+  '/api/public/rerun-underwrite': typeof ApiPublicRerunUnderwriteRoute
   '/api/public/run-bulk-lookups': typeof ApiPublicRunBulkLookupsRoute
   '/api/public/run-monitoring': typeof ApiPublicRunMonitoringRoute
   '/api/public/run-recipes': typeof ApiPublicRunRecipesRoute
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/monitoring'
     | '/prophecy'
     | '/shadow'
+    | '/api/public/rerun-underwrite'
     | '/api/public/run-bulk-lookups'
     | '/api/public/run-monitoring'
     | '/api/public/run-recipes'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/monitoring'
     | '/prophecy'
     | '/shadow'
+    | '/api/public/rerun-underwrite'
     | '/api/public/run-bulk-lookups'
     | '/api/public/run-monitoring'
     | '/api/public/run-recipes'
@@ -153,6 +165,7 @@ export interface FileRouteTypes {
     | '/monitoring'
     | '/prophecy'
     | '/shadow'
+    | '/api/public/rerun-underwrite'
     | '/api/public/run-bulk-lookups'
     | '/api/public/run-monitoring'
     | '/api/public/run-recipes'
@@ -167,6 +180,7 @@ export interface RootRouteChildren {
   MonitoringRoute: typeof MonitoringRoute
   ProphecyRoute: typeof ProphecyRoute
   ShadowRoute: typeof ShadowRoute
+  ApiPublicRerunUnderwriteRoute: typeof ApiPublicRerunUnderwriteRoute
   ApiPublicRunBulkLookupsRoute: typeof ApiPublicRunBulkLookupsRoute
   ApiPublicRunMonitoringRoute: typeof ApiPublicRunMonitoringRoute
   ApiPublicRunRecipesRoute: typeof ApiPublicRunRecipesRoute
@@ -252,6 +266,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicRunBulkLookupsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/rerun-underwrite': {
+      id: '/api/public/rerun-underwrite'
+      path: '/api/public/rerun-underwrite'
+      fullPath: '/api/public/rerun-underwrite'
+      preLoaderRoute: typeof ApiPublicRerunUnderwriteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -263,6 +284,7 @@ const rootRouteChildren: RootRouteChildren = {
   MonitoringRoute: MonitoringRoute,
   ProphecyRoute: ProphecyRoute,
   ShadowRoute: ShadowRoute,
+  ApiPublicRerunUnderwriteRoute: ApiPublicRerunUnderwriteRoute,
   ApiPublicRunBulkLookupsRoute: ApiPublicRunBulkLookupsRoute,
   ApiPublicRunMonitoringRoute: ApiPublicRunMonitoringRoute,
   ApiPublicRunRecipesRoute: ApiPublicRunRecipesRoute,
