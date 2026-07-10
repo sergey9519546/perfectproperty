@@ -60,6 +60,26 @@ export function BulkLookupPanel() {
     }
   }
 
+  const resume = useServerFn(resumeFailedInJob);
+  const latestJob = jobs.data?.[0] as any;
+  const latestFailed = Number(latestJob?.failed ?? 0);
+  const [resuming, setResuming] = useState(false);
+
+  async function resumeLatest() {
+    if (!latestJob) return;
+    setResuming(true); setMsg(null);
+    try {
+      const r = await resume({ data: { job_id: latestJob.id } });
+      setMsg(`Requeued ${r.reset} failed items · ran ${r.processed} now (${r.succeeded} ok, ${r.failed} fail).`);
+      await qc.invalidateQueries({ queryKey: ["bulk-lookup-jobs"] });
+    } catch (e: any) {
+      setMsg(e?.message ?? "Resume failed.");
+    } finally {
+      setResuming(false);
+    }
+  }
+
+
   return (
     <div className="mt-6 rounded-lg border border-border bg-surface p-4">
       <div className="flex items-center justify-between">
