@@ -1,84 +1,70 @@
-## Goal
+## Why the map looks clustered — diagnosis
 
-Make parcels work end-to-end: add Realie as a live parcel/comps source, harden the existing ingest → score → dossier pipeline, and fix the bugs I find along the way.
+I checked the parcels table. The **only reason data is concentrated in LA, NYC, and SF** is that the ingestion pipeline is hardcoded to those 4 counties:
 
-## What Realie will do for us
+```
+LA County (06037)  → 304 LIVE parcels
+NYC PLUTO (36061)  → 250 LIVE
+Bronx (36005)      → 247 LIVE
+San Francisco      → 210 LIVE
+Queens (36081)     → 3 LIVE
++ 4 FIXTURE counties (fake demo data)
+```
 
-Realie (`https://app.realie.ai/api`, `REALIE_API_KEY` already stored) gives us four endpoints we actually need:
+Root causes:
+1. **`src/lib/adapters/sources.ts` hardcodes 4 counties** (LA, SF, NYC PLUTO, Chicago). Every other US county has zero coverage by design.
+2. **Per-run cap of ~300 parcels** in `ingestCounty` (max 2000). NYC PLUTO alone has ~860,000 lots — we're pulling 0.03%.
+3. **Realie is used only for one-off address lookups** (`lookupParcelByAddress` + `bulk_lookup_items`), never for bulk expansion.
+4. **Zyte + Scrapy secrets are set** (`ZYTE_API_KEY`, `SCRAPY_INGEST_SECRET`) and the adapter-recipe system works, but the only real recipe in DB is a demo (`books.toscrape`) and one Miami-Dade foreclosure calendar that targets `distress_events`, not `parcels`. Nothing is scraping parcels via Zyte/Scrapy.
+5. **Firecrawl is not wired at all** — no connector, no adapter.
 
-| Endpoint | Uses in our app |
-|---|---|
-| `GET /public/property/address` | Single-address lookup for the "Add parcel" flow and dossier refresh |
-| `GET /public/property/parcelId` | Refresh a known parcel by APN when county GIS data is stale |
-| `GET /public/property/location` (lat/lng) | Discover neighboring parcels in a ring around a subject |
-| `GET /public/premium/comparables` | Comps for ARV — replaces empty results from `pick_comps` when the local `sales` table is thin |
+So the answer to "why can't it use the scrape tools": the tools exist, they're just not pointed at any real parcel sources yet.
 
-CLI (`realie lookup ...`) is not usable in production — the Cloudflare Worker runtime has no `child_process`. We call the HTTP API server-side instead.
+---
 
-## Plan
+## Plan to broaden coverage
 
-### 1. New Realie adapter — `src/lib/adapters/realie.ts`
+### Phase 1 — Turn on more free public GIS (fastest, no scraping)
+Add ArcGIS/Socrata sources for the top 30–50 US counties by transaction volume. Every one below has a documented open endpoint and needs only a new entry in `COUNTY_SOURCES`:
 
-Thin fetch wrapper:
-- `realieLookupAddress({ address, state, unit? })`
-- `realieLookupParcelId({ parcelId, state, county })`
-- `realieLocationSearch({ lat, lng, radius, limit })`
-- `realieComparables({ lat, lng, beds_min, beds_max, sqft_min, sqft_max, months_back })`
+- **FL**: Miami-Dade (12086), Broward (12011), Palm Beach (12099), Orange/Orlando (12095), Hillsborough/Tampa (12057), Duval/Jacksonville (12031)
+- **TX**: Harris/Houston (48201), Dallas (48113), Tarrant/Fort Worth (48439), Bexar/San Antonio (48029), Travis/Austin (48453)
+- **AZ**: Maricopa/Phoenix (04013), Pima/Tucson (04019)
+- **GA**: Fulton/Atlanta (13121), DeKalb (13089), Gwinnett (13135)
+- **NC**: Mecklenburg/Charlotte (37119), Wake/Raleigh (37183)
+- **CA**: Orange (06059), San Diego (06073), Riverside (06065), San Bernardino (06071), Sacramento (06067)
+- **NY**: Nassau (36059), Suffolk (36103), Westchester (36119)
+- **NV**: Clark/Vegas (32003)
+- **CO**: Denver (08031), Arapahoe (08005)
+- **WA**: King/Seattle (53033)
+- **OH**: Franklin/Columbus (39049), Cuyahoga/Cleveland (39035)
 
-Each function reads `process.env.REALIE_API_KEY` inside the call (not at module scope — Worker env is per-request), attaches `Authorization: Bearer …`, throws typed errors on non-2xx, and normalizes the response into the shapes our engine already consumes (`ParcelInput`, comps rows with `{ ppsf, distance_km, sale_price, living_sqft, sold_at, address }`).
+Each entry is ~10 lines. I'll add them in batches and verify each returns rows.
 
-Register `REALIE` in `SourceKind` and add a `provider: "REALIE"` branch alongside ARCGIS/SOCRATA in `sources.ts` for counties where we prefer Realie over the county GIS (e.g. Travis TX where no ArcGIS is wired).
+### Phase 2 — Actually pull the full county, not 300 rows
+- Bump `max_parcels` default from 300 → 5,000 and add pagination in `fetchParcelsFromSocrata` (currently one-shot; Socrata paginates at 50k/req).
+- Add a nightly `ingest-all` cron under `/api/public/` gated by `CRON_SECRET` that rotates through counties and pulls ~5k/night each.
 
-### 2. Server functions — `src/lib/parcels.functions.ts`
+### Phase 3 — Bulk Realie enrichment for uncovered ZIPs
+For counties WITHOUT a public GIS endpoint (rural, small metros), use Realie's bulk search to seed parcels by ZIP or city. Add a `seedFromRealie(county_fips, zips[])` admin fn.
 
-Add two new server fns next to the existing `listRankedParcels` / `getDossier`:
+### Phase 4 — Zyte/Scrapy for the hard counties
+The recipe engine is already built. Add 3–5 real recipes targeting counties that only publish parcel data on HTML pages (many TX and rural counties). Example targets:
+- Bexar County (TX) property search — HTML pagination, needs Zyte browser
+- Wayne County (MI, Detroit) treasurer tax list — code violations feeder
+- Cook County (IL) recorder — distress feeder for existing Chicago parcels
 
-- `lookupParcelByAddress({ address, state, city?, county_fips? })`
-  - Hits Realie address lookup, upserts into `parcels` (using existing `match_parcel` RPC to dedupe against county+APN or normalized address), runs the underwrite pipeline, upserts `parcel_scores`, appends a `decision_audit` row (same chain as `rerunUnderwrite`), returns `{ parcel_id, perfect_score }`.
-- `refreshDossierFromRealie({ parcel_id })`
-  - Re-hits Realie by APN (or by address if APN missing), updates parcel + score in place. Same audit append.
+### Phase 5 — Firecrawl for structured extraction (optional)
+Add the Firecrawl connector. Use `formats: [{ type: 'json', schema }]` to extract parcel records from county HTML pages where writing hand-tuned CSS selectors is fragile. This replaces or supplements Phase 4 recipes with LLM-driven extraction.
 
-Both go through the existing `underwrite()` engine — no engine changes for correctness, only for the input-source path.
+---
 
-### 3. Comps fallback in the engine path
+## Recommendation & choice
 
-In `underwrite.functions.ts` (`rerunUnderwrite`) and `ingest.functions.ts` scoring path: if `pick_comps` RPC returns fewer than 3 rows AND the parcel has lat/lng, call `realieComparables()` and merge results into the `compsClean` array before passing to `underwrite()`. This directly kills the empty-ARV / `arv_source = "MODEL"` cases we see today.
+The 80/20 win is **Phase 1 + Phase 2** — adds coverage across the top 30 US counties within a few hours, no scraping needed. Phases 3–5 are for filling gaps after that.
 
-### 4. Bug sweep on the parcels pipeline
-
-I'll audit and fix in one batch:
-
-- `src/lib/ingest.functions.ts` — verify all `Number(...)` coercions guard against `NaN` before insert; verify the `parcel_scores` upsert includes every v12 column we added (some new fields may be dropped silently), and ensure `data_source: "LIVE"` never gets stamped on failed underwrites.
-- `src/lib/parcels.functions.ts` `listRankedParcels` — the `parcels!inner(...)` join with `.eq("parcels.county_fips", …)` is correct, but confirm the `min_score`/`min_profit`/`max_offer` filters don't shadow the ORDER BY (they don't, but I'll double-check the query builder call order).
-- `src/lib/parcels.functions.ts` `getDossier` — currently errors when `parcel_scores` row is missing (`.single()` throws). Switch to `.maybeSingle()` and let the UI render "not scored yet" instead of a 500.
-- `src/components/DossierPanel.tsx` — guard the new V12/Credit/Gates blocks against `null` score.
-- `src/routes/deals.tsx` `StressPanel` — ARV fallback currently uses `r.risk_adjusted_profit` when scope is missing, which is a category error (RAP is not an ARV). Fall back to `full_reno_arv || cosmetic_arv || as_is_value` instead.
-- Confirm `src/routes/api/public/scrapy-ingest.ts` still writes the v12 columns; if not, wire the same shape as `rerunUnderwrite`.
-
-### 5. UI — one small addition on `src/routes/deals.tsx`
-
-An "Add by address" input above the table:
-- Calls `lookupParcelByAddress`
-- On success, invalidates the list query and opens the dossier for the new `parcel_id`
-- Shows the Realie error verbatim on failure (no PII in it)
-
-No other UI redesign — the existing dossier / stress panel / monitoring stays.
-
-### 6. Verification (after build mode)
-
-- `tsgo` typecheck.
-- `stack_modern--invoke-server-function` on `lookupParcelByAddress` with a known Austin TX address; check that a `parcels` row + `parcel_scores` row + `decision_audit` row appear.
-- `psql -c "select count(*) from parcel_scores where arv_source='COMPS'"` before/after to confirm the comps-fallback lifts coverage.
-- Load `/deals`, open the new parcel's dossier, screenshot via Playwright to confirm the V12/Credit/Gates blocks render with real numbers.
-
-## Not doing
-
-- Not touching the underwriting math, gate logic, monitoring cron, or `parcel_scores` schema.
-- Not shelling out to the `realie` CLI (would fail in production).
-- Not adding a batch Realie backfill job in this pass — one-address-at-a-time + comps fallback first; batch later if you want it.
-
-## Notes for the technical reviewer
-
-- Realie's REST base is `https://app.realie.ai/api`, endpoints under `/public/property/*` and `/public/premium/comparables`. Auth is a bearer token in the `Authorization` header.
-- `REALIE_API_KEY` must be read inside handlers, not at module top-level — Worker env injection is per-request.
-- Realie calls happen only from server functions and `_authenticated` loaders; the key is never exposed to the client.
+**Which do you want me to do first?**
+- **A) Just Phase 1** (add ~30 counties to `sources.ts`, run one ingest per county, verify data on the map).
+- **B) Phase 1 + 2** (broad coverage + nightly pull-more cron for full county depth).
+- **C) All phases** (also wire Realie bulk seed, add Zyte parcel recipes, connect Firecrawl).
+- **D) Something else** — tell me which counties/regions you care about most and I'll prioritize.
