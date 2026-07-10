@@ -116,15 +116,13 @@ export async function processBulkLookupBatch(limit = 20): Promise<{
     touched.add(item.job_id);
     try {
       const r = await lookupParcelByAddressCore({
-
-        data: {
-          address: item.address,
-          state: item.state,
-          city: item.city ?? undefined,
-          county: item.county ?? undefined,
-          unit: item.unit ?? undefined,
-        },
+        address: item.address,
+        state: item.state,
+        city: item.city ?? undefined,
+        county: item.county ?? undefined,
+        unit: item.unit ?? undefined,
       });
+
       await supabaseAdmin.from("bulk_lookup_items").update({
         status: "succeeded",
         parcel_id: r.parcel_id,
