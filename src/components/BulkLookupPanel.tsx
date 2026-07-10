@@ -5,7 +5,7 @@
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { createBulkLookupJob, listBulkLookupJobs } from "@/lib/bulk-lookup.functions";
+import { createBulkLookupJob, listBulkLookupJobs, resumeFailedInJob } from "@/lib/bulk-lookup.functions";
 
 type ParsedRow = { address: string; state: string; city?: string };
 
