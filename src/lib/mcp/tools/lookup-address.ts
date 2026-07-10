@@ -9,9 +9,10 @@ export default defineTool({
     "Resolve a street address to a parcel record via the ingestion pipeline. Returns parcel + latest score.",
   inputSchema: {
     address: z.string().min(3).describe("Street address, e.g. '123 Main St'."),
+    state: z.string().length(2).describe("Two-letter state code, required."),
     city: z.string().optional(),
-    state: z.string().length(2).optional(),
-    zip: z.string().optional(),
+    county: z.string().optional(),
+    unit: z.string().optional(),
   },
   annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (input, ctx) => {
