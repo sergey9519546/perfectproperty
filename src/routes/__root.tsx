@@ -100,37 +100,39 @@ function RootComponent() {
 }
 
 function TopNav() {
+  const links: { to: string; label: string; hint: string }[] = [
+    { to: "/", label: "Map", hint: "See every scored property on a live map" },
+    { to: "/deals", label: "Deals", hint: "Ranked list of the best properties to buy" },
+    { to: "/shadow", label: "Off-Market", hint: "Owners likely to sell, but not yet listed" },
+    { to: "/prophecy", label: "Predicted", hint: "Properties we expect to hit the market soon" },
+    { to: "/accuracy", label: "Model Accuracy", hint: "How close our predictions have been to reality" },
+    { to: "/monitoring", label: "Portfolio Health", hint: "Overall risk and performance of the book" },
+    { to: "/admin", label: "Data Sources", hint: "Pull in new counties and refresh data" },
+  ];
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-8 px-6">
         <Link to="/" className="flex items-center gap-2.5">
           <div className="h-2.5 w-2.5 rounded-full bg-opportunity opp-pulse text-opportunity" />
-          <span className="text-[13px] font-semibold tracking-wide uppercase">Perfect Property Engine</span>
+          <span className="text-[14px] font-semibold tracking-wide">Perfect Property</span>
         </Link>
-        <nav className="flex items-center gap-1 text-[13px]">
-          {[
-            { to: "/", label: "Map" },
-            { to: "/deals", label: "Ranked Deals" },
-            { to: "/shadow", label: "Shadow Market" },
-            { to: "/prophecy", label: "Prophecy" },
-            { to: "/accuracy", label: "Accuracy" },
-            { to: "/monitoring", label: "Monitoring" },
-            { to: "/admin", label: "Ingestion" },
-          ].map((l) => (
+        <nav className="flex items-center gap-1 text-[14px]">
+          {links.map((l) => (
             <Link
               key={l.to}
               to={l.to}
+              title={l.hint}
               className="rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
-              activeProps={{ className: "rounded-md px-3 py-1.5 bg-surface text-foreground" }}
+              activeProps={{ className: "rounded-md px-3 py-1.5 bg-surface text-foreground font-medium" }}
               activeOptions={{ exact: l.to === "/" }}
             >
               {l.label}
             </Link>
           ))}
         </nav>
-        <div className="ml-auto flex items-center gap-2 text-[11px] text-muted-foreground">
+        <div className="ml-auto flex items-center gap-2 text-[12px] text-muted-foreground">
           <span className="h-1.5 w-1.5 rounded-full bg-profit-strong" />
-          <span className="num">engine live · CA + FL pilot</span>
+          <span>Updated nightly · CA + FL pilot</span>
         </div>
       </div>
     </header>

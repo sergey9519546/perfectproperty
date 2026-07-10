@@ -12,13 +12,13 @@ export function pct(n: number | null | undefined): string {
   return `${Math.round(Number(n) * 100)}%`;
 }
 
-export function tierLabel(score: number): { label: string; color: string } {
-  if (score >= 80) return { label: "Exceptional", color: "var(--tier-exceptional)" };
-  if (score >= 65) return { label: "Strong", color: "var(--tier-strong)" };
-  if (score >= 50) return { label: "Viable", color: "var(--tier-viable)" };
-  return { label: "Watch", color: "var(--tier-watch)" };
+export function tierLabel(score: number): { label: string; color: string; hint: string } {
+  if (score >= 80) return { label: "Great buy", color: "var(--tier-exceptional)", hint: "Top-tier opportunity (score 80+)" };
+  if (score >= 65) return { label: "Strong", color: "var(--tier-strong)", hint: "Solid deal (score 65–79)" };
+  if (score >= 50) return { label: "Worth a look", color: "var(--tier-viable)", hint: "Viable, run the numbers (score 50–64)" };
+  return { label: "Skip / watch", color: "var(--tier-watch)", hint: "Below our buy bar right now (score under 50)" };
 }
 
 export function ringLabel(ring: number): string {
-  return ring === 3 ? "Prophecy" : ring === 2 ? "Shadow" : "Open Market";
+  return ring === 3 ? "Predicted to list" : ring === 2 ? "Off-market" : "On the market";
 }
