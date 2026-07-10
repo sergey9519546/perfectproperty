@@ -1,0 +1,133 @@
+{
+  "version": 1,
+  "sdk_version": "0.20.0",
+  "path": "/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://ddqhewwswlgogzziamku.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "perfect-property-mcp",
+      "version": "0.1.0",
+      "title": "Perfect Property Engine"
+    },
+    "tools": [
+      {
+        "name": "search_parcels",
+        "title": "Search parcels",
+        "description": "Search parcels by county, state, city, or owner name. Returns basic parcel identity + assessed value.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "state": {
+              "description": "Two-letter state code, e.g. 'CA' or 'FL'.",
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 2
+            },
+            "county": {
+              "description": "County name filter (case-insensitive contains).",
+              "type": "string"
+            },
+            "city": {
+              "description": "City filter (case-insensitive contains).",
+              "type": "string"
+            },
+            "owner": {
+              "description": "Owner name filter (case-insensitive contains).",
+              "type": "string"
+            },
+            "absentee_only": {
+              "description": "Restrict to absentee-owned parcels.",
+              "type": "boolean"
+            },
+            "limit": {
+              "description": "Max rows (default 25).",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_parcel_score",
+        "title": "Get parcel underwriting score",
+        "description": "Return the latest underwriting score for a parcel: ARV, offer, projected profit, risk metrics.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "parcel_id": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "Parcel UUID from search_parcels."
+            }
+          },
+          "required": [
+            "parcel_id"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "lookup_parcel_by_address",
+        "title": "Look up parcel by address",
+        "description": "Resolve a street address to a parcel record via the ingestion pipeline. Returns parcel + latest score.",
+        "annotations": {
+          "readOnlyHint": false,
+          "idempotentHint": true,
+          "openWorldHint": true
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "address": {
+              "type": "string",
+              "minLength": 3,
+              "description": "Street address, e.g. '123 Main St'."
+            },
+            "state": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 2,
+              "description": "Two-letter state code, required."
+            },
+            "city": {
+              "type": "string"
+            },
+            "county": {
+              "type": "string"
+            },
+            "unit": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "address",
+            "state"
+          ]
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
