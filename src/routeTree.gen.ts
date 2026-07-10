@@ -25,6 +25,7 @@ import { Route as ApiPublicRunRecipesRouteImport } from './routes/api/public/run
 import { Route as ApiPublicRunMonitoringRouteImport } from './routes/api/public/run-monitoring'
 import { Route as ApiPublicRunBulkLookupsRouteImport } from './routes/api/public/run-bulk-lookups'
 import { Route as ApiPublicRerunUnderwriteRouteImport } from './routes/api/public/rerun-underwrite'
+import { Route as ApiPublicIngestAllRouteImport } from './routes/api/public/ingest-all'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 
@@ -111,6 +112,11 @@ const ApiPublicRerunUnderwriteRoute =
     path: '/api/public/rerun-underwrite',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicIngestAllRoute = ApiPublicIngestAllRouteImport.update({
+  id: '/api/public/ingest-all',
+  path: '/api/public/ingest-all',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
   Char91DotmcpChar93InvokeToolToolRouteImport.update({
     id: '/.mcp/invoke-tool/$tool',
@@ -137,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/public/ingest-all': typeof ApiPublicIngestAllRoute
   '/api/public/rerun-underwrite': typeof ApiPublicRerunUnderwriteRoute
   '/api/public/run-bulk-lookups': typeof ApiPublicRunBulkLookupsRoute
   '/api/public/run-monitoring': typeof ApiPublicRunMonitoringRoute
@@ -157,6 +164,7 @@ export interface FileRoutesByTo {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/public/ingest-all': typeof ApiPublicIngestAllRoute
   '/api/public/rerun-underwrite': typeof ApiPublicRerunUnderwriteRoute
   '/api/public/run-bulk-lookups': typeof ApiPublicRunBulkLookupsRoute
   '/api/public/run-monitoring': typeof ApiPublicRunMonitoringRoute
@@ -178,6 +186,7 @@ export interface FileRoutesById {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/public/ingest-all': typeof ApiPublicIngestAllRoute
   '/api/public/rerun-underwrite': typeof ApiPublicRerunUnderwriteRoute
   '/api/public/run-bulk-lookups': typeof ApiPublicRunBulkLookupsRoute
   '/api/public/run-monitoring': typeof ApiPublicRunMonitoringRoute
@@ -200,6 +209,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/public/ingest-all'
     | '/api/public/rerun-underwrite'
     | '/api/public/run-bulk-lookups'
     | '/api/public/run-monitoring'
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/public/ingest-all'
     | '/api/public/rerun-underwrite'
     | '/api/public/run-bulk-lookups'
     | '/api/public/run-monitoring'
@@ -240,6 +251,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/public/ingest-all'
     | '/api/public/rerun-underwrite'
     | '/api/public/run-bulk-lookups'
     | '/api/public/run-monitoring'
@@ -261,6 +273,7 @@ export interface RootRouteChildren {
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  ApiPublicIngestAllRoute: typeof ApiPublicIngestAllRoute
   ApiPublicRerunUnderwriteRoute: typeof ApiPublicRerunUnderwriteRoute
   ApiPublicRunBulkLookupsRoute: typeof ApiPublicRunBulkLookupsRoute
   ApiPublicRunMonitoringRoute: typeof ApiPublicRunMonitoringRoute
@@ -382,6 +395,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicRerunUnderwriteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/ingest-all': {
+      id: '/api/public/ingest-all'
+      path: '/api/public/ingest-all'
+      fullPath: '/api/public/ingest-all'
+      preLoaderRoute: typeof ApiPublicIngestAllRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/.mcp/invoke-tool/$tool': {
       id: '/.mcp/invoke-tool/$tool'
       path: '/.mcp/invoke-tool/$tool'
@@ -414,6 +434,7 @@ const rootRouteChildren: RootRouteChildren = {
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  ApiPublicIngestAllRoute: ApiPublicIngestAllRoute,
   ApiPublicRerunUnderwriteRoute: ApiPublicRerunUnderwriteRoute,
   ApiPublicRunBulkLookupsRoute: ApiPublicRunBulkLookupsRoute,
   ApiPublicRunMonitoringRoute: ApiPublicRunMonitoringRoute,

@@ -28,7 +28,7 @@ export interface CountySource {
     field_owner?: string;
     field_assessed?: string;
     // Socrata-only: how to build the address from row fields
-    address_builder?: "sf" | "nyc";
+    address_builder?: "sf" | "nyc" | "chicago";
   };
   distress?: {
     kind: SourceKind;
@@ -87,6 +87,13 @@ export const COUNTY_SOURCES: CountySource[] = [
   {
     fips: "17031", state: "IL", name: "Chicago (Cook)",
     center: [41.8781, -87.6298],
+    parcels: {
+      kind: "SOCRATA",
+      url: "https://datacatalog.cookcountyil.gov/resource/tx2p-k2g9.json",
+      field_apn: "pin",
+      field_zip: "prop_address_zipcode_1",
+      address_builder: "chicago",
+    },
     distress: {
       kind: "SOCRATA",
       url: "https://data.cityofchicago.org/resource/22u3-xenr.json",
