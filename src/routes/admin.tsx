@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -8,11 +8,26 @@ import { ingestCounty, scoreAll, listSources } from "@/lib/ingest.functions";
 import { ingestAllNycSales, salesSummary } from "@/lib/sales.functions";
 import { probeUrl, listProbes } from "@/lib/probe.functions";
 import { discoverSchema, saveRecipe, listRecipes, runRecipe, deleteRecipe } from "@/lib/recipes.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { PageHead } from "./deals";
 import { toast } from "sonner";
 import { Database, Zap, Globe, ScrollText, Search, Wand2, Play, Trash2, Copy } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
+  ssr: false,
+  beforeLoad: async () => {
+    const { data: userRes } = await supabase.auth.getUser();
+    if (!userRes.user) {
+      throw redirect({ to: "/auth", search: { next: "/admin" } });
+    }
+    const { data: isAdmin, error } = await (supabase as any).rpc("has_role", {
+      _user_id: userRes.user.id,
+      _role: "admin",
+    });
+    if (error || !isAdmin) {
+      throw redirect({ to: "/" });
+    }
+  },
   head: () => ({
     meta: [
       { title: "Ingestion — Perfect Property Engine" },
