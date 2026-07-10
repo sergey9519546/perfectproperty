@@ -6,6 +6,8 @@ import { listRankedParcels, lookupParcelByAddress } from "@/lib/parcels.function
 import { DossierPanel } from "@/components/DossierPanel";
 import { fmt$, tierLabel, ringLabel } from "@/lib/format";
 import { stressedDeal, portfolioStressLossMean, type StressScenario, type DealBase } from "@/lib/engine/credit";
+import { pickArv } from "@/lib/arv-picker";
+import { BulkLookupPanel } from "@/components/BulkLookupPanel";
 
 export const Route = createFileRoute("/deals")({
   head: () => ({
@@ -37,6 +39,7 @@ function DealsPage() {
           <span className="text-muted-foreground">Showing {q.data?.length ?? 0} {includeFixture ? "parcels (live + demo)" : "LIVE parcels"}.</span>
         </div>
         <RealieLookup onCreated={(id) => setSelected(id)} />
+        <BulkLookupPanel />
         <StressPanel rows={q.data ?? []} />
         <div className="mt-6 overflow-hidden rounded-lg border border-border bg-surface">
           <table className="w-full text-[13px]">
@@ -137,12 +140,7 @@ function StressPanel({ rows }: { rows: any[] }) {
     const weights: number[] = [];
     const perDeal: Array<{ id: string; addr: string; base: number; stressed: number; delta: number }> = [];
     for (const r of rows) {
-      const arv = Number(
-        r.recommended_scope === "COSMETIC" ? r.cosmetic_arv :
-        r.recommended_scope === "FULL" ? r.full_reno_arv :
-        r.recommended_scope === "EXPANDED" ? r.expanded_arv :
-        (r.full_reno_arv ?? r.cosmetic_arv ?? r.as_is_value ?? 0),
-      );
+      const arv = pickArv(r);
       const P = Number(r.modeled_offer ?? 0);
       const R = Number(r.reno_cost ?? 0);
       const exit_days = Number(r.exit_days ?? 90);

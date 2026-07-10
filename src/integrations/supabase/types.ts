@@ -59,6 +59,111 @@ export type Database = {
         }
         Relationships: []
       }
+      bulk_lookup_items: {
+        Row: {
+          address: string
+          attempts: number
+          city: string | null
+          county: string | null
+          created_at: string
+          error: string | null
+          id: string
+          job_id: string
+          parcel_id: string | null
+          processed_at: string | null
+          state: string
+          status: string
+          unit: string | null
+        }
+        Insert: {
+          address: string
+          attempts?: number
+          city?: string | null
+          county?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          job_id: string
+          parcel_id?: string | null
+          processed_at?: string | null
+          state: string
+          status?: string
+          unit?: string | null
+        }
+        Update: {
+          address?: string
+          attempts?: number
+          city?: string | null
+          county?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          job_id?: string
+          parcel_id?: string | null
+          processed_at?: string | null
+          state?: string
+          status?: string
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_lookup_items_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "bulk_lookup_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulk_lookup_items_parcel_id_fkey"
+            columns: ["parcel_id"]
+            isOneToOne: false
+            referencedRelation: "parcels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bulk_lookup_jobs: {
+        Row: {
+          created_at: string
+          failed: number
+          finished_at: string | null
+          id: string
+          name: string | null
+          notes: string | null
+          processed: number
+          status: string
+          succeeded: number
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          failed?: number
+          finished_at?: string | null
+          id?: string
+          name?: string | null
+          notes?: string | null
+          processed?: number
+          status?: string
+          succeeded?: number
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          failed?: number
+          finished_at?: string | null
+          id?: string
+          name?: string | null
+          notes?: string | null
+          processed?: number
+          status?: string
+          succeeded?: number
+          total?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       counties: {
         Row: {
           center_lat: number
