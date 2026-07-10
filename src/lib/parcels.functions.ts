@@ -41,9 +41,10 @@ export const listRankedParcels = createServerFn({ method: "POST" })
   });
 
 export const getDossier = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => z.object({ parcel_id: z.string().uuid() }).parse(data))
-  .handler(async ({ data }) => {
-    const supabase = serverClient();
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase;
     const [parcel, score, deeds, distress, listings] = await Promise.all([
       supabase.from("parcels").select("*").eq("id", data.parcel_id).maybeSingle(),
       supabase.from("parcel_scores").select("*").eq("parcel_id", data.parcel_id).maybeSingle(),
