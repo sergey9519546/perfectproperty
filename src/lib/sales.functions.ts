@@ -9,6 +9,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireAdmin } from "@/integrations/supabase/require-admin";
 import { fetchNycSales, nycBoroughs, boroughFor } from "./adapters/nyc-sales";
 
 async function adminClient() {
@@ -22,6 +23,7 @@ const RunInput = z.object({
 });
 
 export const ingestSales = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
   .inputValidator((data: unknown) => RunInput.parse(data))
   .handler(async ({ data }) => {
     const supabase = await adminClient();
@@ -103,7 +105,7 @@ export const ingestSales = createServerFn({ method: "POST" })
     return { fips: b.fips, name: b.name, fetched: rows.length, inserted, matched_to_parcels: matched, status, note };
   });
 
-export const ingestAllNycSales = createServerFn({ method: "POST" }).handler(async () => {
+export const ingestAllNycSales = createServerFn({ method: "POST" }).middleware([requireAdmin]).handler(async () => {
   // Citywide single fetch, then group by borough → county for reporting.
   const supabase = await adminClient();
   const { fetchNycSales } = await import("./adapters/nyc-sales");
@@ -193,7 +195,7 @@ export const ingestAllNycSales = createServerFn({ method: "POST" }).handler(asyn
   }));
 });
 
-export const salesSummary = createServerFn({ method: "GET" }).handler(async () => {
+export const salesSummary = createServerFn({ method: "GET" }).middleware([requireAdmin]).handler(async () => {
   const supabase = await adminClient();
   const { count: total } = await supabase.from("sales").select("id", { count: "exact", head: true });
   const { data: byCounty } = await supabase.from("sales").select("county_fips");

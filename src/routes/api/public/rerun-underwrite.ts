@@ -1,21 +1,23 @@
 /**
  * Cron endpoint: re-run underwrite for LIVE parcels whose latest score is
- * stale (older than N days) or has no ARV source (heuristic-only). Batched
- * so a single invocation stays bounded; run frequently to catch up.
+ * stale (older than N days) or has no ARV source. Batched.
  *
- * Auth: Supabase anon key via `apikey` header, or legacy `x-cron-secret`.
+ * Auth: shared secret `CRON_SECRET` in `x-cron-secret` header, compared
+ * with timingSafeEqual. The publishable/anon key is NOT accepted.
  * Query params: ?limit=N (default 50, max 200), ?days=D (default 7).
  */
 import { createFileRoute } from "@tanstack/react-router";
+import { timingSafeEqual } from "crypto";
 import { rerunUnderwriteCore } from "@/lib/underwrite-core";
 
 function authorized(request: Request): boolean {
-  const apikey = request.headers.get("apikey");
-  const anon = process.env.SUPABASE_PUBLISHABLE_KEY;
-  if (apikey && anon && apikey === anon) return true;
-  const legacy = request.headers.get("x-cron-secret");
   const secret = process.env.CRON_SECRET;
-  return Boolean(legacy && secret && legacy === secret);
+  const header = request.headers.get("x-cron-secret");
+  if (!secret || !header) return false;
+  const a = Buffer.from(secret, "utf8");
+  const b = Buffer.from(header.trim(), "utf8");
+  if (a.length !== b.length) return false;
+  try { return timingSafeEqual(a, b); } catch { return false; }
 }
 
 export const Route = createFileRoute("/api/public/rerun-underwrite")({
@@ -30,7 +32,6 @@ export const Route = createFileRoute("/api/public/rerun-underwrite")({
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const staleBefore = new Date(Date.now() - days * 86400_000).toISOString();
 
-        // Candidates: LIVE scores with no arv_source, OR older than `days`.
         const { data: rows, error } = await supabaseAdmin
           .from("parcel_scores")
           .select("parcel_id, computed_at, arv_source, data_source")
