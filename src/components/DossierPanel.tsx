@@ -324,7 +324,7 @@ function TransactionHistory({ d }: { d: D }) {
       <SectionHead icon={<ScrollText className="h-3.5 w-3.5" />} title={`Transaction bloodline (${d.deeds.length})`} />
       <div className="mt-2 space-y-1">
         {d.deeds.length === 0 && <div className="text-[12px] text-muted-foreground">No recorded deeds in the genome.</div>}
-        {d.deeds.map((x) => (
+        {d.deeds.map((x: any) => (
           <div key={x.id} className="flex items-center justify-between rounded-md border border-border bg-surface-2 px-3 py-2 text-[12px]">
             <span className="num text-muted-foreground">{x.recorded_at}</span>
             <span className="text-[11px] uppercase text-muted-foreground">{x.deed_type}</span>
