@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { listRankedParcels } from "@/lib/parcels.functions";
+import { listRankedParcels, lookupParcelByAddress } from "@/lib/parcels.functions";
 import { DossierPanel } from "@/components/DossierPanel";
 import { fmt$, tierLabel, ringLabel } from "@/lib/format";
 import { stressedDeal, portfolioStressLossMean, type StressScenario, type DealBase } from "@/lib/engine/credit";
