@@ -2,6 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import type { Database } from "@/integrations/supabase/types";
+import { realieLookupAddress, realieToParcelRow } from "@/lib/adapters/realie";
+import { underwrite, MARKET_CONTEXT, type ParcelInput, type DistressInput } from "@/lib/engine";
+import { appendDecision, type DecisionRecord } from "@/lib/engine/warehouse";
 
 function serverClient() {
   return createClient<Database>(
@@ -28,7 +31,7 @@ export const listRankedParcels = createServerFn({ method: "POST" })
     let q = supabase
       .from("parcel_scores")
       .select(
-        "parcel_id, perfect_score, gross_profit, risk_adjusted_profit, modeled_offer, acquisition_probability, exit_days, ring, confidence_grade, skeptic_flags, recommended_scope, reno_cost, data_source, parcels!inner(id, address, city, state, zip, lat, lng, living_sqft, year_built, bedrooms, bathrooms, condition_grade, owner_is_absentee, is_listed, is_vacant, county_fips, data_source)",
+        "parcel_id, perfect_score, gross_profit, risk_adjusted_profit, modeled_offer, acquisition_probability, exit_days, ring, confidence_grade, skeptic_flags, recommended_scope, reno_cost, data_source, mc_profit_p5, mc_profit_p50, mc_p_loss, cosmetic_arv, full_reno_arv, expanded_arv, as_is_value, carry_cost, selling_cost, ead, pd_credit, lgd, risk_adjusted_profit_credit, parcels!inner(id, address, city, state, zip, lat, lng, living_sqft, year_built, bedrooms, bathrooms, condition_grade, owner_is_absentee, is_listed, is_vacant, county_fips, data_source)",
       )
       .order("perfect_score", { ascending: false })
       .limit(data.limit);
@@ -50,20 +53,76 @@ export const getDossier = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const supabase = serverClient();
     const [parcel, score, deeds, distress, listings] = await Promise.all([
-      supabase.from("parcels").select("*").eq("id", data.parcel_id).single(),
-      supabase.from("parcel_scores").select("*").eq("parcel_id", data.parcel_id).single(),
+      supabase.from("parcels").select("*").eq("id", data.parcel_id).maybeSingle(),
+      supabase.from("parcel_scores").select("*").eq("parcel_id", data.parcel_id).maybeSingle(),
       supabase.from("deeds").select("*").eq("parcel_id", data.parcel_id).order("recorded_at", { ascending: false }),
       supabase.from("distress_events").select("*").eq("parcel_id", data.parcel_id).order("event_date", { ascending: false }),
       supabase.from("listings").select("*").eq("parcel_id", data.parcel_id).order("listed_at", { ascending: false }),
     ]);
     if (parcel.error) throw new Error(parcel.error.message);
+    if (!parcel.data) throw new Error("Parcel not found");
     return {
       parcel: parcel.data,
-      score: score.data,
+      score: score.data ?? null,
       deeds: deeds.data ?? [],
       distress: distress.data ?? [],
       listings: listings.data ?? [],
     };
+  });
+
+// ---------------------------------------------------------------------------
+// Realie-powered single-address lookup + underwrite in one call.
+// ---------------------------------------------------------------------------
+const LookupInput = z.object({
+  address: z.string().min(3),
+  state: z.string().length(2),
+  city: z.string().optional(),
+  county: z.string().optional(),
+  unit: z.string().optional(),
+});
+
+export const lookupParcelByAddress = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => LookupInput.parse(data))
+  .handler(async ({ data }) => {
+    const property = await realieLookupAddress({
+      address: data.address,
+      state: data.state.toUpperCase(),
+      city: data.city,
+      county: data.county,
+      unitNumberStripped: data.unit,
+    });
+    if (!property) throw new Error("Address not found in Realie");
+
+    const row = realieToParcelRow(property, data.state);
+    if (!row) throw new Error("Realie returned insufficient data for this address");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Try to match an existing parcel first (APN + county, then normalized address).
+    const { data: matchId } = await (supabaseAdmin as any).rpc("match_parcel", {
+      _county_fips: row.county_fips,
+      _apn: row.apn,
+      _address: row.address,
+      _city: row.city,
+    });
+
+    let parcelId: string | null = matchId ?? null;
+    if (parcelId) {
+      await supabaseAdmin.from("parcels").update(row).eq("id", parcelId);
+    } else {
+      const { data: inserted, error } = await supabaseAdmin
+        .from("parcels")
+        .upsert(row, { onConflict: "county_fips,apn" })
+        .select("id")
+        .single();
+      if (error || !inserted) throw new Error(error?.message ?? "Failed to upsert parcel");
+      parcelId = inserted.id;
+    }
+
+    // Run the underwrite pipeline (comps come from pick_comps + Realie fallback via rerunUnderwrite).
+    const { rerunUnderwrite } = await import("@/lib/underwrite.functions");
+    const result = await rerunUnderwrite({ data: { parcel_id: parcelId! } });
+    return { parcel_id: parcelId!, ...result };
   });
 
 export const getCoverage = createServerFn({ method: "GET" }).handler(async () => {
@@ -77,7 +136,6 @@ export const getCoverage = createServerFn({ method: "GET" }).handler(async () =>
     supabase.from("parcels").select("county_fips").eq("data_source", "FIXTURE"),
   ]);
   const s = scores.data ?? [];
-  // Rank tiers computed over LIVE parcels only — fixture doesn't count.
   const sLive = s.filter((x: any) => x.data_source === "LIVE");
   const tiers = {
     exceptional: sLive.filter((x) => x.perfect_score >= 80).length,
