@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -7,8 +7,14 @@ import { MapView } from "@/components/MapView";
 import { DossierPanel } from "@/components/DossierPanel";
 import { fmt$, tierLabel, ringLabel } from "@/lib/format";
 import { Flame, Sparkles, Eye } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
+  ssr: false,
+  beforeLoad: async () => {
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) throw redirect({ to: "/auth", search: { next: "/" } });
+  },
   component: HomePage,
 });
 

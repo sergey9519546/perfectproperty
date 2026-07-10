@@ -1,18 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import type { Database } from "@/integrations/supabase/types";
 import { realieLookupAddress, realieToParcelRow } from "@/lib/adapters/realie";
 import { underwrite, MARKET_CONTEXT, type ParcelInput, type DistressInput } from "@/lib/engine";
 import { appendDecision, type DecisionRecord } from "@/lib/engine/warehouse";
-
-function serverClient() {
-  return createClient<Database>(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_PUBLISHABLE_KEY!,
-    { auth: { storage: undefined, persistSession: false, autoRefreshToken: false } },
-  );
-}
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const ListInput = z.object({
   county_fips: z.string().optional(),
@@ -25,9 +16,10 @@ const ListInput = z.object({
 });
 
 export const listRankedParcels = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => ListInput.parse(data ?? {}))
-  .handler(async ({ data }) => {
-    const supabase = serverClient();
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase;
     let q = supabase
       .from("parcel_scores")
       .select(
@@ -49,9 +41,10 @@ export const listRankedParcels = createServerFn({ method: "POST" })
   });
 
 export const getDossier = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => z.object({ parcel_id: z.string().uuid() }).parse(data))
-  .handler(async ({ data }) => {
-    const supabase = serverClient();
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase;
     const [parcel, score, deeds, distress, listings] = await Promise.all([
       supabase.from("parcels").select("*").eq("id", data.parcel_id).maybeSingle(),
       supabase.from("parcel_scores").select("*").eq("parcel_id", data.parcel_id).maybeSingle(),
@@ -82,6 +75,7 @@ const LookupInput = z.object({
 });
 
 export const lookupParcelByAddress = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => LookupInput.parse(data))
   .handler(async ({ data }) => {
     const { lookupParcelByAddressCore } = await import("@/lib/parcels-core");
@@ -89,8 +83,10 @@ export const lookupParcelByAddress = createServerFn({ method: "POST" })
   });
 
 
-export const getCoverage = createServerFn({ method: "GET" }).handler(async () => {
-  const supabase = serverClient();
+export const getCoverage = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+  const supabase = context.supabase;
   const [counties, runs, scores, outcomes, liveByCounty, fixtureByCounty] = await Promise.all([
     supabase.from("counties").select("*").order("state").order("name"),
     supabase.from("ingestion_runs").select("*").order("started_at", { ascending: false }).limit(30),
@@ -99,35 +95,35 @@ export const getCoverage = createServerFn({ method: "GET" }).handler(async () =>
     supabase.from("parcels").select("county_fips").eq("data_source", "LIVE"),
     supabase.from("parcels").select("county_fips").eq("data_source", "FIXTURE"),
   ]);
-  const s = scores.data ?? [];
+  const s = (scores.data ?? []) as any[];
   const sLive = s.filter((x: any) => x.data_source === "LIVE");
   const tiers = {
-    exceptional: sLive.filter((x) => x.perfect_score >= 80).length,
-    strong: sLive.filter((x) => x.perfect_score >= 65 && x.perfect_score < 80).length,
-    viable: sLive.filter((x) => x.perfect_score >= 50 && x.perfect_score < 65).length,
-    watch: sLive.filter((x) => x.perfect_score < 50).length,
+    exceptional: sLive.filter((x: any) => x.perfect_score >= 80).length,
+    strong: sLive.filter((x: any) => x.perfect_score >= 65 && x.perfect_score < 80).length,
+    viable: sLive.filter((x: any) => x.perfect_score >= 50 && x.perfect_score < 65).length,
+    watch: sLive.filter((x: any) => x.perfect_score < 50).length,
   };
   const rings = {
-    r1: sLive.filter((x) => x.ring === 1).length,
-    r2: sLive.filter((x) => x.ring === 2).length,
-    r3: sLive.filter((x) => x.ring === 3).length,
+    r1: sLive.filter((x: any) => x.ring === 1).length,
+    r2: sLive.filter((x: any) => x.ring === 2).length,
+    r3: sLive.filter((x: any) => x.ring === 3).length,
   };
   const liveCounts: Record<string, number> = {};
   const fxCounts: Record<string, number> = {};
-  for (const r of liveByCounty.data ?? []) liveCounts[r.county_fips] = (liveCounts[r.county_fips] ?? 0) + 1;
-  for (const r of fixtureByCounty.data ?? []) fxCounts[r.county_fips] = (fxCounts[r.county_fips] ?? 0) + 1;
+  for (const r of (liveByCounty.data ?? []) as any[]) liveCounts[r.county_fips] = (liveCounts[r.county_fips] ?? 0) + 1;
+  for (const r of (fixtureByCounty.data ?? []) as any[]) fxCounts[r.county_fips] = (fxCounts[r.county_fips] ?? 0) + 1;
   const countiesEnriched = (counties.data ?? []).map((c: any) => ({
     ...c,
     live_parcels: liveCounts[c.fips] ?? 0,
     fixture_parcels: fxCounts[c.fips] ?? 0,
   }));
 
-  const o = outcomes.data ?? [];
-  const wins = o.filter((x) => x.outcome === "WIN").length;
-  const losses = o.filter((x) => x.outcome === "LOSS").length;
-  const stuck = o.filter((x) => x.outcome === "STUCK").length;
+  const o = (outcomes.data ?? []) as any[];
+  const wins = o.filter((x: any) => x.outcome === "WIN").length;
+  const losses = o.filter((x: any) => x.outcome === "LOSS").length;
+  const stuck = o.filter((x: any) => x.outcome === "STUCK").length;
   const avgError = o.length
-    ? o.reduce((a, b) => a + Math.abs(Number(b.error_pct ?? 0)), 0) / o.length
+    ? o.reduce((a: number, b: any) => a + Math.abs(Number(b.error_pct ?? 0)), 0) / o.length
     : 0;
   return {
     counties: countiesEnriched,

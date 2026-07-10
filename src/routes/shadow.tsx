@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -7,8 +7,14 @@ import { DossierPanel } from "@/components/DossierPanel";
 import { PageHead } from "./deals";
 import { fmt$, tierLabel } from "@/lib/format";
 import { Sparkles } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/shadow")({
+  ssr: false,
+  beforeLoad: async () => {
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) throw redirect({ to: "/auth", search: { next: "/shadow" } });
+  },
   head: () => ({
     meta: [
       { title: "Shadow Market — Perfect Property Engine" },
