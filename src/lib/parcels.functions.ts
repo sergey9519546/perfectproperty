@@ -1,18 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import type { Database } from "@/integrations/supabase/types";
 import { realieLookupAddress, realieToParcelRow } from "@/lib/adapters/realie";
 import { underwrite, MARKET_CONTEXT, type ParcelInput, type DistressInput } from "@/lib/engine";
 import { appendDecision, type DecisionRecord } from "@/lib/engine/warehouse";
-
-function serverClient() {
-  return createClient<Database>(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_PUBLISHABLE_KEY!,
-    { auth: { storage: undefined, persistSession: false, autoRefreshToken: false } },
-  );
-}
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const ListInput = z.object({
   county_fips: z.string().optional(),
