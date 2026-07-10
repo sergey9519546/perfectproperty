@@ -1,19 +1,21 @@
 /**
  * Cron endpoint: process a batch of pending bulk-lookup items.
- * Auth: Supabase anon key via `apikey` header (canonical pg_cron pattern),
- * with legacy `x-cron-secret` still accepted for backward compatibility.
+ * Auth: shared secret `CRON_SECRET` in `x-cron-secret` header, compared
+ * with timingSafeEqual. The publishable/anon key is NOT accepted — it
+ * ships in the client bundle and is not a secret.
  */
 import { createFileRoute } from "@tanstack/react-router";
+import { timingSafeEqual } from "crypto";
 import { processBulkLookupBatch } from "@/lib/bulk-lookup.functions";
 
 function authorized(request: Request): boolean {
-  const apikey = request.headers.get("apikey");
-  const anon = process.env.SUPABASE_PUBLISHABLE_KEY;
-  if (apikey && anon && apikey === anon) return true;
-  const legacy = request.headers.get("x-cron-secret");
   const secret = process.env.CRON_SECRET;
-  if (legacy && secret && legacy === secret) return true;
-  return false;
+  const header = request.headers.get("x-cron-secret");
+  if (!secret || !header) return false;
+  const a = Buffer.from(secret, "utf8");
+  const b = Buffer.from(header.trim(), "utf8");
+  if (a.length !== b.length) return false;
+  try { return timingSafeEqual(a, b); } catch { return false; }
 }
 
 export const Route = createFileRoute("/api/public/run-bulk-lookups")({

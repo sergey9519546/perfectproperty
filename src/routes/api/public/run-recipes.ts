@@ -23,13 +23,9 @@ export const Route = createFileRoute("/api/public/run-recipes")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const anon = process.env.SUPABASE_PUBLISHABLE_KEY;
         const secret = process.env.CRON_SECRET;
-        const apikey = request.headers.get("apikey");
-        const legacy = request.headers.get("x-cron-secret");
-        const okApi = Boolean(anon && apikey && apikey === anon);
-        const okLegacy = Boolean(secret && legacy && verify(secret, legacy));
-        if (!okApi && !okLegacy) return new Response("Unauthorized", { status: 401 });
+        const header = request.headers.get("x-cron-secret");
+        if (!secret || !verify(secret, header)) return new Response("Unauthorized", { status: 401 });
 
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
