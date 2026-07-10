@@ -98,7 +98,7 @@ export async function processBulkLookupBatch(limit = 20): Promise<{
   failed: number;
 }> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { lookupParcelByAddress } = await import("@/lib/parcels.functions");
+  const { lookupParcelByAddressCore } = await import("@/lib/parcels-core");
 
   const { data: pending, error } = await supabaseAdmin
     .from("bulk_lookup_items")
@@ -115,7 +115,8 @@ export async function processBulkLookupBatch(limit = 20): Promise<{
   for (const item of pending ?? []) {
     touched.add(item.job_id);
     try {
-      const r = await lookupParcelByAddress({
+      const r = await lookupParcelByAddressCore({
+
         data: {
           address: item.address,
           state: item.state,
