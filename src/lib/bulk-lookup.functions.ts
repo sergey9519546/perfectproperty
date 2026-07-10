@@ -44,17 +44,55 @@ export const createBulkLookupJob = createServerFn({ method: "POST" })
       .single();
     if (jErr || !job) throw new Error(jErr?.message ?? "failed to create job");
 
-    const items = data.rows.map((r) => ({
-      job_id: job.id,
-      address: r.address.trim(),
-      state: r.state.trim().toUpperCase(),
-      city: r.city?.trim() || null,
-      county: r.county?.trim() || null,
-      unit: r.unit?.trim() || null,
-    }));
-    const { error: iErr } = await supabaseAdmin.from("bulk_lookup_items").insert(items);
-    if (iErr) throw new Error(iErr.message);
-    return { job_id: job.id, enqueued: items.length };
+    // De-dupe within the paste itself (case-insensitive on address+state)
+    // so we don't send known-duplicate rows into the unique index.
+    const seen = new Set<string>();
+    const items: Array<{
+      job_id: string; address: string; state: string;
+      city: string | null; county: string | null; unit: string | null;
+    }> = [];
+    for (const r of data.rows) {
+      const address = r.address.trim();
+      const state = r.state.trim().toUpperCase();
+      const key = `${address.toUpperCase()}|${state}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      items.push({
+        job_id: job.id,
+        address,
+        state,
+        city: r.city?.trim() || null,
+        county: r.county?.trim() || null,
+        unit: r.unit?.trim() || null,
+      });
+    }
+
+    // Insert; the (job_id, upper(address), upper(state)) unique index will
+    // reject any duplicates that slip past client-side de-dupe. Fall back to
+    // per-row inserts on conflict so a single dupe doesn't fail the batch.
+    const { data: inserted, error: iErr } = await supabaseAdmin
+      .from("bulk_lookup_items").insert(items).select("id");
+    let enqueued = inserted?.length ?? 0;
+    if (iErr) {
+      if (!/duplicate key|unique constraint/i.test(iErr.message)) {
+        throw new Error(iErr.message);
+      }
+      enqueued = 0;
+      for (const it of items) {
+        const { error: rowErr } = await supabaseAdmin.from("bulk_lookup_items").insert(it);
+        if (!rowErr) enqueued++;
+        else if (!/duplicate key|unique constraint/i.test(rowErr.message)) {
+          throw new Error(rowErr.message);
+        }
+      }
+    }
+
+    // Keep the job's total in sync with what actually made it into the queue.
+    if (enqueued !== data.rows.length) {
+      await supabaseAdmin.from("bulk_lookup_jobs")
+        .update({ total: enqueued }).eq("id", job.id);
+    }
+    return { job_id: job.id, enqueued, skipped: data.rows.length - enqueued };
   });
 
 /**
