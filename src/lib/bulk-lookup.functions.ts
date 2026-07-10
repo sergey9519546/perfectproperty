@@ -166,3 +166,63 @@ export async function processBulkLookupBatch(limit = 20): Promise<{
 
   return { processed: (pending ?? []).length, succeeded, failed };
 }
+
+/**
+ * Reset every failed item on a job back to `pending` so the overnight worker
+ * picks them up on the next tick. Also nudges the worker to run one batch
+ * immediately so the user sees movement without waiting for cron.
+ *
+ * `latest` (default) resolves to the most recently created job.
+ */
+const ResumeInput = z.object({ job_id: z.string().uuid().optional() });
+
+export const resumeFailedInJob = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => ResumeInput.parse(data ?? {}))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let jobId = data.job_id;
+    if (!jobId) {
+      const { data: latest } = await supabaseAdmin
+        .from("bulk_lookup_jobs")
+        .select("id")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!latest) return { job_id: null, reset: 0, processed: 0, succeeded: 0, failed: 0 };
+      jobId = latest.id;
+    }
+
+    const { data: reset, error } = await supabaseAdmin
+      .from("bulk_lookup_items")
+      .update({ status: "pending", error: null, processed_at: null })
+      .eq("job_id", jobId)
+      .eq("status", "failed")
+      .select("id");
+    if (error) throw new Error(error.message);
+
+    const resetN = reset?.length ?? 0;
+
+    // Reflect the reset on the parent job so the UI updates immediately.
+    if (resetN > 0) {
+      const { data: counts } = await supabaseAdmin
+        .from("bulk_lookup_items").select("status").eq("job_id", jobId);
+      const done = (counts ?? []).filter((c) => c.status !== "pending").length;
+      const okN = (counts ?? []).filter((c) => c.status === "succeeded").length;
+      const failN = (counts ?? []).filter((c) => c.status === "failed").length;
+      await supabaseAdmin.from("bulk_lookup_jobs").update({
+        status: done === (counts?.length ?? 0) ? "done" : "running",
+        processed: done, succeeded: okN, failed: failN,
+        finished_at: null,
+        updated_at: new Date().toISOString(),
+      }).eq("id", jobId);
+    }
+
+    // Kick off one batch now so the user sees progress without waiting for cron.
+    let processed = 0, succeeded = 0, failed = 0;
+    if (resetN > 0) {
+      const r = await processBulkLookupBatch(Math.min(resetN, 20));
+      processed = r.processed; succeeded = r.succeeded; failed = r.failed;
+    }
+    return { job_id: jobId, reset: resetN, processed, succeeded, failed };
+  });
