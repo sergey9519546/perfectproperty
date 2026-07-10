@@ -6,6 +6,8 @@ import { listRankedParcels, lookupParcelByAddress } from "@/lib/parcels.function
 import { DossierPanel } from "@/components/DossierPanel";
 import { fmt$, tierLabel, ringLabel } from "@/lib/format";
 import { stressedDeal, portfolioStressLossMean, type StressScenario, type DealBase } from "@/lib/engine/credit";
+import { pickArv } from "@/lib/arv-picker";
+import { BulkLookupPanel } from "@/components/BulkLookupPanel";
 
 export const Route = createFileRoute("/deals")({
   head: () => ({
