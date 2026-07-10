@@ -342,7 +342,7 @@ function DistressLog({ d }: { d: D }) {
     <section>
       <SectionHead icon={<AlertTriangle className="h-3.5 w-3.5" />} title={`Legal weather (${d.distress.length})`} />
       <div className="mt-2 space-y-1">
-        {d.distress.map((x) => (
+        {d.distress.map((x: any) => (
           <div key={x.id} className="rounded-md border px-3 py-2 text-[12px]" style={{ backgroundColor: "color-mix(in oklab, var(--shadow-ring) 8%, transparent)", borderColor: "color-mix(in oklab, var(--shadow-ring) 30%, transparent)" }}>
             <div className="flex items-center justify-between">
               <span className="font-medium text-foreground">{x.event_type.replace(/_/g, " ")}</span>
