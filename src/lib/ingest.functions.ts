@@ -107,15 +107,19 @@ function normalizeSocrataRow(r: Record<string, any>, src: CountySource) {
   } else if (c.address_builder === "nyc") {
     address = String(r.address ?? "").trim() || "Address unknown";
     city = { BX: "Bronx", BK: "Brooklyn", MN: "Manhattan", QN: "Queens", SI: "Staten Island" }[r.borough as string] ?? null;
+  } else if (c.address_builder === "chicago") {
+    address = String(r.prop_address_full ?? "").trim() || "Address unknown";
+    city = String(r.prop_address_city_name ?? "").trim() || null;
   } else if (c.field_address) {
     address = String(r[c.field_address] ?? "").trim() || "Address unknown";
     city = c.field_city ? String(r[c.field_city] ?? "").trim() || null : null;
   }
   const yb = c.field_year_built ? Number(r[c.field_year_built]) || null : null;
   const sqft = c.field_living_sqft ? Number(r[c.field_living_sqft]) || null : null;
-  // NYC lat/lng comes from latitude/longitude fields; SF from location
+  // NYC lat/lng comes from latitude/longitude; SF from location; Cook from lat/lon.
   let lat = src.center[0], lng = src.center[1];
   if (r.latitude && r.longitude) { lat = Number(r.latitude); lng = Number(r.longitude); }
+  else if (r.lat && r.lon) { lat = Number(r.lat); lng = Number(r.lon); }
   else if (r.location?.latitude && r.location?.longitude) { lat = Number(r.location.latitude); lng = Number(r.location.longitude); }
   // NYC PLUTO returns `bbl` as a numeric field which arrives as "2032020044.00000000".
   // Sales use the 10-digit BBL string, so strip the decimal noise here so joins match.
