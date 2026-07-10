@@ -5,7 +5,7 @@
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { createBulkLookupJob, listBulkLookupJobs } from "@/lib/bulk-lookup.functions";
+import { createBulkLookupJob, listBulkLookupJobs, resumeFailedInJob } from "@/lib/bulk-lookup.functions";
 
 type ParsedRow = { address: string; state: string; city?: string };
 
@@ -60,6 +60,26 @@ export function BulkLookupPanel() {
     }
   }
 
+  const resume = useServerFn(resumeFailedInJob);
+  const latestJob = jobs.data?.[0] as any;
+  const latestFailed = Number(latestJob?.failed ?? 0);
+  const [resuming, setResuming] = useState(false);
+
+  async function resumeLatest() {
+    if (!latestJob) return;
+    setResuming(true); setMsg(null);
+    try {
+      const r = await resume({ data: { job_id: latestJob.id } });
+      setMsg(`Requeued ${r.reset} failed items · ran ${r.processed} now (${r.succeeded} ok, ${r.failed} fail).`);
+      await qc.invalidateQueries({ queryKey: ["bulk-lookup-jobs"] });
+    } catch (e: any) {
+      setMsg(e?.message ?? "Resume failed.");
+    } finally {
+      setResuming(false);
+    }
+  }
+
+
   return (
     <div className="mt-6 rounded-lg border border-border bg-surface p-4">
       <div className="flex items-center justify-between">
@@ -70,6 +90,15 @@ export function BulkLookupPanel() {
             The overnight worker underwrites them via Realie.
           </div>
         </div>
+        <button
+          type="button"
+          onClick={resumeLatest}
+          disabled={resuming || !latestJob || latestFailed === 0}
+          title={!latestJob ? "No jobs yet" : latestFailed === 0 ? "Latest job has no failed items" : `Requeue ${latestFailed} failed`}
+          className="rounded-md border border-border bg-surface-2 px-3 py-1.5 text-[12px] hover:bg-surface disabled:opacity-40"
+        >
+          {resuming ? "Resuming…" : `Resume failed (${latestFailed})`}
+        </button>
       </div>
 
       <form onSubmit={submit} className="mt-3 grid gap-2 md:grid-cols-[1fr_240px]">
