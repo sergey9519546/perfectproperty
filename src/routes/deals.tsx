@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -8,8 +8,14 @@ import { fmt$, tierLabel, ringLabel } from "@/lib/format";
 import { stressedDeal, portfolioStressLossMean, type StressScenario, type DealBase } from "@/lib/engine/credit";
 import { pickArv } from "@/lib/arv-picker";
 import { BulkLookupPanel } from "@/components/BulkLookupPanel";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/deals")({
+  ssr: false,
+  beforeLoad: async () => {
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) throw redirect({ to: "/auth", search: { next: "/deals" } });
+  },
   head: () => ({
     meta: [
       { title: "Ranked Deals — Perfect Property Engine" },
