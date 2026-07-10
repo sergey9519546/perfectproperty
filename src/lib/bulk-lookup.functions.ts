@@ -194,11 +194,12 @@ export const resumeFailedInJob = createServerFn({ method: "POST" })
 
     const { data: reset, error } = await supabaseAdmin
       .from("bulk_lookup_items")
-      .update({ status: "pending", error: null, processed_at: null })
+      .update({ status: "pending", error: null, processed_at: null, attempts: 0 })
       .eq("job_id", jobId)
       .eq("status", "failed")
       .select("id");
     if (error) throw new Error(error.message);
+
 
     const resetN = reset?.length ?? 0;
 
