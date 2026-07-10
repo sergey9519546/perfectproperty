@@ -12,6 +12,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import * as cheerio from "cheerio";
+import { requireAdmin } from "@/integrations/supabase/require-admin";
 
 async function adminClient() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -26,6 +27,7 @@ const ProbeInput = z.object({
 });
 
 export const probeUrl = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => ProbeInput.parse(d))
   .handler(async ({ data }) => {
     const supabase = await adminClient();
@@ -131,7 +133,7 @@ function extractHints(html: string, baseUrl: string) {
   return { headings, links, tables, forms, dates, dollars };
 }
 
-export const listProbes = createServerFn({ method: "GET" }).handler(async () => {
+export const listProbes = createServerFn({ method: "GET" }).middleware([requireAdmin]).handler(async () => {
   const supabase = await adminClient();
   const { data: runs } = await supabase.from("probe_runs")
     .select("*").order("started_at", { ascending: false }).limit(25);

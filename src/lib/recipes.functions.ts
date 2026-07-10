@@ -12,6 +12,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireAdmin } from "@/integrations/supabase/require-admin";
 
 async function adminClient() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -19,6 +20,7 @@ async function adminClient() {
 }
 
 export const discoverSchema = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => z.object({ url: z.string().url() }).parse(d))
   .handler(async ({ data }) => {
     const supabase = await adminClient();
@@ -54,6 +56,7 @@ const RecipeSchema = z.object({
 });
 
 export const saveRecipe = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => RecipeSchema.parse(d))
   .handler(async ({ data }) => {
     const supabase = await adminClient();
@@ -74,7 +77,7 @@ export const saveRecipe = createServerFn({ method: "POST" })
     return { id: inserted.id };
   });
 
-export const listRecipes = createServerFn({ method: "GET" }).handler(async () => {
+export const listRecipes = createServerFn({ method: "GET" }).middleware([requireAdmin]).handler(async () => {
   const supabase = await adminClient();
   const { data } = await supabase.from("adapter_recipes")
     .select("*").order("updated_at", { ascending: false });
@@ -82,6 +85,7 @@ export const listRecipes = createServerFn({ method: "GET" }).handler(async () =>
 });
 
 export const deleteRecipe = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
     const supabase = await adminClient();
@@ -90,6 +94,7 @@ export const deleteRecipe = createServerFn({ method: "POST" })
   });
 
 export const runRecipe = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid(), max_rows: z.number().min(1).max(2000).default(500) }).parse(d))
   .handler(async ({ data }) => {
     const { executeRecipeById } = await import("./recipes-runner.server");

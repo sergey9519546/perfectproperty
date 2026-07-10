@@ -13,6 +13,7 @@ import { COUNTY_SOURCES, type CountySource } from "./adapters/sources";
 import { arcgisQuery, featureCentroid, type ArcGISFeature } from "./adapters/arcgis";
 import { socrataQuery } from "./adapters/socrata";
 import { femaFloodZoneAt } from "./adapters/fema";
+import { requireAdmin } from "@/integrations/supabase/require-admin";
 import { MARKET_CONTEXT, underwrite, type ParcelInput, type DistressInput } from "./engine";
 
 async function adminClient() {
@@ -151,6 +152,7 @@ function normalizeSocrataRow(r: Record<string, any>, src: CountySource) {
 }
 
 export const ingestCounty = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
   .inputValidator((d: unknown) => RunInput.parse(d))
   .handler(async ({ data }) => {
     const src = COUNTY_SOURCES.find((s) => s.fips === data.county_fips);
@@ -247,7 +249,7 @@ export const ingestCounty = createServerFn({ method: "POST" })
   });
 
 // Score only LIVE parcels. Fixture scoring is handled by runUnderwrite.
-export const scoreAll = createServerFn({ method: "POST" }).handler(async () => {
+export const scoreAll = createServerFn({ method: "POST" }).middleware([requireAdmin]).handler(async () => {
   const supabase = await adminClient();
   const { data: parcels, error } = await supabase
     .from("parcels").select("*").eq("data_source", "LIVE");
@@ -358,7 +360,7 @@ export const scoreAll = createServerFn({ method: "POST" }).handler(async () => {
   return { scored: scores.length, comps_backed: compBacked };
 });
 
-export const listSources = createServerFn({ method: "GET" }).handler(async () => {
+export const listSources = createServerFn({ method: "GET" }).middleware([requireAdmin]).handler(async () => {
   return COUNTY_SOURCES.map((s) => ({
     fips: s.fips, state: s.state, name: s.name,
     parcels: s.parcels ? { kind: s.parcels.kind, url: s.parcels.url } : null,

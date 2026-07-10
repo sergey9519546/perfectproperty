@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
+import { requireAdmin } from "@/integrations/supabase/require-admin";
 import { MARKET_CONTEXT, underwrite, type ParcelInput, type DistressInput } from "./engine";
 
 // service-role client (admin) is required for bulk writes bypassing RLS.
@@ -36,7 +37,7 @@ function pick<T>(rng: () => number, arr: T[]): T {
   return arr[Math.floor(rng() * arr.length)]!;
 }
 
-export const seedFixtures = createServerFn({ method: "POST" }).handler(async () => {
+export const seedFixtures = createServerFn({ method: "POST" }).middleware([requireAdmin]).handler(async () => {
   const supabase = await adminClient();
   const rng = mulberry32(20260707);
 
@@ -212,7 +213,7 @@ export const seedFixtures = createServerFn({ method: "POST" }).handler(async () 
   return { parcels: allParcels.length, deeds: allDeeds.length, distress: allDistress.length, listings: allListings.length };
 });
 
-export const runUnderwrite = createServerFn({ method: "POST" }).handler(async () => {
+export const runUnderwrite = createServerFn({ method: "POST" }).middleware([requireAdmin]).handler(async () => {
   const supabase = await adminClient();
   const { data: parcels, error } = await supabase.from("parcels").select("*");
   if (error) throw new Error(error.message);
