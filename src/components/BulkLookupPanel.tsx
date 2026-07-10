@@ -5,7 +5,8 @@
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { createBulkLookupJob, listBulkLookupJobs, resumeFailedInJob } from "@/lib/bulk-lookup.functions";
+import { createBulkLookupJob, listBulkLookupJobs, resumeFailedInJob, getBulkLookupJob } from "@/lib/bulk-lookup.functions";
+
 
 type ParsedRow = { address: string; state: string; city?: string };
 
@@ -144,23 +145,12 @@ export function BulkLookupPanel() {
                 <th className="px-3 py-2 text-right">Progress</th>
                 <th className="px-3 py-2 text-right">OK / Fail</th>
                 <th className="px-3 py-2 text-right">Created</th>
+                <th className="px-3 py-2 text-right"></th>
               </tr>
             </thead>
             <tbody>
               {(jobs.data ?? []).map((j: any) => (
-                <tr key={j.id} className="border-t border-border">
-                  <td className="px-3 py-2">{j.name || j.id.slice(0, 8)}</td>
-                  <td className="px-3 py-2">{j.status}</td>
-                  <td className="num px-3 py-2 text-right">{j.processed} / {j.total}</td>
-                  <td className="num px-3 py-2 text-right">
-                    <span className="text-profit-strong">{j.succeeded}</span>
-                    {" · "}
-                    <span className="text-skeptic">{j.failed}</span>
-                  </td>
-                  <td className="px-3 py-2 text-right text-muted-foreground">
-                    {new Date(j.created_at).toLocaleString()}
-                  </td>
-                </tr>
+                <JobRow key={j.id} job={j} />
               ))}
             </tbody>
           </table>
@@ -169,3 +159,87 @@ export function BulkLookupPanel() {
     </div>
   );
 }
+
+function JobRow({ job }: { job: any }) {
+  const [open, setOpen] = useState(false);
+  const get = useServerFn(getBulkLookupJob);
+  const detail = useQuery({
+    queryKey: ["bulk-lookup-job", job.id],
+    queryFn: () => get({ data: { job_id: job.id } }),
+    enabled: open,
+    refetchInterval: open ? 5000 : false,
+  });
+  const failedItems = ((detail.data?.items ?? []) as any[]).filter((i) => i.status === "failed");
+  return (
+    <>
+      <tr className="border-t border-border">
+        <td className="px-3 py-2">{job.name || job.id.slice(0, 8)}</td>
+        <td className="px-3 py-2">{job.status}</td>
+        <td className="num px-3 py-2 text-right">{job.processed} / {job.total}</td>
+        <td className="num px-3 py-2 text-right">
+          <span className="text-profit-strong">{job.succeeded}</span>{" · "}
+          <span className="text-skeptic">{job.failed}</span>
+        </td>
+        <td className="px-3 py-2 text-right text-muted-foreground">
+          {new Date(job.created_at).toLocaleString()}
+        </td>
+        <td className="px-3 py-2 text-right">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="text-[11px] text-muted-foreground underline hover:text-foreground"
+          >
+            {open ? "Hide" : "Details"}
+          </button>
+        </td>
+      </tr>
+      {open && (
+        <tr className="border-t border-border bg-surface-2">
+          <td colSpan={6} className="px-3 py-2">
+            {detail.isLoading ? (
+              <div className="text-[11px] text-muted-foreground">Loading…</div>
+            ) : failedItems.length === 0 ? (
+              <div className="text-[11px] text-muted-foreground">
+                No failed items ({(detail.data?.items ?? []).length} total).
+              </div>
+            ) : (
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                  {failedItems.length} failed
+                </div>
+                <table className="mt-1 w-full text-[11px]">
+                  <thead className="text-muted-foreground">
+                    <tr>
+                      <th className="px-2 py-1 text-left">Address</th>
+                      <th className="px-2 py-1 text-left">State</th>
+                      <th className="px-2 py-1 text-right">Attempts</th>
+                      <th className="px-2 py-1 text-left">Error</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {failedItems.slice(0, 100).map((it: any) => (
+                      <tr key={it.id} className="border-t border-border">
+                        <td className="px-2 py-1">{it.address}{it.city ? `, ${it.city}` : ""}</td>
+                        <td className="px-2 py-1">{it.state}</td>
+                        <td className="num px-2 py-1 text-right">
+                          {it.attempts ?? 0}/{it.max_attempts ?? 3}
+                        </td>
+                        <td className="px-2 py-1 text-skeptic">{it.error ?? "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {failedItems.length > 100 && (
+                  <div className="mt-1 text-[10px] text-muted-foreground">
+                    Showing 100 of {failedItems.length} failed items.
+                  </div>
+                )}
+              </div>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+

@@ -98,7 +98,7 @@ export async function processBulkLookupBatch(limit = 20): Promise<{
   failed: number;
 }> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { lookupParcelByAddress } = await import("@/lib/parcels.functions");
+  const { lookupParcelByAddressCore } = await import("@/lib/parcels-core");
 
   const { data: pending, error } = await supabaseAdmin
     .from("bulk_lookup_items")
@@ -115,15 +115,14 @@ export async function processBulkLookupBatch(limit = 20): Promise<{
   for (const item of pending ?? []) {
     touched.add(item.job_id);
     try {
-      const r = await lookupParcelByAddress({
-        data: {
-          address: item.address,
-          state: item.state,
-          city: item.city ?? undefined,
-          county: item.county ?? undefined,
-          unit: item.unit ?? undefined,
-        },
+      const r = await lookupParcelByAddressCore({
+        address: item.address,
+        state: item.state,
+        city: item.city ?? undefined,
+        county: item.county ?? undefined,
+        unit: item.unit ?? undefined,
       });
+
       await supabaseAdmin.from("bulk_lookup_items").update({
         status: "succeeded",
         parcel_id: r.parcel_id,
@@ -195,11 +194,12 @@ export const resumeFailedInJob = createServerFn({ method: "POST" })
 
     const { data: reset, error } = await supabaseAdmin
       .from("bulk_lookup_items")
-      .update({ status: "pending", error: null, processed_at: null })
+      .update({ status: "pending", error: null, processed_at: null, attempts: 0 })
       .eq("job_id", jobId)
       .eq("status", "failed")
       .select("id");
     if (error) throw new Error(error.message);
+
 
     const resetN = reset?.length ?? 0;
 
