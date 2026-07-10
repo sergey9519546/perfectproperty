@@ -141,7 +141,7 @@ function StressPanel({ rows }: { rows: any[] }) {
         r.recommended_scope === "COSMETIC" ? r.cosmetic_arv :
         r.recommended_scope === "FULL" ? r.full_reno_arv :
         r.recommended_scope === "EXPANDED" ? r.expanded_arv :
-        r.risk_adjusted_profit,
+        (r.full_reno_arv ?? r.cosmetic_arv ?? r.as_is_value ?? 0),
       );
       const P = Number(r.modeled_offer ?? 0);
       const R = Number(r.reno_cost ?? 0);
