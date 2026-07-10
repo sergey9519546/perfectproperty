@@ -55,11 +55,14 @@ export const Route = createFileRoute("/api/public/run-monitoring")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const anon = process.env.SUPABASE_PUBLISHABLE_KEY;
         const secret = process.env.CRON_SECRET;
-        if (!secret) return new Response("Not configured", { status: 503 });
-        if (!verify(secret, request.headers.get("x-cron-secret"))) {
-          return new Response("Unauthorized", { status: 401 });
-        }
+        const apikey = request.headers.get("apikey");
+        const legacy = request.headers.get("x-cron-secret");
+        const okApi = Boolean(anon && apikey && apikey === anon);
+        const okLegacy = Boolean(secret && legacy && verify(secret, legacy));
+        if (!okApi && !okLegacy) return new Response("Unauthorized", { status: 401 });
+
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
