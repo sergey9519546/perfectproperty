@@ -78,21 +78,29 @@ function HomePage() {
 }
 
 function CoverageStrip({ cov }: { cov: Awaited<ReturnType<typeof getCoverage>> | undefined }) {
-  if (!cov) return <div className="border-b border-border px-5 py-4 text-[11px] text-muted-foreground">Loading coverage…</div>;
+  if (!cov) return <div className="border-b border-border px-5 py-4 text-[12px] text-muted-foreground">Loading coverage…</div>;
   return (
     <div className="border-b border-border px-5 py-4">
-      <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Live coverage</div>
-      <div className="num mt-1 text-2xl font-semibold">{cov.total_parcels.toLocaleString()}<span className="text-sm font-normal text-muted-foreground"> parcels underwritten</span></div>
-      <div className="mt-3 grid grid-cols-4 gap-1.5 text-center text-[10px]">
-        <TierPill label="Exceptional" n={cov.tiers.exceptional} color="var(--tier-exceptional)" />
-        <TierPill label="Strong" n={cov.tiers.strong} color="var(--tier-strong)" />
-        <TierPill label="Viable" n={cov.tiers.viable} color="var(--tier-viable)" />
-        <TierPill label="Watch" n={cov.tiers.watch} color="var(--tier-watch)" />
+      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Live coverage</div>
+      <div className="num mt-1 text-2xl font-semibold">
+        {cov.total_parcels.toLocaleString()}
+        <span className="ml-1 text-sm font-normal text-muted-foreground">properties scored</span>
       </div>
-      <div className="mt-2 grid grid-cols-3 gap-1.5 text-center text-[10px]">
-        <RingPill label="Open" n={cov.rings.r1} icon={<Eye className="h-3 w-3" />} />
-        <RingPill label="Shadow" n={cov.rings.r2} icon={<Sparkles className="h-3 w-3" />} />
-        <RingPill label="Prophecy" n={cov.rings.r3} icon={<Flame className="h-3 w-3" />} />
+      <div className="mt-1 text-[12px] text-muted-foreground">Every property in-range gets a fresh score every night.</div>
+
+      <div className="mt-3 text-[10px] uppercase tracking-wider text-muted-foreground">Buy rating</div>
+      <div className="mt-1 grid grid-cols-4 gap-1.5 text-center text-[11px]">
+        <TierPill label="Great" n={cov.tiers.exceptional} color="var(--tier-exceptional)" />
+        <TierPill label="Strong" n={cov.tiers.strong} color="var(--tier-strong)" />
+        <TierPill label="Look" n={cov.tiers.viable} color="var(--tier-viable)" />
+        <TierPill label="Skip" n={cov.tiers.watch} color="var(--tier-watch)" />
+      </div>
+
+      <div className="mt-3 text-[10px] uppercase tracking-wider text-muted-foreground">Where it came from</div>
+      <div className="mt-1 grid grid-cols-3 gap-1.5 text-center text-[11px]">
+        <RingPill label="Listed" n={cov.rings.r1} icon={<Eye className="h-3 w-3" />} />
+        <RingPill label="Off-mkt" n={cov.rings.r2} icon={<Sparkles className="h-3 w-3" />} />
+        <RingPill label="Predicted" n={cov.rings.r3} icon={<Flame className="h-3 w-3" />} />
       </div>
     </div>
   );
@@ -101,8 +109,8 @@ function CoverageStrip({ cov }: { cov: Awaited<ReturnType<typeof getCoverage>> |
 function TierPill({ label, n, color }: { label: string; n: number; color: string }) {
   return (
     <div className="rounded-md border border-border bg-surface-2 px-1 py-1.5">
-      <div className="num text-[13px] font-semibold" style={{ color }}>{n}</div>
-      <div className="text-[9px] uppercase text-muted-foreground tracking-wider">{label}</div>
+      <div className="num text-[14px] font-semibold" style={{ color }}>{n}</div>
+      <div className="text-[10px] uppercase text-muted-foreground tracking-wider">{label}</div>
     </div>
   );
 }
@@ -110,8 +118,8 @@ function RingPill({ label, n, icon }: { label: string; n: number; icon: React.Re
   return (
     <div className="flex items-center justify-center gap-1.5 rounded-md border border-border bg-surface-2 px-1 py-1.5">
       <span className="text-muted-foreground">{icon}</span>
-      <span className="num text-[12px]">{n}</span>
-      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <span className="num text-[13px]">{n}</span>
+      <span className="text-[11px] text-muted-foreground">{label}</span>
     </div>
   );
 }
@@ -123,17 +131,17 @@ function FilterBar({ ring, setRing, county, setCounty, counties }: {
 }) {
   return (
     <div className="border-b border-border px-5 py-3 space-y-2">
-      <div className="flex items-center gap-1 text-[11px]">
-        <span className="mr-1 text-muted-foreground">Ring</span>
-        {[[undefined, "All"], [1, "Open"], [2, "Shadow"], [3, "Prophecy"]].map(([v, l]) => (
+      <div className="flex flex-wrap items-center gap-1 text-[12px]">
+        <span className="mr-1 text-muted-foreground">Show</span>
+        {([[undefined, "All"], [1, "Listed"], [2, "Off-market"], [3, "Predicted"]] as const).map(([v, l]) => (
           <button
             key={String(l)}
             onClick={() => setRing(v as number | undefined)}
             className={"rounded px-2 py-1 " + (ring === v ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground hover:text-foreground")}
-          >{l as string}</button>
+          >{l}</button>
         ))}
       </div>
-      <div className="flex items-center gap-1 text-[11px]">
+      <div className="flex flex-wrap items-center gap-1 text-[12px]">
         <span className="mr-1 text-muted-foreground">County</span>
         <button
           onClick={() => setCounty(undefined)}
@@ -144,7 +152,7 @@ function FilterBar({ ring, setRing, county, setCounty, counties }: {
             key={c.fips}
             onClick={() => setCounty(c.fips)}
             className={"rounded px-2 py-1 " + (county === c.fips ? "bg-primary text-primary-foreground" : "bg-surface-2 text-muted-foreground hover:text-foreground")}
-            title={c.name}
+            title={`${c.name}, ${c.state}`}
           >{c.state}·{c.name.split(" ")[0]}</button>
         ))}
       </div>
@@ -155,9 +163,9 @@ function FilterBar({ ring, setRing, county, setCounty, counties }: {
 function DealList({ rows, onSelect, selectedId }: { rows: any[]; onSelect: (id: string) => void; selectedId: string | null }) {
   return (
     <div>
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-surface px-5 py-2 text-[10px] uppercase tracking-widest text-muted-foreground">
-        <span>Top deals · nightly underwrite</span>
-        <span className="num">{rows.length}</span>
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-surface px-5 py-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+        <span>Best deals right now</span>
+        <span className="num text-foreground">{rows.length}</span>
       </div>
       <ul>
         {rows.map((r) => {
@@ -171,19 +179,22 @@ function DealList({ rows, onSelect, selectedId }: { rows: any[]; onSelect: (id: 
                 className={"flex w-full items-start justify-between gap-3 border-b border-border/60 px-5 py-3 text-left transition-colors hover:bg-surface-2 " + (isSel ? "bg-surface-2" : "")}
               >
                 <div className="min-w-0">
-                  <div className="truncate text-[13px] font-medium">{p.address}</div>
-                  <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{p.city}, {p.state} · {p.living_sqft?.toLocaleString()} sqft · {p.condition_grade}</div>
-                  <div className="mt-1.5 flex items-center gap-2 text-[10px]">
+                  <div className="truncate text-[14px] font-medium">{p.address}</div>
+                  <div className="mt-0.5 truncate text-[12px] text-muted-foreground">
+                    {p.city}, {p.state} · {p.living_sqft?.toLocaleString()} sqft · condition {p.condition_grade}
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
                     <span className="rounded-full border border-border bg-surface-2 px-1.5 py-0.5 text-muted-foreground">{ringLabel(r.ring)}</span>
-                    <span className="text-muted-foreground num">P(acq) {Math.round(Number(r.acquisition_probability) * 100)}%</span>
+                    <span className="text-muted-foreground"><span className="num">{Math.round(Number(r.acquisition_probability) * 100)}%</span> deal odds</span>
                     <span className="text-muted-foreground">·</span>
-                    <span className="text-muted-foreground num">exit {r.exit_days}d</span>
+                    <span className="text-muted-foreground"><span className="num">{r.exit_days}d</span> to sell</span>
                   </div>
                 </div>
                 <div className="flex-shrink-0 text-right">
-                  <div className="num text-lg font-semibold" style={{ color: tier.color }}>{r.perfect_score}</div>
-                  <div className="num text-[11px] text-profit-strong">{fmt$(Number(r.gross_profit))}</div>
-                  <div className="num text-[10px] text-muted-foreground">@ {fmt$(Number(r.modeled_offer))}</div>
+                  <div className="num text-xl font-semibold leading-none" style={{ color: tier.color }}>{r.perfect_score}</div>
+                  <div className="mt-0.5 text-[10px] uppercase tracking-wide" style={{ color: tier.color }}>{tier.label}</div>
+                  <div className="num mt-1 text-[12px] text-profit-strong">+{fmt$(Number(r.gross_profit))}</div>
+                  <div className="num text-[11px] text-muted-foreground">offer {fmt$(Number(r.modeled_offer))}</div>
                 </div>
               </button>
             </li>
@@ -196,13 +207,13 @@ function DealList({ rows, onSelect, selectedId }: { rows: any[]; onSelect: (id: 
 
 function MapLegend() {
   return (
-    <div className="pointer-events-none absolute bottom-4 left-4 rounded-lg border border-border bg-surface/95 p-3 text-[11px] shadow-lg backdrop-blur">
-      <div className="mb-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">Heat legend</div>
+    <div className="pointer-events-none absolute bottom-4 left-4 rounded-lg border border-border bg-surface/95 p-3 text-[12px] shadow-lg backdrop-blur">
+      <div className="mb-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">Buy rating (0–100)</div>
       <div className="flex items-center gap-3">
-        <LegendDot color="var(--tier-exceptional)" label="80+" />
-        <LegendDot color="var(--tier-strong)" label="65–79" />
-        <LegendDot color="var(--tier-viable)" label="50–64" />
-        <LegendDot color="var(--tier-watch)" label="<50" />
+        <LegendDot color="var(--tier-exceptional)" label="Great 80+" />
+        <LegendDot color="var(--tier-strong)" label="Strong 65+" />
+        <LegendDot color="var(--tier-viable)" label="Look 50+" />
+        <LegendDot color="var(--tier-watch)" label="Skip <50" />
       </div>
     </div>
   );
@@ -211,7 +222,7 @@ function LegendDot({ color, label }: { color: string; label: string }) {
   return (
     <div className="flex items-center gap-1.5">
       <span className="h-2.5 w-2.5 rounded-full" style={{ background: color, boxShadow: `0 0 8px ${color}` }} />
-      <span className="num text-muted-foreground">{label}</span>
+      <span className="text-muted-foreground">{label}</span>
     </div>
   );
 }
