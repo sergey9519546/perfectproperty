@@ -47,7 +47,12 @@ export const rerunUnderwrite = createServerFn({ method: "POST" })
     // Realie comps fallback: if the local sales table returned too few, top up
     // with Realie's premium comparables. Silent no-op when REALIE_API_KEY is missing.
     let realieCompsRaw: any[] = [];
-    if ((comps?.length ?? 0) < 3 && parcel.lat != null && parcel.lng != null && process.env.REALIE_API_KEY) {
+    const { shouldTopUpWithRealie } = await import("@/lib/arv-picker");
+    if (shouldTopUpWithRealie({
+      localCompCount: comps?.length ?? 0,
+      hasLatLng: parcel.lat != null && parcel.lng != null,
+      hasApiKey: Boolean(process.env.REALIE_API_KEY),
+    })) {
       try {
         const { realieComparables, realieCompsToEngineComps } = await import("@/lib/adapters/realie");
         const raw = await realieComparables({
