@@ -16,9 +16,10 @@ const ListInput = z.object({
 });
 
 export const listRankedParcels = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => ListInput.parse(data ?? {}))
-  .handler(async ({ data }) => {
-    const supabase = serverClient();
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase;
     let q = supabase
       .from("parcel_scores")
       .select(
