@@ -90,6 +90,15 @@ export function BulkLookupPanel() {
             The overnight worker underwrites them via Realie.
           </div>
         </div>
+        <button
+          type="button"
+          onClick={resumeLatest}
+          disabled={resuming || !latestJob || latestFailed === 0}
+          title={!latestJob ? "No jobs yet" : latestFailed === 0 ? "Latest job has no failed items" : `Requeue ${latestFailed} failed`}
+          className="rounded-md border border-border bg-surface-2 px-3 py-1.5 text-[12px] hover:bg-surface disabled:opacity-40"
+        >
+          {resuming ? "Resuming…" : `Resume failed (${latestFailed})`}
+        </button>
       </div>
 
       <form onSubmit={submit} className="mt-3 grid gap-2 md:grid-cols-[1fr_240px]">
