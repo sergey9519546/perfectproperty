@@ -83,11 +83,12 @@ export const rerunUnderwrite = createServerFn({ method: "POST" })
     const m = MARKET_CONTEXT[parcel.county_fips] ?? {
       median_ppsf: 300, ppsf_stddev: 90, avg_dom_renovated: 55, pending_ratio: 0.35, momentum: 0,
     };
-    const compsClean = (comps ?? []).map((c: any) => ({
+    const localComps = (comps ?? []).map((c: any) => ({
       ppsf: Number(c.ppsf), distance_km: Number(c.distance_km),
       sale_id: c.sale_id, address: c.address, sold_at: c.sold_at,
       sale_price: Number(c.sale_price), living_sqft: c.living_sqft,
     }));
+    const compsClean = [...localComps, ...realieCompsRaw];
 
     const u = underwrite(input, distress, m, compsClean) as any;
 
