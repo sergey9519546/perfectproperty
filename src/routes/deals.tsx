@@ -36,59 +36,75 @@ function DealsPage() {
   return (
     <>
       <div className="mx-auto max-w-[1400px] px-6 py-8">
-        <PageHead title="Ranked deals" sub="Every parcel the machine has underwritten, sorted by Perfect Score. Click any row for the full Dossier." />
-        <div className="mt-4 flex items-center gap-3 text-[12px]">
+        <PageHead
+          title="Ranked deals"
+          sub="Every property we've scored, sorted by our overall buy score (0–100). Click any row to see the full breakdown — offer, profit, risks, and comps."
+        />
+
+        <HelpStrip />
+
+        <div className="mt-4 flex flex-wrap items-center gap-3 text-[13px]">
           <label className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5">
             <input type="checkbox" checked={includeFixture} onChange={(e) => setIncludeFixture(e.target.checked)} />
-            Include demo (FIXTURE) data
+            Include demo data
           </label>
-          <span className="text-muted-foreground">Showing {q.data?.length ?? 0} {includeFixture ? "parcels (live + demo)" : "LIVE parcels"}.</span>
+          <span className="text-muted-foreground">
+            Showing <span className="font-semibold text-foreground">{q.data?.length ?? 0}</span> {includeFixture ? "properties (live + demo)" : "live properties"}
+          </span>
         </div>
         <RealieLookup onCreated={(id) => setSelected(id)} />
         <BulkLookupPanel />
         <StressPanel rows={q.data ?? []} />
         <div className="mt-6 overflow-hidden rounded-lg border border-border bg-surface">
-          <table className="w-full text-[13px]">
-            <thead className="bg-surface-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+          <table className="w-full text-[14px]">
+            <thead className="bg-surface-2 text-[11px] uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="px-4 py-3 text-left">Address</th>
-                <th className="px-4 py-3 text-right">Score</th>
-                <th className="px-4 py-3 text-left">Ring</th>
-                <th className="px-4 py-3 text-left">Scope</th>
-                <th className="px-4 py-3 text-right">Offer</th>
-                <th className="px-4 py-3 text-right">Gross Profit</th>
-                <th className="px-4 py-3 text-right">P50 · P5</th>
-                <th className="px-4 py-3 text-right">P(loss)</th>
-                <th className="px-4 py-3 text-right">P(acq)</th>
-                <th className="px-4 py-3 text-right">Exit</th>
-                <th className="px-4 py-3 text-left">Skeptic</th>
+                <th className="px-4 py-3 text-left">Property</th>
+                <th className="px-4 py-3 text-right" title="Overall buy score, 0–100. Higher is better.">Score</th>
+                <th className="px-4 py-3 text-left" title="How we found it: on-market, off-market, or predicted to list soon.">Source</th>
+                <th className="px-4 py-3 text-left" title="Recommended renovation plan.">Plan</th>
+                <th className="px-4 py-3 text-right" title="What we'd offer the seller today.">Our offer</th>
+                <th className="px-4 py-3 text-right" title="Expected profit after all costs, at our offer.">Expected profit</th>
+                <th className="px-4 py-3 text-right" title="Middle-case profit · worst-case profit (bottom 5% of outcomes).">Typical · Worst case</th>
+                <th className="px-4 py-3 text-right" title="Chance the deal loses money.">Loss risk</th>
+                <th className="px-4 py-3 text-right" title="Chance the seller accepts our offer.">Deal odds</th>
+                <th className="px-4 py-3 text-right" title="Expected days to sell after renovation.">Days to sell</th>
+                <th className="px-4 py-3 text-left" title="Automatic warnings that need a human look.">Warnings</th>
               </tr>
             </thead>
             <tbody>
               {(q.data ?? []).map((r: any) => {
                 const t = tierLabel(Number(r.perfect_score));
                 const flags = (r.skeptic_flags as string[]) ?? [];
+                const pLoss = Number(r.mc_p_loss);
                 return (
                   <tr key={r.parcel_id} onClick={() => setSelected(r.parcel_id)} className="cursor-pointer border-t border-border hover:bg-surface-2">
                     <td className="px-4 py-3">
                       <div className="font-medium">{r.parcels.address}</div>
-                      <div className="text-[11px] text-muted-foreground">{r.parcels.city}, {r.parcels.state}</div>
+                      <div className="text-[12px] text-muted-foreground">{r.parcels.city}, {r.parcels.state}</div>
                     </td>
-                    <td className="num px-4 py-3 text-right font-semibold" style={{ color: t.color }}>{r.perfect_score}</td>
-                    <td className="px-4 py-3 text-[12px]">{ringLabel(r.ring)}</td>
-                    <td className="px-4 py-3 text-[12px]">{r.recommended_scope}</td>
+                    <td className="num px-4 py-3 text-right font-semibold" title={t.hint}>
+                      <span style={{ color: t.color }}>{r.perfect_score}</span>
+                      <div className="text-[11px] font-normal text-muted-foreground">{t.label}</div>
+                    </td>
+                    <td className="px-4 py-3 text-[13px]">{ringLabel(r.ring)}</td>
+                    <td className="px-4 py-3 text-[13px]">{r.recommended_scope}</td>
                     <td className="num px-4 py-3 text-right">{fmt$(Number(r.modeled_offer))}</td>
-                    <td className="num px-4 py-3 text-right text-profit-strong">{fmt$(Number(r.gross_profit))}</td>
-                    <td className="num px-4 py-3 text-right text-[12px]">
+                    <td className="num px-4 py-3 text-right text-profit-strong font-medium">{fmt$(Number(r.gross_profit))}</td>
+                    <td className="num px-4 py-3 text-right text-[13px]">
                       {r.mc_profit_p50 != null ? fmt$(Number(r.mc_profit_p50)) : "—"}
-                      <div className="text-[10px] text-muted-foreground">{r.mc_profit_p5 != null ? `p5 ${fmt$(Number(r.mc_profit_p5))}` : ""}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {r.mc_profit_p5 != null ? `worst ${fmt$(Number(r.mc_profit_p5))}` : ""}
+                      </div>
                     </td>
-                    <td className="num px-4 py-3 text-right" style={{ color: Number(r.mc_p_loss) > 0.35 ? "var(--skeptic)" : Number(r.mc_p_loss) > 0.15 ? "var(--opportunity)" : "var(--profit-strong)" }}>
-                      {r.mc_p_loss != null ? `${Math.round(Number(r.mc_p_loss) * 100)}%` : "—"}
+                    <td className="num px-4 py-3 text-right" style={{ color: pLoss > 0.35 ? "var(--skeptic)" : pLoss > 0.15 ? "var(--opportunity)" : "var(--profit-strong)" }}>
+                      {r.mc_p_loss != null ? `${Math.round(pLoss * 100)}%` : "—"}
                     </td>
                     <td className="num px-4 py-3 text-right">{Math.round(Number(r.acquisition_probability) * 100)}%</td>
                     <td className="num px-4 py-3 text-right">{r.exit_days}d</td>
-                    <td className="px-4 py-3 text-[11px] text-skeptic">{flags.length ? `${flags.length} flag${flags.length > 1 ? "s" : ""}` : "—"}</td>
+                    <td className="px-4 py-3 text-[12px] text-skeptic">
+                      {flags.length ? `${flags.length} warning${flags.length > 1 ? "s" : ""}` : "—"}
+                    </td>
                   </tr>
                 );
               })}
@@ -101,11 +117,33 @@ function DealsPage() {
   );
 }
 
+function HelpStrip() {
+  const items = [
+    { k: "Score", v: "0–100 buy rating. 80+ = great, 65–79 = strong, 50–64 = worth a look." },
+    { k: "Our offer", v: "The price we'd pay today to hit our profit target." },
+    { k: "Loss risk", v: "How often this deal loses money across thousands of simulations." },
+    { k: "Deal odds", v: "How likely the seller says yes at our offer." },
+  ];
+  return (
+    <div className="mt-4 rounded-lg border border-border bg-surface/60 p-3">
+      <div className="mb-2 text-[11px] uppercase tracking-wider text-muted-foreground">How to read this</div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {items.map((it) => (
+          <div key={it.k} className="text-[13px]">
+            <span className="font-medium text-foreground">{it.k}: </span>
+            <span className="text-muted-foreground">{it.v}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function PageHead({ title, sub }: { title: string; sub: string }) {
   return (
     <div>
-      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-      <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{sub}</p>
+      <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
+      <p className="mt-2 max-w-3xl text-[15px] leading-relaxed text-muted-foreground">{sub}</p>
     </div>
   );
 }
