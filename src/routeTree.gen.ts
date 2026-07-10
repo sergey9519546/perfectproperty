@@ -19,6 +19,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiPublicScrapyIngestRouteImport } from './routes/api/public/scrapy-ingest'
 import { Route as ApiPublicRunRecipesRouteImport } from './routes/api/public/run-recipes'
 import { Route as ApiPublicRunMonitoringRouteImport } from './routes/api/public/run-monitoring'
+import { Route as ApiPublicRunBulkLookupsRouteImport } from './routes/api/public/run-bulk-lookups'
 
 const ShadowRoute = ShadowRouteImport.update({
   id: '/shadow',
@@ -70,6 +71,11 @@ const ApiPublicRunMonitoringRoute = ApiPublicRunMonitoringRouteImport.update({
   path: '/api/public/run-monitoring',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicRunBulkLookupsRoute = ApiPublicRunBulkLookupsRouteImport.update({
+  id: '/api/public/run-bulk-lookups',
+  path: '/api/public/run-bulk-lookups',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/monitoring': typeof MonitoringRoute
   '/prophecy': typeof ProphecyRoute
   '/shadow': typeof ShadowRoute
+  '/api/public/run-bulk-lookups': typeof ApiPublicRunBulkLookupsRoute
   '/api/public/run-monitoring': typeof ApiPublicRunMonitoringRoute
   '/api/public/run-recipes': typeof ApiPublicRunRecipesRoute
   '/api/public/scrapy-ingest': typeof ApiPublicScrapyIngestRoute
@@ -91,6 +98,7 @@ export interface FileRoutesByTo {
   '/monitoring': typeof MonitoringRoute
   '/prophecy': typeof ProphecyRoute
   '/shadow': typeof ShadowRoute
+  '/api/public/run-bulk-lookups': typeof ApiPublicRunBulkLookupsRoute
   '/api/public/run-monitoring': typeof ApiPublicRunMonitoringRoute
   '/api/public/run-recipes': typeof ApiPublicRunRecipesRoute
   '/api/public/scrapy-ingest': typeof ApiPublicScrapyIngestRoute
@@ -104,6 +112,7 @@ export interface FileRoutesById {
   '/monitoring': typeof MonitoringRoute
   '/prophecy': typeof ProphecyRoute
   '/shadow': typeof ShadowRoute
+  '/api/public/run-bulk-lookups': typeof ApiPublicRunBulkLookupsRoute
   '/api/public/run-monitoring': typeof ApiPublicRunMonitoringRoute
   '/api/public/run-recipes': typeof ApiPublicRunRecipesRoute
   '/api/public/scrapy-ingest': typeof ApiPublicScrapyIngestRoute
@@ -118,6 +127,7 @@ export interface FileRouteTypes {
     | '/monitoring'
     | '/prophecy'
     | '/shadow'
+    | '/api/public/run-bulk-lookups'
     | '/api/public/run-monitoring'
     | '/api/public/run-recipes'
     | '/api/public/scrapy-ingest'
@@ -130,6 +140,7 @@ export interface FileRouteTypes {
     | '/monitoring'
     | '/prophecy'
     | '/shadow'
+    | '/api/public/run-bulk-lookups'
     | '/api/public/run-monitoring'
     | '/api/public/run-recipes'
     | '/api/public/scrapy-ingest'
@@ -142,6 +153,7 @@ export interface FileRouteTypes {
     | '/monitoring'
     | '/prophecy'
     | '/shadow'
+    | '/api/public/run-bulk-lookups'
     | '/api/public/run-monitoring'
     | '/api/public/run-recipes'
     | '/api/public/scrapy-ingest'
@@ -155,6 +167,7 @@ export interface RootRouteChildren {
   MonitoringRoute: typeof MonitoringRoute
   ProphecyRoute: typeof ProphecyRoute
   ShadowRoute: typeof ShadowRoute
+  ApiPublicRunBulkLookupsRoute: typeof ApiPublicRunBulkLookupsRoute
   ApiPublicRunMonitoringRoute: typeof ApiPublicRunMonitoringRoute
   ApiPublicRunRecipesRoute: typeof ApiPublicRunRecipesRoute
   ApiPublicScrapyIngestRoute: typeof ApiPublicScrapyIngestRoute
@@ -232,6 +245,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicRunMonitoringRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/run-bulk-lookups': {
+      id: '/api/public/run-bulk-lookups'
+      path: '/api/public/run-bulk-lookups'
+      fullPath: '/api/public/run-bulk-lookups'
+      preLoaderRoute: typeof ApiPublicRunBulkLookupsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -243,6 +263,7 @@ const rootRouteChildren: RootRouteChildren = {
   MonitoringRoute: MonitoringRoute,
   ProphecyRoute: ProphecyRoute,
   ShadowRoute: ShadowRoute,
+  ApiPublicRunBulkLookupsRoute: ApiPublicRunBulkLookupsRoute,
   ApiPublicRunMonitoringRoute: ApiPublicRunMonitoringRoute,
   ApiPublicRunRecipesRoute: ApiPublicRunRecipesRoute,
   ApiPublicScrapyIngestRoute: ApiPublicScrapyIngestRoute,
@@ -250,3 +271,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

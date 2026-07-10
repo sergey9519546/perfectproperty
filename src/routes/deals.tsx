@@ -39,6 +39,7 @@ function DealsPage() {
           <span className="text-muted-foreground">Showing {q.data?.length ?? 0} {includeFixture ? "parcels (live + demo)" : "LIVE parcels"}.</span>
         </div>
         <RealieLookup onCreated={(id) => setSelected(id)} />
+        <BulkLookupPanel />
         <StressPanel rows={q.data ?? []} />
         <div className="mt-6 overflow-hidden rounded-lg border border-border bg-surface">
           <table className="w-full text-[13px]">
