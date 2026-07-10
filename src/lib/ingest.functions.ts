@@ -11,7 +11,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { COUNTY_SOURCES, type CountySource } from "./adapters/sources";
 import { arcgisQuery, featureCentroid, type ArcGISFeature } from "./adapters/arcgis";
-import { socrataQuery } from "./adapters/socrata";
+import { socrataQuery, socrataQueryAll } from "./adapters/socrata";
 import { femaFloodZoneAt } from "./adapters/fema";
 import { requireAdmin } from "@/integrations/supabase/require-admin";
 import { MARKET_CONTEXT, underwrite, type ParcelInput, type DistressInput } from "./engine";
@@ -23,7 +23,7 @@ async function adminClient() {
 
 const RunInput = z.object({
   county_fips: z.string(),
-  max_parcels: z.number().int().min(1).max(2000).default(300),
+  max_parcels: z.number().int().min(1).max(50000).default(5000),
   enrich_flood: z.boolean().default(true),
 });
 
@@ -56,7 +56,7 @@ async function fetchParcelsFromArcGIS(src: CountySource, max: number): Promise<a
 
 async function fetchParcelsFromSocrata(src: CountySource, max: number): Promise<any[]> {
   if (!src.parcels || src.parcels.kind !== "SOCRATA") return [];
-  const rows = await socrataQuery(src.parcels.url, { limit: max });
+  const rows = await socrataQueryAll(src.parcels.url, { max, chunk: 5000 });
   return rows.map((r) => normalizeSocrataRow(r, src));
 }
 
