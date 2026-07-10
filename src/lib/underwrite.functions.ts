@@ -44,6 +44,29 @@ export const rerunUnderwrite = createServerFn({ method: "POST" })
         : Promise.resolve({ data: [] as any[] }),
     ]);
 
+    // Realie comps fallback: if the local sales table returned too few, top up
+    // with Realie's premium comparables. Silent no-op when REALIE_API_KEY is missing.
+    let realieCompsRaw: any[] = [];
+    if ((comps?.length ?? 0) < 3 && parcel.lat != null && parcel.lng != null && process.env.REALIE_API_KEY) {
+      try {
+        const { realieComparables, realieCompsToEngineComps } = await import("@/lib/adapters/realie");
+        const raw = await realieComparables({
+          latitude: Number(parcel.lat),
+          longitude: Number(parcel.lng),
+          radius: 1,
+          timeFrame: 18,
+          maxResults: 12,
+          sqftMin: parcel.living_sqft ? Math.round(parcel.living_sqft * 0.7) : undefined,
+          sqftMax: parcel.living_sqft ? Math.round(parcel.living_sqft * 1.3) : undefined,
+          bedsMin: parcel.bedrooms ? Math.max(1, parcel.bedrooms - 1) : undefined,
+          bedsMax: parcel.bedrooms ? parcel.bedrooms + 1 : undefined,
+        });
+        realieCompsRaw = realieCompsToEngineComps(raw, Number(parcel.lat), Number(parcel.lng));
+      } catch (e) {
+        console.warn("Realie comps fallback failed:", (e as Error).message);
+      }
+    }
+
     const input: ParcelInput = {
       living_sqft: parcel.living_sqft, lot_sqft: parcel.lot_sqft, year_built: parcel.year_built,
       bedrooms: parcel.bedrooms, bathrooms: parcel.bathrooms ? Number(parcel.bathrooms) : null,
