@@ -84,46 +84,10 @@ const LookupInput = z.object({
 export const lookupParcelByAddress = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => LookupInput.parse(data))
   .handler(async ({ data }) => {
-    const property = await realieLookupAddress({
-      address: data.address,
-      state: data.state.toUpperCase(),
-      city: data.city,
-      county: data.county,
-      unitNumberStripped: data.unit,
-    });
-    if (!property) throw new Error("Address not found in Realie");
-
-    const row = realieToParcelRow(property, data.state);
-    if (!row) throw new Error("Realie returned insufficient data for this address");
-
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    // Try to match an existing parcel first (APN + county, then normalized address).
-    const { data: matchId } = await (supabaseAdmin as any).rpc("match_parcel", {
-      _county_fips: row.county_fips,
-      _apn: row.apn,
-      _address: row.address,
-      _city: row.city,
-    });
-
-    let parcelId: string | null = matchId ?? null;
-    if (parcelId) {
-      await supabaseAdmin.from("parcels").update(row).eq("id", parcelId);
-    } else {
-      const { data: inserted, error } = await supabaseAdmin
-        .from("parcels")
-        .upsert(row, { onConflict: "county_fips,apn" })
-        .select("id")
-        .single();
-      if (error || !inserted) throw new Error(error?.message ?? "Failed to upsert parcel");
-      parcelId = inserted.id;
-    }
-
-    // Run the underwrite pipeline (comps come from pick_comps + Realie fallback via rerunUnderwrite).
-    const { rerunUnderwrite } = await import("@/lib/underwrite.functions");
-    const result = await rerunUnderwrite({ data: { parcel_id: parcelId! } });
-    return { parcel_id: parcelId!, ...result };
+    const { lookupParcelByAddressCore } = await import("@/lib/parcels-core");
+    return lookupParcelByAddressCore(data);
   });
+
 
 export const getCoverage = createServerFn({ method: "GET" }).handler(async () => {
   const supabase = serverClient();
