@@ -14,6 +14,7 @@ import { Route as ProphecyRouteImport } from './routes/prophecy'
 import { Route as MonitoringRouteImport } from './routes/monitoring'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as DealsRouteImport } from './routes/deals'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccuracyRouteImport } from './routes/accuracy'
 import { Route as IndexRouteImport } from './routes/index'
@@ -25,6 +26,7 @@ import { Route as ApiPublicRunMonitoringRouteImport } from './routes/api/public/
 import { Route as ApiPublicRunBulkLookupsRouteImport } from './routes/api/public/run-bulk-lookups'
 import { Route as ApiPublicRerunUnderwriteRouteImport } from './routes/api/public/rerun-underwrite'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 
 const ShadowRoute = ShadowRouteImport.update({
   id: '/shadow',
@@ -49,6 +51,11 @@ const McpRoute = McpRouteImport.update({
 const DealsRoute = DealsRouteImport.update({
   id: '/deals',
   path: '/deals',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -110,11 +117,17 @@ const Char91DotmcpChar93InvokeToolToolRoute =
     path: '/.mcp/invoke-tool/$tool',
     getParentRoute: () => rootRouteImport,
   } as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/accuracy': typeof AccuracyRoute
   '/admin': typeof AdminRoute
+  '/auth': typeof AuthRoute
   '/deals': typeof DealsRoute
   '/mcp': typeof McpRoute
   '/monitoring': typeof MonitoringRoute
@@ -122,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/shadow': typeof ShadowRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/rerun-underwrite': typeof ApiPublicRerunUnderwriteRoute
   '/api/public/run-bulk-lookups': typeof ApiPublicRunBulkLookupsRoute
@@ -133,6 +147,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/accuracy': typeof AccuracyRoute
   '/admin': typeof AdminRoute
+  '/auth': typeof AuthRoute
   '/deals': typeof DealsRoute
   '/mcp': typeof McpRoute
   '/monitoring': typeof MonitoringRoute
@@ -140,6 +155,7 @@ export interface FileRoutesByTo {
   '/shadow': typeof ShadowRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/rerun-underwrite': typeof ApiPublicRerunUnderwriteRoute
   '/api/public/run-bulk-lookups': typeof ApiPublicRunBulkLookupsRoute
@@ -152,6 +168,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/accuracy': typeof AccuracyRoute
   '/admin': typeof AdminRoute
+  '/auth': typeof AuthRoute
   '/deals': typeof DealsRoute
   '/mcp': typeof McpRoute
   '/monitoring': typeof MonitoringRoute
@@ -159,6 +176,7 @@ export interface FileRoutesById {
   '/shadow': typeof ShadowRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/rerun-underwrite': typeof ApiPublicRerunUnderwriteRoute
   '/api/public/run-bulk-lookups': typeof ApiPublicRunBulkLookupsRoute
@@ -172,6 +190,7 @@ export interface FileRouteTypes {
     | '/'
     | '/accuracy'
     | '/admin'
+    | '/auth'
     | '/deals'
     | '/mcp'
     | '/monitoring'
@@ -179,6 +198,7 @@ export interface FileRouteTypes {
     | '/shadow'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/rerun-underwrite'
     | '/api/public/run-bulk-lookups'
@@ -190,6 +210,7 @@ export interface FileRouteTypes {
     | '/'
     | '/accuracy'
     | '/admin'
+    | '/auth'
     | '/deals'
     | '/mcp'
     | '/monitoring'
@@ -197,6 +218,7 @@ export interface FileRouteTypes {
     | '/shadow'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/rerun-underwrite'
     | '/api/public/run-bulk-lookups'
@@ -208,6 +230,7 @@ export interface FileRouteTypes {
     | '/'
     | '/accuracy'
     | '/admin'
+    | '/auth'
     | '/deals'
     | '/mcp'
     | '/monitoring'
@@ -215,6 +238,7 @@ export interface FileRouteTypes {
     | '/shadow'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/rerun-underwrite'
     | '/api/public/run-bulk-lookups'
@@ -227,6 +251,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccuracyRoute: typeof AccuracyRoute
   AdminRoute: typeof AdminRoute
+  AuthRoute: typeof AuthRoute
   DealsRoute: typeof DealsRoute
   McpRoute: typeof McpRoute
   MonitoringRoute: typeof MonitoringRoute
@@ -234,6 +259,7 @@ export interface RootRouteChildren {
   ShadowRoute: typeof ShadowRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicRerunUnderwriteRoute: typeof ApiPublicRerunUnderwriteRoute
   ApiPublicRunBulkLookupsRoute: typeof ApiPublicRunBulkLookupsRoute
@@ -277,6 +303,13 @@ declare module '@tanstack/react-router' {
       path: '/deals'
       fullPath: '/deals'
       preLoaderRoute: typeof DealsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -356,6 +389,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -363,6 +403,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccuracyRoute: AccuracyRoute,
   AdminRoute: AdminRoute,
+  AuthRoute: AuthRoute,
   DealsRoute: DealsRoute,
   McpRoute: McpRoute,
   MonitoringRoute: MonitoringRoute,
@@ -371,6 +412,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicRerunUnderwriteRoute: ApiPublicRerunUnderwriteRoute,
   ApiPublicRunBulkLookupsRoute: ApiPublicRunBulkLookupsRoute,
