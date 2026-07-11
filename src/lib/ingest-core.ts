@@ -264,8 +264,10 @@ export async function scoreAllCore(): Promise<{ scored: number; comps_backed: nu
     }
   }
 
+  const { recordFailure: recordScoreFailure } = await import("./dlq");
   const scores: any[] = [];
   for (const p of parcels ?? []) {
+    try {
     const m = MARKET_CONTEXT[p.county_fips] ?? {
       median_ppsf: 400, ppsf_stddev: 110, avg_dom_renovated: 55, pending_ratio: 0.35, momentum: 0,
     };
