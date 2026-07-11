@@ -16,7 +16,7 @@ const RunInput = z.object({
 
 export const ingestCounty = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
-  .inputValidator((d: unknown) => RunInput.parse(d))
+  .validator((d: unknown) => RunInput.parse(d))
   .handler(async ({ data }) => ingestCountyCore(data));
 
 export const scoreAll = createServerFn({ method: "POST" })

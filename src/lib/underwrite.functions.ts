@@ -12,5 +12,5 @@ const Input = z.object({ parcel_id: z.string().uuid() });
 
 export const rerunUnderwrite = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => Input.parse(data))
+  .validator((data: unknown) => Input.parse(data))
   .handler(async ({ data }) => rerunUnderwriteCore(data.parcel_id));
