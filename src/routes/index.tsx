@@ -56,21 +56,26 @@ function HomePage() {
           />
           <div className="flex-1 overflow-y-auto">
             {q.isLoading && <div className="p-6 text-sm text-muted-foreground">Loading the ranked map…</div>}
-            {q.data && <DealList rows={q.data} onSelect={setSelected} selectedId={selected} />}
+            <SectionBoundary label="Deal list unavailable">
+              {q.data && <DealList rows={q.data} onSelect={setSelected} selectedId={selected} />}
+            </SectionBoundary>
           </div>
         </div>
 
         {/* MAP */}
         <div className="relative">
           <div className="absolute inset-0">
-            <MapView
-              parcels={mapParcels}
-              onSelect={setSelected}
-              selectedId={selected}
-              className="h-full w-full"
-            />
+            <SectionBoundary label="Map unavailable">
+              <MapView
+                parcels={mapParcels}
+                onSelect={setSelected}
+                selectedId={selected}
+                className="h-full w-full"
+              />
+            </SectionBoundary>
           </div>
           <MapLegend />
+          <div className="absolute bottom-3 left-3"><DataFreshness timestamp={cov.data?.last_updated ?? new Date()} prefix="Data" /></div>
         </div>
       </div>
 
