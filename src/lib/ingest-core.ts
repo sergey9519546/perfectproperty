@@ -179,14 +179,24 @@ export async function ingestCountyCore(args: IngestArgs): Promise<IngestResult> 
   let parcels: any[] = [];
   let status: "OK" | "PARTIAL" | "FAIL" = "OK";
   let note = "";
-  try {
-    if (src.parcels?.kind === "ARCGIS") parcels = await fetchParcelsFromArcGIS(src, max);
-    else if (src.parcels?.kind === "SOCRATA") parcels = await fetchParcelsFromSocrata(src, max);
-    else throw new Error("No parcel source configured");
-    note = `Fetched ${parcels.length} from ${src.parcels?.url}`;
-  } catch (e: any) {
+  const { checkSource } = await import("./ingest-preflight");
+  const { recordFailure } = await import("./dlq");
+  const preflight = await checkSource(src);
+  if (!preflight.ok) {
     status = "FAIL";
-    note = `Upstream error: ${e.message}`;
+    note = `Preflight ${preflight.status}: ${preflight.note}`;
+    await recordFailure({ source: "PARCELS_PREFLIGHT", stage: "preflight", countyFips: src.fips, error: new Error(note) });
+  } else {
+    try {
+      if (src.parcels?.kind === "ARCGIS") parcels = await fetchParcelsFromArcGIS(src, max);
+      else if (src.parcels?.kind === "SOCRATA") parcels = await fetchParcelsFromSocrata(src, max);
+      else throw new Error("No parcel source configured");
+      note = `Fetched ${parcels.length} from ${src.parcels?.url}`;
+    } catch (e: any) {
+      status = "FAIL";
+      note = `Upstream error: ${e.message}`;
+      await recordFailure({ source: "PARCELS_FETCH", stage: "fetch", countyFips: src.fips, error: e });
+    }
   }
 
   if (enrichFlood && parcels.length && status === "OK") {
