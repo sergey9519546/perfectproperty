@@ -222,7 +222,11 @@ export async function ingestCountyCore(args: IngestArgs): Promise<IngestResult> 
     for (let i = 0; i < stamped.length; i += CHUNK) {
       const chunk = stamped.slice(i, i + CHUNK);
       const { error } = await supabase.from("parcels").upsert(chunk, { onConflict: "county_fips,apn" });
-      if (error) { status = "PARTIAL"; note = `Upsert error: ${error.message}`; break; }
+      if (error) {
+        status = "PARTIAL"; note = `Upsert error: ${error.message}`;
+        await recordFailure({ source: "PARCELS_UPSERT", stage: "upsert", countyFips: src.fips, error, payload: { chunk_start: i, chunk_len: chunk.length } });
+        break;
+      }
       inserted += chunk.length;
     }
     const touched = Array.from(new Set(stamped.map((p) => p.county_fips)));
