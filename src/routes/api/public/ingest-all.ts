@@ -32,10 +32,16 @@ export const Route = createFileRoute("/api/public/ingest-all")({
 
         // Import server-only helpers inside the handler.
         const { ingestCountyCore, scoreAllCore } = await import("@/lib/ingest-core");
+        const { checkSource } = await import("@/lib/ingest-preflight");
 
         const results: Array<{ fips: string; name: string; fetched: number; inserted: number; status: string; note: string }> = [];
         for (const src of COUNTY_SOURCES) {
           if (!src.parcels) continue;
+          const pre = await checkSource(src);
+          if (pre.tripped) {
+            results.push({ fips: src.fips, name: src.name, fetched: 0, inserted: 0, status: "SKIP", note: `breaker open: ${pre.note}` });
+            continue;
+          }
           try {
             const r = await ingestCountyCore({ county_fips: src.fips, max_parcels: perCounty, enrich_flood: true });
             results.push(r);
