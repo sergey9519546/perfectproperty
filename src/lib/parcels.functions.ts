@@ -17,7 +17,7 @@ const ListInput = z.object({
 
 export const listRankedParcels = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => ListInput.parse(data ?? {}))
+  .validator((data: unknown) => ListInput.parse(data ?? {}))
   .handler(async ({ data, context }) => {
     const supabase = context.supabase;
     let q = supabase
@@ -42,7 +42,7 @@ export const listRankedParcels = createServerFn({ method: "POST" })
 
 export const getDossier = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => z.object({ parcel_id: z.string().uuid() }).parse(data))
+  .validator((data: unknown) => z.object({ parcel_id: z.string().uuid() }).parse(data))
   .handler(async ({ data, context }) => {
     const supabase = context.supabase;
     const [parcel, score, deeds, distress, listings] = await Promise.all([
@@ -76,7 +76,7 @@ const LookupInput = z.object({
 
 export const lookupParcelByAddress = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => LookupInput.parse(data))
+  .validator((data: unknown) => LookupInput.parse(data))
   .handler(async ({ data }) => {
     const { lookupParcelByAddressCore } = await import("@/lib/parcels-core");
     return lookupParcelByAddressCore(data);

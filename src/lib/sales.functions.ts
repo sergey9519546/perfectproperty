@@ -24,7 +24,7 @@ const RunInput = z.object({
 
 export const ingestSales = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
-  .inputValidator((data: unknown) => RunInput.parse(data))
+  .validator((data: unknown) => RunInput.parse(data))
   .handler(async ({ data }) => {
     const supabase = await adminClient();
     const b = boroughFor(data.county_fips);

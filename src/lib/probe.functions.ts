@@ -28,7 +28,7 @@ const ProbeInput = z.object({
 
 export const probeUrl = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
-  .inputValidator((d: unknown) => ProbeInput.parse(d))
+  .validator((d: unknown) => ProbeInput.parse(d))
   .handler(async ({ data }) => {
     const supabase = await adminClient();
     const started = Date.now();

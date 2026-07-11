@@ -21,7 +21,7 @@ async function adminClient() {
 
 export const discoverSchema = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
-  .inputValidator((d: unknown) => z.object({ url: z.string().url() }).parse(d))
+  .validator((d: unknown) => z.object({ url: z.string().url() }).parse(d))
   .handler(async ({ data }) => {
     const supabase = await adminClient();
     // Prefer cached HTML — the user just probed the URL.
@@ -57,7 +57,7 @@ const RecipeSchema = z.object({
 
 export const saveRecipe = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
-  .inputValidator((d: unknown) => RecipeSchema.parse(d))
+  .validator((d: unknown) => RecipeSchema.parse(d))
   .handler(async ({ data }) => {
     const supabase = await adminClient();
     const row = {
@@ -86,7 +86,7 @@ export const listRecipes = createServerFn({ method: "GET" }).middleware([require
 
 export const deleteRecipe = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .validator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
     const supabase = await adminClient();
     await supabase.from("adapter_recipes").delete().eq("id", data.id);
@@ -95,7 +95,7 @@ export const deleteRecipe = createServerFn({ method: "POST" })
 
 export const runRecipe = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid(), max_rows: z.number().min(1).max(2000).default(500) }).parse(d))
+  .validator((d: unknown) => z.object({ id: z.string().uuid(), max_rows: z.number().min(1).max(2000).default(500) }).parse(d))
   .handler(async ({ data }) => {
     const { executeRecipeById } = await import("./recipes-runner.server");
     return executeRecipeById(data.id, data.max_rows);

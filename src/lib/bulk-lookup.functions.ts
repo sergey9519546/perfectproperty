@@ -34,7 +34,7 @@ const CreateInput = z.object({
  * insert privileges on the queue tables.
  */
 export const createBulkLookupJob = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => CreateInput.parse(data))
+  .validator((data: unknown) => CreateInput.parse(data))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: job, error: jErr } = await supabaseAdmin
@@ -113,7 +113,7 @@ export const listBulkLookupJobs = createServerFn({ method: "GET" }).handler(asyn
  * Read a job + its items (paged).
  */
 export const getBulkLookupJob = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ job_id: z.string().uuid() }).parse(data))
+  .validator((data: unknown) => z.object({ job_id: z.string().uuid() }).parse(data))
   .handler(async ({ data }) => {
     const supabase = serverClient();
     const [job, items] = await Promise.all([
@@ -214,7 +214,7 @@ export async function processBulkLookupBatch(limit = 20): Promise<{
 const ResumeInput = z.object({ job_id: z.string().uuid().optional() });
 
 export const resumeFailedInJob = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => ResumeInput.parse(data ?? {}))
+  .validator((data: unknown) => ResumeInput.parse(data ?? {}))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
