@@ -75,7 +75,7 @@ function HomePage() {
             </SectionBoundary>
           </div>
           <MapLegend />
-          <div className="absolute bottom-3 left-3"><DataFreshness timestamp={cov.data?.last_updated ?? new Date()} prefix="Data" /></div>
+          <div className="absolute bottom-3 left-3"><DataFreshness timestamp={new Date()} prefix="Data" /></div>
         </div>
       </div>
 
