@@ -8,6 +8,8 @@ import { DossierPanel } from "@/components/DossierPanel";
 import { fmt$, tierLabel, ringLabel } from "@/lib/format";
 import { Flame, Sparkles, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { SectionBoundary } from "@/components/SectionBoundary";
+import { DataFreshness } from "@/components/DataFreshness";
 
 export const Route = createFileRoute("/")({
   ssr: false,
