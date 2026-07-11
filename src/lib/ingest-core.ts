@@ -333,6 +333,10 @@ export async function scoreAllCore(): Promise<{ scored: number; comps_backed: nu
       raroc: u.raroc ?? null,
       gate_status: u.gate_status ?? null,
     });
+    });
+    } catch (e) {
+      await recordScoreFailure({ source: "SCORE", stage: "underwrite", parcelRef: p.id, countyFips: p.county_fips, error: e });
+    }
   }
   await supabase.from("parcel_scores").delete().eq("data_source", "LIVE");
   const CHUNK = 200;
