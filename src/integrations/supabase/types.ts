@@ -356,6 +356,42 @@ export type Database = {
           },
         ]
       }
+      ingestion_failures: {
+        Row: {
+          county_fips: string | null
+          created_at: string
+          error_message: string
+          id: string
+          parcel_ref: string | null
+          payload: Json | null
+          source: string
+          stack: string | null
+          stage: string
+        }
+        Insert: {
+          county_fips?: string | null
+          created_at?: string
+          error_message: string
+          id?: string
+          parcel_ref?: string | null
+          payload?: Json | null
+          source: string
+          stack?: string | null
+          stage: string
+        }
+        Update: {
+          county_fips?: string | null
+          created_at?: string
+          error_message?: string
+          id?: string
+          parcel_ref?: string | null
+          payload?: Json | null
+          source?: string
+          stack?: string | null
+          stage?: string
+        }
+        Relationships: []
+      }
       ingestion_runs: {
         Row: {
           county_fips: string
@@ -992,6 +1028,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      source_health: {
+        Row: {
+          consecutive_failures: number
+          county_fips: string | null
+          last_error: string | null
+          last_fail_at: string | null
+          last_ok_at: string | null
+          source_key: string
+          status: string
+          tripped_until: string | null
+          updated_at: string
+        }
+        Insert: {
+          consecutive_failures?: number
+          county_fips?: string | null
+          last_error?: string | null
+          last_fail_at?: string | null
+          last_ok_at?: string | null
+          source_key: string
+          status?: string
+          tripped_until?: string | null
+          updated_at?: string
+        }
+        Update: {
+          consecutive_failures?: number
+          county_fips?: string | null
+          last_error?: string | null
+          last_fail_at?: string | null
+          last_ok_at?: string | null
+          source_key?: string
+          status?: string
+          tripped_until?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
