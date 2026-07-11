@@ -179,14 +179,24 @@ export async function ingestCountyCore(args: IngestArgs): Promise<IngestResult> 
   let parcels: any[] = [];
   let status: "OK" | "PARTIAL" | "FAIL" = "OK";
   let note = "";
-  try {
-    if (src.parcels?.kind === "ARCGIS") parcels = await fetchParcelsFromArcGIS(src, max);
-    else if (src.parcels?.kind === "SOCRATA") parcels = await fetchParcelsFromSocrata(src, max);
-    else throw new Error("No parcel source configured");
-    note = `Fetched ${parcels.length} from ${src.parcels?.url}`;
-  } catch (e: any) {
+  const { checkSource } = await import("./ingest-preflight");
+  const { recordFailure } = await import("./dlq");
+  const preflight = await checkSource(src);
+  if (!preflight.ok) {
     status = "FAIL";
-    note = `Upstream error: ${e.message}`;
+    note = `Preflight ${preflight.status}: ${preflight.note}`;
+    await recordFailure({ source: "PARCELS_PREFLIGHT", stage: "preflight", countyFips: src.fips, error: new Error(note) });
+  } else {
+    try {
+      if (src.parcels?.kind === "ARCGIS") parcels = await fetchParcelsFromArcGIS(src, max);
+      else if (src.parcels?.kind === "SOCRATA") parcels = await fetchParcelsFromSocrata(src, max);
+      else throw new Error("No parcel source configured");
+      note = `Fetched ${parcels.length} from ${src.parcels?.url}`;
+    } catch (e: any) {
+      status = "FAIL";
+      note = `Upstream error: ${e.message}`;
+      await recordFailure({ source: "PARCELS_FETCH", stage: "fetch", countyFips: src.fips, error: e });
+    }
   }
 
   if (enrichFlood && parcels.length && status === "OK") {
@@ -212,7 +222,11 @@ export async function ingestCountyCore(args: IngestArgs): Promise<IngestResult> 
     for (let i = 0; i < stamped.length; i += CHUNK) {
       const chunk = stamped.slice(i, i + CHUNK);
       const { error } = await supabase.from("parcels").upsert(chunk, { onConflict: "county_fips,apn" });
-      if (error) { status = "PARTIAL"; note = `Upsert error: ${error.message}`; break; }
+      if (error) {
+        status = "PARTIAL"; note = `Upsert error: ${error.message}`;
+        await recordFailure({ source: "PARCELS_UPSERT", stage: "upsert", countyFips: src.fips, error, payload: { chunk_start: i, chunk_len: chunk.length } });
+        break;
+      }
       inserted += chunk.length;
     }
     const touched = Array.from(new Set(stamped.map((p) => p.county_fips)));
@@ -250,8 +264,10 @@ export async function scoreAllCore(): Promise<{ scored: number; comps_backed: nu
     }
   }
 
+  const { recordFailure: recordScoreFailure } = await import("./dlq");
   const scores: any[] = [];
   for (const p of parcels ?? []) {
+    try {
     const m = MARKET_CONTEXT[p.county_fips] ?? {
       median_ppsf: 400, ppsf_stddev: 110, avg_dom_renovated: 55, pending_ratio: 0.35, momentum: 0,
     };
@@ -317,6 +333,10 @@ export async function scoreAllCore(): Promise<{ scored: number; comps_backed: nu
       raroc: u.raroc ?? null,
       gate_status: u.gate_status ?? null,
     });
+
+    } catch (e) {
+      await recordScoreFailure({ source: "SCORE", stage: "underwrite", parcelRef: p.id, countyFips: p.county_fips, error: e });
+    }
   }
   await supabase.from("parcel_scores").delete().eq("data_source", "LIVE");
   const CHUNK = 200;

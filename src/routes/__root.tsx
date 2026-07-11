@@ -108,6 +108,7 @@ function TopNav() {
     { to: "/accuracy", label: "Model Accuracy", hint: "How close our predictions have been to reality" },
     { to: "/monitoring", label: "Portfolio Health", hint: "Overall risk and performance of the book" },
     { to: "/admin", label: "Data Sources", hint: "Pull in new counties and refresh data" },
+    { to: "/admin/health", label: "Health", hint: "Ingestion health, failures, and source rings" },
   ];
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur">

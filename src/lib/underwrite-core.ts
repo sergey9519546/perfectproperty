@@ -116,43 +116,57 @@ export async function rerunUnderwriteCore(parcel_id: string) {
   };
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  await supabaseAdmin.from("parcel_scores").upsert(row, { onConflict: "parcel_id" });
+  const { recordFailure } = await import("@/lib/dlq");
 
-  const { data: last } = await supabaseAdmin
-    .from("decision_audit").select("hash").eq("parcel_id", parcel.id)
-    .order("seq", { ascending: false }).limit(1).maybeSingle();
-  const prev_hash = last?.hash ?? "GENESIS";
-  const rec: DecisionRecord = {
-    decision_id: crypto.randomUUID(),
-    timestamp: new Date().toISOString(),
-    model_version: "v12.0",
-    policy_version: "policy.0",
-    feature_hashes: [],
-    input_snapshot: { input, distress, market: m, comps_n: compsClean.length },
-    output_snapshot: {
-      perfect_score: u.perfect_score, gross_profit: u.gross_profit,
-      risk_adjusted_profit_credit: u.risk_adjusted_profit_credit,
-      pd_credit: u.pd_credit, lgd: u.lgd, ead: u.ead, raroc: u.raroc,
-      gate_status: u.gate_status,
-    },
-    reason_codes: u.skeptic_flags ?? [],
-    user_id: "system",
-    compliance_flags: [],
-  };
-  const chained = await appendDecision(prev_hash, rec);
-  await supabaseAdmin.from("decision_audit").insert({
-    parcel_id: parcel.id,
-    decision_id: chained.decision_id,
-    ts: chained.timestamp,
-    model_version: chained.model_version,
-    policy_version: chained.policy_version,
-    input_snapshot: chained.input_snapshot as any,
-    output_snapshot: chained.output_snapshot as any,
-    reason_codes: chained.reason_codes as any,
-    compliance_flags: chained.compliance_flags as any,
-    previous_hash: chained.previous_hash,
-    hash: chained.hash,
-  });
+  // Multi-write "transaction": (1) score upsert, (2) audit insert. If (2)
+  // fails we DLQ so an admin can retry — the score row is still valid.
+  const { error: upsertErr } = await supabaseAdmin
+    .from("parcel_scores").upsert(row, { onConflict: "parcel_id" });
+  if (upsertErr) {
+    await recordFailure({ source: "UNDERWRITE", stage: "score_upsert", parcelRef: parcel.id, countyFips: parcel.county_fips, error: upsertErr });
+    throw new Error(upsertErr.message);
+  }
+
+  try {
+    const { data: last } = await supabaseAdmin
+      .from("decision_audit").select("hash").eq("parcel_id", parcel.id)
+      .order("seq", { ascending: false }).limit(1).maybeSingle();
+    const prev_hash = last?.hash ?? "GENESIS";
+    const rec: DecisionRecord = {
+      decision_id: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+      model_version: "v12.0",
+      policy_version: "policy.0",
+      feature_hashes: [],
+      input_snapshot: { input, distress, market: m, comps_n: compsClean.length },
+      output_snapshot: {
+        perfect_score: u.perfect_score, gross_profit: u.gross_profit,
+        risk_adjusted_profit_credit: u.risk_adjusted_profit_credit,
+        pd_credit: u.pd_credit, lgd: u.lgd, ead: u.ead, raroc: u.raroc,
+        gate_status: u.gate_status,
+      },
+      reason_codes: u.skeptic_flags ?? [],
+      user_id: "system",
+      compliance_flags: [],
+    };
+    const chained = await appendDecision(prev_hash, rec);
+    const { error: auditErr } = await supabaseAdmin.from("decision_audit").insert({
+      parcel_id: parcel.id,
+      decision_id: chained.decision_id,
+      ts: chained.timestamp,
+      model_version: chained.model_version,
+      policy_version: chained.policy_version,
+      input_snapshot: chained.input_snapshot as any,
+      output_snapshot: chained.output_snapshot as any,
+      reason_codes: chained.reason_codes as any,
+      compliance_flags: chained.compliance_flags as any,
+      previous_hash: chained.previous_hash,
+      hash: chained.hash,
+    });
+    if (auditErr) throw auditErr;
+  } catch (e) {
+    await recordFailure({ source: "UNDERWRITE", stage: "audit_insert", parcelRef: parcel.id, countyFips: parcel.county_fips, error: e });
+  }
 
   return { ok: true as const, perfect_score: u.perfect_score };
 }

@@ -18,6 +18,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccuracyRouteImport } from './routes/accuracy'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminHealthRouteImport } from './routes/admin.health'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as ApiPublicScrapyIngestRouteImport } from './routes/api/public/scrapy-ingest'
@@ -73,6 +74,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminHealthRoute = AdminHealthRouteImport.update({
+  id: '/health',
+  path: '/health',
+  getParentRoute: () => AdminRoute,
 } as any)
 const Char91DotwellKnownChar93OauthProtectedResourceRoute =
   Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
@@ -132,7 +138,7 @@ const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/accuracy': typeof AccuracyRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/deals': typeof DealsRoute
   '/mcp': typeof McpRoute
@@ -141,6 +147,7 @@ export interface FileRoutesByFullPath {
   '/shadow': typeof ShadowRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/admin/health': typeof AdminHealthRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/ingest-all': typeof ApiPublicIngestAllRoute
@@ -153,7 +160,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/accuracy': typeof AccuracyRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/deals': typeof DealsRoute
   '/mcp': typeof McpRoute
@@ -162,6 +169,7 @@ export interface FileRoutesByTo {
   '/shadow': typeof ShadowRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/admin/health': typeof AdminHealthRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/ingest-all': typeof ApiPublicIngestAllRoute
@@ -175,7 +183,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/accuracy': typeof AccuracyRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/deals': typeof DealsRoute
   '/mcp': typeof McpRoute
@@ -184,6 +192,7 @@ export interface FileRoutesById {
   '/shadow': typeof ShadowRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/admin/health': typeof AdminHealthRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/ingest-all': typeof ApiPublicIngestAllRoute
@@ -207,6 +216,7 @@ export interface FileRouteTypes {
     | '/shadow'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/admin/health'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/ingest-all'
@@ -228,6 +238,7 @@ export interface FileRouteTypes {
     | '/shadow'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/admin/health'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/ingest-all'
@@ -249,6 +260,7 @@ export interface FileRouteTypes {
     | '/shadow'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/admin/health'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/ingest-all'
@@ -262,7 +274,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccuracyRoute: typeof AccuracyRoute
-  AdminRoute: typeof AdminRoute
+  AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
   DealsRoute: typeof DealsRoute
   McpRoute: typeof McpRoute
@@ -346,6 +358,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/health': {
+      id: '/admin/health'
+      path: '/health'
+      fullPath: '/admin/health'
+      preLoaderRoute: typeof AdminHealthRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/.well-known/oauth-protected-resource': {
       id: '/.well-known/oauth-protected-resource'
       path: '/.well-known/oauth-protected-resource'
@@ -419,10 +438,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminRouteChildren {
+  AdminHealthRoute: typeof AdminHealthRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminHealthRoute: AdminHealthRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccuracyRoute: AccuracyRoute,
-  AdminRoute: AdminRoute,
+  AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
   DealsRoute: DealsRoute,
   McpRoute: McpRoute,
