@@ -69,18 +69,21 @@ async function call<T>(path: string, params: Record<string, string | number | un
     q.set(k, String(v));
   }
   const url = `${BASE}${path}${q.toString() ? `?${q}` : ""}`;
-  const res = await fetch(url, {
-    method: "GET",
-    headers: { Authorization: key, Accept: "application/json" },
-  });
-  const text = await res.text();
-  let body: any = null;
-  try { body = text ? JSON.parse(text) : null; } catch { body = { raw: text }; }
-  if (!res.ok) {
-    const msg = body?.error ?? res.statusText ?? `HTTP ${res.status}`;
-    throw new Error(`Realie ${res.status}: ${msg}`);
-  }
-  return body as T;
+  const { retryWithBackoff } = await import("@/lib/retry");
+  return retryWithBackoff(async () => {
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { Authorization: key, Accept: "application/json" },
+    });
+    const text = await res.text();
+    let body: any = null;
+    try { body = text ? JSON.parse(text) : null; } catch { body = { raw: text }; }
+    if (!res.ok) {
+      const msg = body?.error ?? res.statusText ?? `HTTP ${res.status}`;
+      throw new Error(`Realie ${res.status}: ${msg}`);
+    }
+    return body as T;
+  }, { retries: 3, baseMs: 500 });
 }
 
 export async function realieLookupAddress(args: {
