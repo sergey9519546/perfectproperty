@@ -90,6 +90,8 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  use401Interceptor();
+
   return (
     <QueryClientProvider client={queryClient}>
       <div className="dark min-h-screen bg-background text-foreground">
