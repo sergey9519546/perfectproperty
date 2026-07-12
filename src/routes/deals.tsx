@@ -23,7 +23,11 @@ export const Route = createFileRoute("/deals")({
       { name: "description", content: "Every underwritten parcel, ranked by risk-adjusted Perfect Score." },
     ],
   }),
-  component: DealsPage,
+  component: () => (
+    <SectionBoundary label="Deals unavailable" minHeight={400}>
+      <DealsPage />
+    </SectionBoundary>
+  ),
 });
 
 function DealsPage() {
