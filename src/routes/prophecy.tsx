@@ -22,7 +22,11 @@ export const Route = createFileRoute("/prophecy")({
       { name: "description", content: "Parcels whose signatures predict acquisition 60–90 days out. Alerted before the opportunity exists anywhere else." },
     ],
   }),
-  component: ProphecyPage,
+  component: () => (
+    <SectionBoundary label="Prophecy unavailable" minHeight={400}>
+      <ProphecyPage />
+    </SectionBoundary>
+  ),
 });
 
 function ProphecyPage() {
