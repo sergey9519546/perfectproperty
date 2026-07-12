@@ -3,6 +3,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { getDossier } from "@/lib/parcels.functions";
 import { fmt$, pct, tierLabel } from "@/lib/format";
 import { X, TrendingUp, AlertTriangle, Building2, ScrollText, Zap, Activity, ShieldCheck, Lock } from "lucide-react";
+import { DataFreshness } from "@/components/DataFreshness";
+
 
 interface Props {
   parcelId: string | null;
