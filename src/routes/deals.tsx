@@ -9,6 +9,7 @@ import { stressedDeal, portfolioStressLossMean, type StressScenario, type DealBa
 import { pickArv } from "@/lib/arv-picker";
 import { BulkLookupPanel } from "@/components/BulkLookupPanel";
 import { supabase } from "@/integrations/supabase/client";
+import { SectionBoundary } from "@/components/SectionBoundary";
 
 export const Route = createFileRoute("/deals")({
   ssr: false,
@@ -22,7 +23,11 @@ export const Route = createFileRoute("/deals")({
       { name: "description", content: "Every underwritten parcel, ranked by risk-adjusted Perfect Score." },
     ],
   }),
-  component: DealsPage,
+  component: () => (
+    <SectionBoundary label="Deals unavailable" minHeight={400}>
+      <DealsPage />
+    </SectionBoundary>
+  ),
 });
 
 function DealsPage() {

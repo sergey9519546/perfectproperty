@@ -8,6 +8,7 @@ import { PageHead } from "./deals";
 import { fmt$, tierLabel } from "@/lib/format";
 import { Flame } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { SectionBoundary } from "@/components/SectionBoundary";
 
 export const Route = createFileRoute("/prophecy")({
   ssr: false,
@@ -21,7 +22,11 @@ export const Route = createFileRoute("/prophecy")({
       { name: "description", content: "Parcels whose signatures predict acquisition 60–90 days out. Alerted before the opportunity exists anywhere else." },
     ],
   }),
-  component: ProphecyPage,
+  component: () => (
+    <SectionBoundary label="Prophecy unavailable" minHeight={400}>
+      <ProphecyPage />
+    </SectionBoundary>
+  ),
 });
 
 function ProphecyPage() {
