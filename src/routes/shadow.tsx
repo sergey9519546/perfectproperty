@@ -22,7 +22,11 @@ export const Route = createFileRoute("/shadow")({
       { name: "description", content: "Off-market parcels ranked by acquisition gravity. No competition, because no listing." },
     ],
   }),
-  component: ShadowPage,
+  component: () => (
+    <SectionBoundary label="Shadow market unavailable" minHeight={400}>
+      <ShadowPage />
+    </SectionBoundary>
+  ),
 });
 
 function ShadowPage() {
