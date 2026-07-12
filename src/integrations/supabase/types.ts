@@ -1142,6 +1142,10 @@ export type Database = {
           sold_at: string
         }[]
       }
+      record_underwrite_atomic: {
+        Args: { p_audit: Json; p_score: Json }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "user"
