@@ -8,6 +8,7 @@ import { PageHead } from "./deals";
 import { fmt$, tierLabel } from "@/lib/format";
 import { Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { SectionBoundary } from "@/components/SectionBoundary";
 
 export const Route = createFileRoute("/shadow")({
   ssr: false,
