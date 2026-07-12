@@ -9,6 +9,7 @@ import { stressedDeal, portfolioStressLossMean, type StressScenario, type DealBa
 import { pickArv } from "@/lib/arv-picker";
 import { BulkLookupPanel } from "@/components/BulkLookupPanel";
 import { supabase } from "@/integrations/supabase/client";
+import { SectionBoundary } from "@/components/SectionBoundary";
 
 export const Route = createFileRoute("/deals")({
   ssr: false,
