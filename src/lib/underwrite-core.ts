@@ -118,15 +118,8 @@ export async function rerunUnderwriteCore(parcel_id: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { recordFailure } = await import("@/lib/dlq");
 
-  // Multi-write "transaction": (1) score upsert, (2) audit insert. If (2)
-  // fails we DLQ so an admin can retry — the score row is still valid.
-  const { error: upsertErr } = await supabaseAdmin
-    .from("parcel_scores").upsert(row, { onConflict: "parcel_id" });
-  if (upsertErr) {
-    await recordFailure({ source: "UNDERWRITE", stage: "score_upsert", parcelRef: parcel.id, countyFips: parcel.county_fips, error: upsertErr });
-    throw new Error(upsertErr.message);
-  }
-
+  // Build audit record so we can commit both writes atomically via RPC.
+  let auditPayload: any = null;
   try {
     const { data: last } = await supabaseAdmin
       .from("decision_audit").select("hash").eq("parcel_id", parcel.id)
@@ -150,23 +143,44 @@ export async function rerunUnderwriteCore(parcel_id: string) {
       compliance_flags: [],
     };
     const chained = await appendDecision(prev_hash, rec);
-    const { error: auditErr } = await supabaseAdmin.from("decision_audit").insert({
+    auditPayload = {
       parcel_id: parcel.id,
       decision_id: chained.decision_id,
       ts: chained.timestamp,
       model_version: chained.model_version,
       policy_version: chained.policy_version,
-      input_snapshot: chained.input_snapshot as any,
-      output_snapshot: chained.output_snapshot as any,
-      reason_codes: chained.reason_codes as any,
-      compliance_flags: chained.compliance_flags as any,
+      input_snapshot: chained.input_snapshot,
+      output_snapshot: chained.output_snapshot,
+      reason_codes: chained.reason_codes,
+      compliance_flags: chained.compliance_flags,
       previous_hash: chained.previous_hash,
       hash: chained.hash,
-    });
-    if (auditErr) throw auditErr;
+    };
   } catch (e) {
-    await recordFailure({ source: "UNDERWRITE", stage: "audit_insert", parcelRef: parcel.id, countyFips: parcel.county_fips, error: e });
+    // Audit build failed; fall back to score-only upsert path below.
+    await recordFailure({ source: "UNDERWRITE", stage: "audit_build", parcelRef: parcel.id, countyFips: parcel.county_fips, error: e });
   }
+
+  if (auditPayload) {
+    // One transactional RPC — either both writes commit, or neither does.
+    const { error: rpcErr } = await (supabaseAdmin as any).rpc("record_underwrite_atomic", {
+      p_score: row,
+      p_audit: auditPayload,
+    });
+    if (rpcErr) {
+      await recordFailure({ source: "UNDERWRITE", stage: "record_underwrite_atomic", parcelRef: parcel.id, countyFips: parcel.county_fips, error: rpcErr });
+      throw new Error(rpcErr.message);
+    }
+  } else {
+    // Degraded path: at least persist the score so the UI reflects the run.
+    const { error: upsertErr } = await supabaseAdmin
+      .from("parcel_scores").upsert(row, { onConflict: "parcel_id" });
+    if (upsertErr) {
+      await recordFailure({ source: "UNDERWRITE", stage: "score_upsert", parcelRef: parcel.id, countyFips: parcel.county_fips, error: upsertErr });
+      throw new Error(upsertErr.message);
+    }
+  }
+
 
   return { ok: true as const, perfect_score: u.perfect_score };
 }

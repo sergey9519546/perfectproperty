@@ -3,6 +3,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { getDossier } from "@/lib/parcels.functions";
 import { fmt$, pct, tierLabel } from "@/lib/format";
 import { X, TrendingUp, AlertTriangle, Building2, ScrollText, Zap, Activity, ShieldCheck, Lock } from "lucide-react";
+import { DataFreshness } from "@/components/DataFreshness";
+
 
 interface Props {
   parcelId: string | null;
@@ -59,7 +61,9 @@ function Header({ d }: { d: D }) {
     <div>
       <div className="text-lg font-semibold leading-tight">{p.address}</div>
       <div className="text-sm text-muted-foreground">{p.city}, {p.state} {p.zip}</div>
+      <DataFreshness timestamp={d.score?.computed_at} prefix="Underwritten" className="mt-1" />
       <div className="mt-3 grid grid-cols-4 gap-2 text-[11px] text-muted-foreground">
+
         <Cell label="Beds/Ba" value={`${p.bedrooms ?? "—"}/${p.bathrooms ?? "—"}`} />
         <Cell label="Sqft" value={<span className="num">{p.living_sqft?.toLocaleString() ?? "—"}</span>} />
         <Cell label="Built" value={<span className="num">{p.year_built ?? "—"}</span>} />

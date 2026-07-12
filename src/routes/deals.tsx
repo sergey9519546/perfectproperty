@@ -10,6 +10,8 @@ import { pickArv } from "@/lib/arv-picker";
 import { BulkLookupPanel } from "@/components/BulkLookupPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { SectionBoundary } from "@/components/SectionBoundary";
+import { DataFreshness } from "@/components/DataFreshness";
+
 
 export const Route = createFileRoute("/deals")({
   ssr: false,
@@ -87,7 +89,9 @@ function DealsPage() {
                     <td className="px-4 py-3">
                       <div className="font-medium">{r.parcels.address}</div>
                       <div className="text-[12px] text-muted-foreground">{r.parcels.city}, {r.parcels.state}</div>
+                      <DataFreshness timestamp={r.computed_at} prefix="Underwritten" className="mt-1" />
                     </td>
+
                     <td className="num px-4 py-3 text-right font-semibold" title={t.hint}>
                       <span style={{ color: t.color }}>{r.perfect_score}</span>
                       <div className="text-[11px] font-normal text-muted-foreground">{t.label}</div>
