@@ -23,6 +23,8 @@ class SmokeSpider(scrapy.Spider):
             "city": "MIAMI",
             "state": "FL",
             "zip": "33101",
+            "lat": 25.7617,
+            "lng": -80.1918,
             "property_type": "SFR",
             "year_built": 1990,
             "living_sqft": 1500,
