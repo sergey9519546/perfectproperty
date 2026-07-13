@@ -11,7 +11,12 @@ export const getZyteStatus = createServerFn({ method: "GET" })
   .handler(async () => {
     const { zyteEnabled, zyteProjectId, scrapyCloudListJobs } = await import("./zyte.server");
     if (!zyteEnabled()) {
-      return { enabled: false, project: null as string | null, jobs: [], error: null as string | null };
+      return {
+        enabled: false,
+        project: null as string | null,
+        jobs: [],
+        error: null as string | null,
+      };
     }
     try {
       const jobs = await scrapyCloudListJobs(15);
@@ -23,7 +28,7 @@ export const getZyteStatus = createServerFn({ method: "GET" })
 
 export const scheduleZyteJob = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
-  .inputValidator((d: { spider: string; recipe?: string }) =>
+  .validator((d: { spider: string; recipe?: string }) =>
     z.object({ spider: z.string().min(1), recipe: z.string().optional() }).parse(d),
   )
   .handler(async ({ data }) => {

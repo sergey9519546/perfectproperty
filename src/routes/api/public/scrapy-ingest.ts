@@ -5,7 +5,7 @@
  *   headers.x-signature = hex(HMAC-SHA256(SCRAPY_INGEST_SECRET, raw_body))
  *   body: {
  *     recipe: "foreclosure" | "probate" | "auction" | "code_violation" |
- *             "sale" | "parcel",
+ *             "sale" | "parcel" | "listing",
  *     items: [ { ...normalized fields... } ]
  *   }
  *
@@ -22,7 +22,15 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { z } from "zod";
 
 const BodySchema = z.object({
-  recipe: z.enum(["foreclosure", "probate", "auction", "code_violation", "sale", "parcel"]),
+  recipe: z.enum([
+    "foreclosure",
+    "probate",
+    "auction",
+    "code_violation",
+    "sale",
+    "parcel",
+    "listing",
+  ]),
   items: z.array(z.record(z.string(), z.any())).min(1).max(2000),
   source_url: z.string().url().optional(),
 });
@@ -47,6 +55,7 @@ async function dispatch(recipe: string, items: any[], sourceUrl?: string) {
   // distress_events requires parcel_id — for now we accept only rows that
   // already carry it OR ones we can look up by (county_fips, apn).
   let inserted = 0;
+  let matched = 0;
   let note = "";
 
   if (recipe === "foreclosure" || recipe === "probate" || recipe === "code_violation") {
@@ -56,22 +65,27 @@ async function dispatch(recipe: string, items: any[], sourceUrl?: string) {
         : recipe === "probate"
           ? "PROBATE"
           : "CODE_VIOLATION";
-    // Resolve parcel_id when APN is provided.
+    // Resolve each official event through the shared APN/address matcher.
     const rows: any[] = [];
     for (const it of items) {
       let parcelId = it.parcel_id ?? null;
-      if (!parcelId && it.county_fips && it.apn) {
-        const { data: p } = await supabaseAdmin
-          .from("parcels")
-          .select("id")
-          .eq("county_fips", it.county_fips)
-          .eq("apn", String(it.apn))
-          .maybeSingle();
-        parcelId = p?.id ?? null;
+      if (!parcelId && it.county_fips && (it.apn || it.address)) {
+        const { data: matched, error: matchError } = await (supabaseAdmin as any).rpc(
+          "match_parcel",
+          {
+            _county_fips: String(it.county_fips),
+            _apn: it.apn ? String(it.apn) : null,
+            _address: it.address ? String(it.address) : null,
+            _city: it.city ? String(it.city) : null,
+          },
+        );
+        if (matchError) throw new Error(`Parcel match failed: ${matchError.message}`);
+        parcelId = matched ?? null;
       }
       if (!parcelId) continue;
       rows.push({
         parcel_id: parcelId,
+        source_event_id: it.source_event_id ? String(it.source_event_id) : null,
         event_type: it.event_type ?? eventType,
         severity: Number(it.severity ?? 3),
         amount: it.amount != null ? Number(it.amount) : null,
@@ -81,12 +95,95 @@ async function dispatch(recipe: string, items: any[], sourceUrl?: string) {
         data_source: "SCRAPY",
       });
     }
+    matched = rows.length;
     if (rows.length) {
-      const { error } = await supabaseAdmin.from("distress_events").insert(rows);
+      const { data: written, error } = await (supabaseAdmin as any)
+        .from("distress_events")
+        .upsert(rows, {
+          onConflict: "data_source,source_event_id",
+          ignoreDuplicates: true,
+        })
+        .select("id");
       if (error) throw new Error(error.message);
-      inserted = rows.length;
+      inserted = written?.length ?? 0;
     }
-    note = `matched ${inserted}/${items.length} to parcels`;
+    note = `matched ${matched}/${items.length} to parcels; inserted ${inserted} new events`;
+  } else if (recipe === "listing") {
+    const candidates: any[] = [];
+    for (const it of items) {
+      const source = String(it.source ?? "UNKNOWN")
+        .toUpperCase()
+        .replace(/[^A-Z0-9_-]/g, "");
+      const sourceListingId = it.source_listing_id ? String(it.source_listing_id) : null;
+      const listPrice = Number(it.list_price);
+      if (!sourceListingId || !it.address || !Number.isFinite(listPrice) || listPrice <= 0)
+        continue;
+
+      let parcelId = it.parcel_id ?? null;
+      if (!parcelId && (it.county_fips || it.city)) {
+        const { data: parcelMatch, error: matchError } = await (supabaseAdmin as any).rpc(
+          "match_parcel",
+          {
+            _county_fips: it.county_fips ? String(it.county_fips) : null,
+            _apn: it.apn ? String(it.apn) : null,
+            _address: String(it.address),
+            _city: it.city ? String(it.city) : null,
+          },
+        );
+        if (matchError) throw new Error(`Listing parcel match failed: ${matchError.message}`);
+        parcelId = parcelMatch ?? null;
+      }
+      if (parcelId) matched += 1;
+      candidates.push({
+        parcel_id: parcelId,
+        source_listing_id: sourceListingId,
+        source_url: it.source_url ? String(it.source_url) : (sourceUrl ?? null),
+        address: String(it.address),
+        city: it.city ? String(it.city) : null,
+        state: it.state ? String(it.state) : null,
+        zip: it.zip ? String(it.zip) : null,
+        lat: it.lat != null ? Number(it.lat) : null,
+        lng: it.lng != null ? Number(it.lng) : null,
+        listed_at: it.listed_at ?? started.slice(0, 10),
+        list_price: listPrice,
+        original_price: it.original_price != null ? Number(it.original_price) : null,
+        status: String(it.status ?? "ACTIVE"),
+        dom: it.dom != null ? Number(it.dom) : null,
+        price_cuts: Number(it.price_cuts ?? 0),
+        data_source: `SCRAPY:${source}`,
+        metadata: {
+          ...(typeof it.metadata === "object" && it.metadata ? it.metadata : {}),
+          deal_tags: Array.isArray(it.deal_tags) ? it.deal_tags : [],
+        },
+        last_seen_at: started,
+      });
+    }
+
+    // A listing can appear in newest + foreclosure/FSBO result sets in one job.
+    // De-duplicate the batch before ON CONFLICT to avoid affecting one row twice.
+    const rows = Array.from(
+      new Map(
+        candidates.map((row) => [`${row.data_source}:${row.source_listing_id}`, row]),
+      ).values(),
+    );
+    if (rows.length) {
+      const { data: written, error } = await (supabaseAdmin as any)
+        .from("listings")
+        .upsert(rows, { onConflict: "data_source,source_listing_id" })
+        .select("id");
+      if (error) throw new Error(error.message);
+      inserted = written?.length ?? 0;
+
+      const parcelIds = Array.from(new Set(rows.map((row) => row.parcel_id).filter(Boolean)));
+      if (parcelIds.length) {
+        const { error: parcelError } = await (supabaseAdmin as any)
+          .from("parcels")
+          .update({ is_listed: true })
+          .in("id", parcelIds);
+        if (parcelError) throw new Error(parcelError.message);
+      }
+    }
+    note = `upserted ${inserted}/${items.length} listings; matched ${matched} to parcels`;
   } else if (recipe === "sale" || recipe === "auction") {
     const rows = items
       .map((it) => ({
@@ -121,20 +218,30 @@ async function dispatch(recipe: string, items: any[], sourceUrl?: string) {
         zip: it.zip ?? null,
         lat: it.lat != null ? Number(it.lat) : null,
         lng: it.lng != null ? Number(it.lng) : null,
-        property_type: it.property_type ?? "SFR",
+        property_type: it.property_type ?? null,
         year_built: it.year_built != null ? Number(it.year_built) : null,
         living_sqft: it.living_sqft != null ? Number(it.living_sqft) : null,
         lot_sqft: it.lot_sqft != null ? Number(it.lot_sqft) : null,
         owner_name: it.owner_name ?? null,
         assessed_value: it.assessed_value != null ? Number(it.assessed_value) : null,
-        condition_grade: it.condition_grade ?? "B",
-        flood_zone: it.flood_zone ?? "X",
-        school_score: it.school_score ?? 6,
+        condition_grade: it.condition_grade ?? null,
+        flood_zone: it.flood_zone ?? null,
+        school_score: it.school_score != null ? Number(it.school_score) : null,
         data_source: "SCRAPY",
         source_url: sourceUrl ?? null,
         last_seen_at: started,
       }))
-      .filter((r) => r.apn && r.county_fips);
+      .filter(
+        (r) =>
+          r.apn &&
+          r.county_fips &&
+          r.address &&
+          r.city &&
+          r.state &&
+          r.zip &&
+          Number.isFinite(r.lat) &&
+          Number.isFinite(r.lng),
+      );
     if (rows.length) {
       const { data: upserted, error } = await supabaseAdmin
         .from("parcels")
@@ -193,7 +300,7 @@ async function dispatch(recipe: string, items: any[], sourceUrl?: string) {
   const { error: runError } = await supabaseAdmin.from("ingestion_runs").insert({
     county_fips: counties.length === 1 ? counties[0] : null,
     source: `SCRAPY:${recipe}`,
-    status: inserted > 0 ? "OK" : "PARTIAL",
+    status: inserted > 0 || matched > 0 ? "OK" : "PARTIAL",
     rows_ingested: inserted,
     notes: note,
     started_at: started,

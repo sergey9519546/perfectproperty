@@ -523,40 +523,70 @@ export type Database = {
       }
       listings: {
         Row: {
+          address: string | null
+          city: string | null
           created_at: string
           data_source: string
           dom: number | null
           id: string
+          last_seen_at: string
+          lat: number | null
           list_price: number
           listed_at: string
+          lng: number | null
+          metadata: Json
           original_price: number | null
-          parcel_id: string
+          parcel_id: string | null
           price_cuts: number | null
+          source_listing_id: string | null
+          source_url: string | null
+          state: string | null
           status: string
+          zip: string | null
         }
         Insert: {
+          address?: string | null
+          city?: string | null
           created_at?: string
           data_source?: string
           dom?: number | null
           id?: string
+          last_seen_at?: string
+          lat?: number | null
           list_price: number
           listed_at: string
+          lng?: number | null
+          metadata?: Json
           original_price?: number | null
-          parcel_id: string
+          parcel_id?: string | null
           price_cuts?: number | null
+          source_listing_id?: string | null
+          source_url?: string | null
+          state?: string | null
           status: string
+          zip?: string | null
         }
         Update: {
+          address?: string | null
+          city?: string | null
           created_at?: string
           data_source?: string
           dom?: number | null
           id?: string
+          last_seen_at?: string
+          lat?: number | null
           list_price?: number
           listed_at?: string
+          lng?: number | null
+          metadata?: Json
           original_price?: number | null
-          parcel_id?: string
+          parcel_id?: string | null
           price_cuts?: number | null
+          source_listing_id?: string | null
+          source_url?: string | null
+          state?: string | null
           status?: string
+          zip?: string | null
         }
         Relationships: [
           {

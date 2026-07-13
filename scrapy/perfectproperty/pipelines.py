@@ -63,7 +63,11 @@ class LovableIngestPipeline:
     def _flush(self, spider, recipe: str):
         items = self.batches[recipe]
         self.batches[recipe] = []
-        body = json.dumps({"recipe": recipe, "items": items}).encode()
+        payload = {"recipe": recipe, "items": items}
+        source_url = getattr(spider, "source_url", None)
+        if source_url:
+            payload["source_url"] = source_url
+        body = json.dumps(payload).encode()
         sig = hmac.new(self.secret, body, hashlib.sha256).hexdigest()
         req = Request(
             self.url,
@@ -83,9 +87,11 @@ class LovableIngestPipeline:
                     r.status, recipe, len(items), r.read()[:300].decode("utf-8", "replace"),
                 )
         except HTTPError as e:
-            spider.logger.error(
-                "lovable ingest FAILED %s [%s x%d]: %s",
-                e.code, recipe, len(items), e.read()[:500].decode("utf-8", "replace"),
-            )
+            self.batches[recipe] = items + self.batches[recipe]
+            detail = e.read()[:500].decode("utf-8", "replace")
+            raise RuntimeError(
+                f"lovable ingest failed {e.code} [{recipe} x{len(items)}]: {detail}"
+            ) from e
         except URLError as e:
-            spider.logger.error("lovable ingest URLError [%s x%d]: %s", recipe, len(items), e)
+            self.batches[recipe] = items + self.batches[recipe]
+            raise RuntimeError(f"lovable ingest URL error [{recipe} x{len(items)}]: {e}") from e

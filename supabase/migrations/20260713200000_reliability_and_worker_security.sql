@@ -4,6 +4,88 @@
 ALTER TABLE public.ingestion_runs
   ALTER COLUMN county_fips DROP NOT NULL;
 
+ALTER TABLE public.distress_events
+  ADD COLUMN IF NOT EXISTS source_event_id text;
+
+CREATE UNIQUE INDEX IF NOT EXISTS distress_source_event_idx
+  ON public.distress_events (data_source, source_event_id);
+
+-- Marketplace crawls must retain unmatched leads until the county parcel feed
+-- catches up. Stable provider IDs make repeated newest-first runs idempotent.
+ALTER TABLE public.listings
+  ALTER COLUMN parcel_id DROP NOT NULL,
+  ADD COLUMN IF NOT EXISTS source_listing_id text,
+  ADD COLUMN IF NOT EXISTS source_url text,
+  ADD COLUMN IF NOT EXISTS address text,
+  ADD COLUMN IF NOT EXISTS city text,
+  ADD COLUMN IF NOT EXISTS state text,
+  ADD COLUMN IF NOT EXISTS zip text,
+  ADD COLUMN IF NOT EXISTS lat double precision,
+  ADD COLUMN IF NOT EXISTS lng double precision,
+  ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS last_seen_at timestamptz NOT NULL DEFAULT now();
+
+CREATE UNIQUE INDEX IF NOT EXISTS listings_source_listing_idx
+  ON public.listings (data_source, source_listing_id);
+
+UPDATE public.scrape_target_templates
+SET enabled = false,
+    notes = 'Replaced by one state-level zillow_deals job to avoid duplicate county crawls',
+    updated_at = now()
+WHERE spider = 'generic_zillow_fsbo';
+
+-- These spiders cover the three priority states in one bounded job. They are
+-- scheduled at the spider level rather than expanded once per county target.
+INSERT INTO public.scrape_target_templates
+  (source_kind, spider, url_template, applies_to_states, needs_zyte,
+   cadence_hours, priority_boost, requests_per_min, concurrent_requests,
+   daily_request_cap, enabled, notes)
+VALUES
+  ('listing', 'zillow_deals', 'https://www.zillow.com/{state}/newest/',
+   ARRAY['CA','FL','OH'], true, 2, 100, 12, 2, 1500, false,
+   'State-level spider; schedule once with states=CA,FL,OH to avoid duplicate county expansion'),
+  ('listing', 'redfin_deals', 'https://www.redfin.com/state/{state}/newest-listings',
+   ARRAY['CA','FL','OH'], true, 4, 80, 12, 2, 1500, false,
+   'State-level spider; schedule once with states=CA,FL,OH to avoid duplicate county expansion')
+ON CONFLICT (source_kind, spider, url_template) DO UPDATE
+SET cadence_hours = EXCLUDED.cadence_hours,
+    priority_boost = EXCLUDED.priority_boost,
+    requests_per_min = EXCLUDED.requests_per_min,
+    concurrent_requests = EXCLUDED.concurrent_requests,
+    daily_request_cap = EXCLUDED.daily_request_cap,
+    enabled = EXCLUDED.enabled,
+    notes = EXCLUDED.notes,
+    updated_at = now();
+
+-- Replace brittle portal search pages with their official structured feeds.
+UPDATE public.scrape_target_templates
+SET url_template = 'https://data.lacity.org/resource/u82d-eh7z.json',
+    needs_zyte = false,
+    updated_at = now()
+WHERE spider = 'la_ladbs_code';
+
+UPDATE public.scrape_target_templates
+SET url_template = 'https://data.sfgov.org/resource/gm2e-bten.json',
+    needs_zyte = false,
+    updated_at = now()
+WHERE spider = 'sf_dbi_complaints';
+
+UPDATE public.scrape_target_templates
+SET url_template = 'https://data.cityofnewyork.us/resource/wvxf-dwi5.json',
+    needs_zyte = false,
+    updated_at = now()
+WHERE spider = 'nyc_hpd_violations';
+
+UPDATE public.scrape_targets
+SET url_or_query = CASE spider
+      WHEN 'la_ladbs_code' THEN 'https://data.lacity.org/resource/u82d-eh7z.json'
+      WHEN 'sf_dbi_complaints' THEN 'https://data.sfgov.org/resource/gm2e-bten.json'
+      WHEN 'nyc_hpd_violations' THEN 'https://data.cityofnewyork.us/resource/wvxf-dwi5.json'
+    END,
+    needs_zyte = false,
+    updated_at = now()
+WHERE spider IN ('la_ladbs_code', 'sf_dbi_complaints', 'nyc_hpd_violations');
+
 -- Unknown provider values must remain unknown instead of inheriting synthetic
 -- defaults that later look like verified underwriting inputs.
 ALTER TABLE public.parcels
