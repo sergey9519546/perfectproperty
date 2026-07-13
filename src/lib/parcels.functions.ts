@@ -96,9 +96,16 @@ export const getCoverage = createServerFn({ method: "GET" })
   const [counties, runs, scores, outcomes, liveByCounty] = await Promise.all([
     supabase.from("counties").select("*").order("state").order("name"),
     supabase.from("ingestion_runs").select("*").order("started_at", { ascending: false }).limit(30),
-    supabase.from("parcel_scores").select("perfect_score, ring, confidence_grade, data_source").eq("data_source", "LIVE"),
+    // Match the same real-inputs filter as listRankedParcels so counts don't
+    // include parcels underwritten off defaults.
+    supabase
+      .from("parcel_scores")
+      .select("perfect_score, ring, confidence_grade, data_source, parcels!inner(living_sqft, year_built)")
+      .eq("data_source", "LIVE")
+      .not("parcels.living_sqft", "is", null)
+      .not("parcels.year_built", "is", null),
     supabase.from("prediction_outcomes").select("outcome, error_pct, predicted_profit, actual_profit"),
-    supabase.from("parcels").select("county_fips").eq("data_source", "LIVE"),
+    supabase.from("parcels").select("county_fips").eq("data_source", "LIVE").not("living_sqft", "is", null).not("year_built", "is", null),
   ]);
   const sLive = (scores.data ?? []) as any[];
   const tiers = {
