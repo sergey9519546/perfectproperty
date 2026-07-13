@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { getCoverage } from "@/lib/parcels.functions";
-import { seedFixtures, runUnderwrite } from "@/lib/seed.functions";
+import { runUnderwrite } from "@/lib/seed.functions";
 import { ingestCounty, scoreAll, listSources } from "@/lib/ingest.functions";
 import { ingestAllNycSales, salesSummary } from "@/lib/sales.functions";
 import { probeUrl, listProbes } from "@/lib/probe.functions";
@@ -39,7 +39,7 @@ export const Route = createFileRoute("/admin")({
 
 function AdminPage() {
   const covFn = useServerFn(getCoverage);
-  const seedFn = useServerFn(seedFixtures);
+  
   const uwFn = useServerFn(runUnderwrite);
   const ingestFn = useServerFn(ingestCounty);
   const scoreFn = useServerFn(scoreAll);
@@ -102,16 +102,12 @@ function AdminPage() {
 
 
 
-  const seed = useMutation({
-    mutationFn: () => seedFn(),
-    onSuccess: (r) => { toast.success(`Ingested ${r.parcels} parcels · ${r.deeds} deeds · ${r.distress} distress · ${r.listings} listings`); qc.invalidateQueries(); },
-    onError: (e: any) => toast.error(e.message ?? "Seed failed"),
-  });
   const uw = useMutation({
     mutationFn: () => uwFn(),
-    onSuccess: (r) => { toast.success(`Underwrote ${r.scored} parcels · ${r.outcomes} historical outcomes graded`); qc.invalidateQueries(); },
+    onSuccess: (r) => { toast.success(`Underwrote ${r.scored} live parcels${r.skipped ? ` · skipped ${r.skipped}` : ""}`); qc.invalidateQueries(); },
     onError: (e: any) => toast.error(e.message ?? "Underwrite failed"),
   });
+
   const ingest = useMutation({
     mutationFn: (fips: string) => ingestFn({ data: { county_fips: fips, max_parcels: 300, enrich_flood: true } }),
     onSuccess: (r) => {
