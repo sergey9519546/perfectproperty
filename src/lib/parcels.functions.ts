@@ -155,13 +155,13 @@ export const getCoverage = createServerFn({ method: "GET" })
   const avgError = o.length
     ? o.reduce((a: number, b: any) => a + Math.abs(Number(b.error_pct ?? 0)), 0) / o.length
     : 0;
-  const qRows = (queueRows as any)?.data ?? queueRows ?? [];
+  const qRows = ((queueRows as any)?.data ?? []) as Array<{ status: string }>;
   const queue = {
-    pending: (qRows as any[]).filter((x) => x.status === "pending").length,
-    inflight: (qRows as any[]).filter((x) => x.status === "inflight").length,
-    done: (qRows as any[]).filter((x) => x.status === "done").length,
-    failed: (qRows as any[]).filter((x) => x.status === "failed").length,
-    total: (qRows as any[]).length,
+    pending: qRows.filter((x) => x.status === "pending").length,
+    inflight: qRows.filter((x) => x.status === "inflight").length,
+    done: qRows.filter((x) => x.status === "done").length,
+    failed: qRows.filter((x) => x.status === "failed").length,
+    total: qRows.length,
   };
 
   return {
