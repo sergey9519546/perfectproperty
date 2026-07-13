@@ -13,4 +13,9 @@ const Input = z.object({ parcel_id: z.string().uuid() });
 export const rerunUnderwrite = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
   .validator((data: unknown) => Input.parse(data))
-  .handler(async ({ data }) => rerunUnderwriteCore(data.parcel_id));
+  .handler(async ({ data }) =>
+    rerunUnderwriteCore(data.parcel_id, {
+      allowPremiumComps: true,
+      budgetClass: "interactive",
+    }),
+  );

@@ -59,9 +59,9 @@ function HealthView() {
           sub="rows sent to the dead-letter queue"
         />
         <Card
-          title="Realie calls (1h)"
-          value={d.realie_calls_last_hour.toLocaleString()}
-          sub="proxy for API credit burn"
+          title="Realie requests today"
+          value={d.realie_calls_today.toLocaleString()}
+          sub={`${d.realie_calls_remaining.toLocaleString()} remaining of ${d.realie_daily_call_limit.toLocaleString()} · includes retries`}
         />
         <Card
           title="Sources tracked"
@@ -106,6 +106,26 @@ function HealthView() {
             </span>
           ))}
         </div>
+        {(d.realie_usage_by_endpoint ?? []).length > 0 && (
+          <div className="mt-3 border-t border-border/50 pt-3">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Today by endpoint
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+              {d.realie_usage_by_endpoint.map((usage: any) => (
+                <span
+                  key={usage.endpoint}
+                  className="rounded border border-border bg-surface-2 px-2 py-1 text-muted-foreground"
+                >
+                  <span className="font-mono text-foreground">{usage.endpoint}</span>{" "}
+                  {Number(usage.request_count).toLocaleString()} requests ·{" "}
+                  {Number(usage.property_count).toLocaleString()} properties ·{" "}
+                  {Number(usage.failure_count).toLocaleString()} failed
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="rounded-lg border border-border bg-surface p-4">

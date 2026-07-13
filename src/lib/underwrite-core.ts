@@ -11,7 +11,14 @@ import {
 } from "@/lib/engine";
 import { appendDecision, type DecisionRecord } from "@/lib/engine/warehouse";
 
-export async function rerunUnderwriteCore(parcel_id: string) {
+export interface UnderwriteRunOptions {
+  /** Paid premium comparables are opt-in. Background callers must leave this false. */
+  allowPremiumComps?: boolean;
+  budgetClass?: "background" | "interactive";
+  forceRefreshPremiumComps?: boolean;
+}
+
+export async function rerunUnderwriteCore(parcel_id: string, options: UnderwriteRunOptions = {}) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const supabase = supabaseAdmin;
 
@@ -35,17 +42,16 @@ export async function rerunUnderwriteCore(parcel_id: string) {
   ]);
 
   let realieCompsRaw: any[] = [];
-  const { shouldTopUpWithRealie } = await import("@/lib/arv-picker");
-  if (
-    shouldTopUpWithRealie({
-      localCompCount: (comps as any[])?.length ?? 0,
-      hasLatLng: parcel.lat != null && parcel.lng != null,
-      hasApiKey: Boolean(process.env.REALIE_API_KEY),
-    })
-  ) {
+  const localCompCount = (comps as any[])?.length ?? 0;
+  const hasLatLng = parcel.lat != null && parcel.lng != null;
+  const { REALIE_TOP_UP_THRESHOLD, shouldTopUpWithRealie } = await import("@/lib/arv-picker");
+  const needsPremiumTopUp = localCompCount < REALIE_TOP_UP_THRESHOLD && hasLatLng;
+
+  // Cache reads are always allowed; only the paid cache miss is opt-in. This
+  // keeps scheduled scoring deterministic and free of surprise API charges.
+  if (needsPremiumTopUp) {
     try {
-      const { realieComparables, realieCompsToEngineComps } = await import("@/lib/adapters/realie");
-      const raw = await realieComparables({
+      const query = {
         latitude: Number(parcel.lat),
         longitude: Number(parcel.lng),
         radius: 1,
@@ -55,8 +61,72 @@ export async function rerunUnderwriteCore(parcel_id: string) {
         sqftMax: parcel.living_sqft ? Math.round(parcel.living_sqft * 1.3) : undefined,
         bedsMin: parcel.bedrooms ? Math.max(1, parcel.bedrooms - 1) : undefined,
         bedsMax: parcel.bedrooms ? parcel.bedrooms + 1 : undefined,
-      });
-      realieCompsRaw = realieCompsToEngineComps(raw, Number(parcel.lat), Number(parcel.lng));
+      };
+      const { isUnexpiredCacheEntry, realieCompCacheKey } = await import("@/lib/realie-comp-cache");
+      const cacheKey = realieCompCacheKey(query);
+      const { data: cached, error: cacheReadError } = await (supabase as any)
+        .from("realie_comp_cache")
+        .select("comparables, expires_at")
+        .eq("cache_key", cacheKey)
+        .maybeSingle();
+
+      if (cacheReadError) {
+        console.warn("Realie comps cache read failed:", cacheReadError.message);
+      }
+
+      const hasCachedResponse =
+        !options.forceRefreshPremiumComps &&
+        isUnexpiredCacheEntry(cached) &&
+        Array.isArray(cached?.comparables);
+      let raw: any[] = hasCachedResponse ? cached.comparables : [];
+
+      const maySpendCredit =
+        options.allowPremiumComps === true &&
+        shouldTopUpWithRealie({
+          localCompCount,
+          hasLatLng,
+          hasApiKey: Boolean(process.env.REALIE_API_KEY),
+        });
+
+      if (!hasCachedResponse && maySpendCredit) {
+        const { realieComparables } = await import("@/lib/adapters/realie");
+        raw = await realieComparables({
+          ...query,
+          budgetClass: options.budgetClass ?? "interactive",
+        });
+
+        const { data: config } = await (supabase as any)
+          .from("orchestrator_config")
+          .select("realie_comp_cache_ttl_days")
+          .eq("id", 1)
+          .maybeSingle();
+        const configuredTtl = Number(config?.realie_comp_cache_ttl_days ?? 21);
+        const ttlDays = Number.isFinite(configuredTtl)
+          ? Math.min(90, Math.max(1, configuredTtl))
+          : 21;
+        const now = new Date();
+        const { error: cacheWriteError } = await (supabase as any).from("realie_comp_cache").upsert(
+          {
+            cache_key: cacheKey,
+            latitude: query.latitude,
+            longitude: query.longitude,
+            filters: query,
+            comparables: raw,
+            fetched_at: now.toISOString(),
+            expires_at: new Date(now.getTime() + ttlDays * 86_400_000).toISOString(),
+            updated_at: now.toISOString(),
+          },
+          { onConflict: "cache_key" },
+        );
+        if (cacheWriteError) {
+          console.warn("Realie comps cache write failed:", cacheWriteError.message);
+        }
+      }
+
+      if (raw.length > 0) {
+        const { realieCompsToEngineComps } = await import("@/lib/adapters/realie");
+        realieCompsRaw = realieCompsToEngineComps(raw, Number(parcel.lat), Number(parcel.lng));
+      }
     } catch (e) {
       console.warn("Realie comps fallback failed:", (e as Error).message);
     }

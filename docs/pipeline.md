@@ -5,13 +5,11 @@ Three sources, one job each. Don't mix them up.
 ```text
 SCRAPY (discovery + signals)     REALIE (attributes)                 ZYTE (transport)
 ────────────────────────────     ──────────────────                  ────────────────
-Nightly spiders scrape county    Per-address enrichment: sqft,       Anti-bot proxy + headless
-portals for the reasons a        year, beds, baths, owner,           browser. Used silently by
-parcel is a deal: foreclosure    assessed value, last sale.          Scrapy adapters and by our
-filings, probate, code           $/call — never called for a         own ArcGIS adapter when
-violations, tax liens, new       parcel without a trigger.           the county site blocks
-listings. Also thin parcel                                           direct fetch. NEVER a data
-drops. Cheap. Volume.            The wallet.                         source on its own.
+Spiders scrape county portals    Cache-first, batched enrichment:    Anti-bot proxy + headless
+and marketplaces for reasons     physical facts, owner, tax/AVM,     browser. Used by marketplace
+a parcel is a deal: distress,    transfers, liens, foreclosure,      spiders and blocked public
+probate, code violations, tax    and geometry. Metered per HTTP      sources. It is transport,
+liens, and fresh listings.       request with an atomic daily cap.   never a data source itself.
 
 The funnel.                                                          The pipe.
 ```
@@ -54,14 +52,18 @@ Both only enqueue if the parent parcel is missing `living_sqft` OR
 Body: `{ "batch": 25 }` (default 25, max 100). Auth: `CRON_SECRET` in the
 `x-cron-secret` header, matching the other cron endpoints.
 
-Per call: pulls top N pending items ordered by priority + requested_at,
-marks them `inflight`, calls `lookupParcelByAddressCore` (which upserts
-the parcel and re-runs underwriting), then marks each `done` or bumps
-`attempts`/`failed`. Emits one `ingestion_runs` row per county with
-source `REALIE:enrichment`.
+Per call: atomically claims top pending items ordered by priority and request
+time, reuses snapshots/negative cache, clusters coordinate-bearing parcels for
+location searches, falls back to a single-address lookup only for unmatched
+records, and scores once after the batch. A budget-exhausted item returns to
+`pending` without consuming a queue attempt. Emits one `ingestion_runs` row per
+county with source `REALIE:enrichment`.
 
-Cap: 25 items × every 15 min = ~2,400 Realie calls / day worst case.
-Adjust batch size on the schedule if you want a tighter cap.
+The default hard cap is 100 actual HTTP attempts per UTC day, with 20 reserved
+for interactive work. Retries also consume reservations. Change
+`orchestrator_config.realie_daily_call_limit` and
+`realie_interactive_reserve` instead of estimating cost from the cron batch
+size. See [Realie data and credit strategy](./realie.md).
 
 ## Admin visibility
 
@@ -72,26 +74,15 @@ Adjust batch size on the schedule if you want a tighter cap.
   trigger type.
 - "Enriched (24h)" and "last run" — read directly off
   `ingestion_runs` where `source = 'REALIE:enrichment'`.
+- Actual requests today, remaining daily credits, retries, and endpoint totals
+  from `realie_usage_daily`.
 
-## What still needs to happen in the Scrapy repo
+## Scrapy coverage
 
-The webhook `/api/public/scrapy-ingest` is live and already accepts
-recipes `foreclosure | probate | code_violation | sale | parcel`. Only
-`smoke` exists on the Scrapy side right now. Real spiders to add, in
-descending leverage order (matches the counties we already have parcels
-for):
-
-| County (FIPS)           | Source                                  | Recipe         |
-| ----------------------- | --------------------------------------- | -------------- |
-| Miami-Dade (12086)      | Clerk of Court — foreclosure filings    | foreclosure    |
-| Miami-Dade (12086)      | Probate court public records            | probate        |
-| Los Angeles (06037)     | LA County Recorder — NOD / NOS          | foreclosure    |
-| Los Angeles (06037)     | LA Building & Safety — code enforcement | code_violation |
-| NYC (36061/36005/36081) | ACRIS — distress deeds                  | foreclosure    |
-| NYC (36061/36005/36081) | HPD violations                          | code_violation |
-| NYC (36061/36005/36081) | PLUTO parcel drop (annual)              | parcel         |
-| San Francisco (06075)   | Assessor sales                          | sale           |
-| San Francisco (06075)   | DBI complaints                          | code_violation |
+Production spiders now cover LA LADBS, San Francisco DBI, NYC HPD, Zillow,
+and Redfin. Marketplace crawls prioritize CA, FL, and OH. County-specific
+foreclosure, probate, recorder, tax-lien, sale, and parcel spiders remain the
+next coverage work; see `scrapy/README.md` for the current runnable inventory.
 
 Each spider posts to `LOVABLE_INGEST_URL` with HMAC-SHA256 signature over
 the raw body using `LOVABLE_INGEST_SECRET`. See `docs/scrapy.md` for the

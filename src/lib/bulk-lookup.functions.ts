@@ -130,9 +130,9 @@ export const getBulkLookupJob = createServerFn({ method: "POST" })
   });
 
 /**
- * Worker: process up to `limit` pending items across all jobs. Called by the
- * overnight cron endpoint. Serial rather than parallel so we don't hammer
- * Realie's rate limit; each address takes 2–4 s.
+ * Worker: process up to `limit` pending items across all jobs. Each row is
+ * conditionally moved to `running` before work starts, so overlapping cron and
+ * admin-triggered runs cannot spend two credits on the same address.
  */
 export async function processBulkLookupBatch(limit = 20): Promise<{
   processed: number;
@@ -152,9 +152,21 @@ export async function processBulkLookupBatch(limit = 20): Promise<{
 
   let succeeded = 0;
   let failed = 0;
+  let processed = 0;
   const touched = new Set<string>();
 
-  for (const item of pending ?? []) {
+  for (const candidate of pending ?? []) {
+    const { data: item, error: claimError } = await supabaseAdmin
+      .from("bulk_lookup_items")
+      .update({ status: "running" })
+      .eq("id", candidate.id)
+      .eq("status", "pending")
+      .select("*")
+      .maybeSingle();
+    if (claimError) throw new Error(claimError.message);
+    if (!item) continue;
+
+    processed++;
     touched.add(item.job_id);
     try {
       const r = await lookupParcelByAddressCore({
@@ -163,6 +175,8 @@ export async function processBulkLookupBatch(limit = 20): Promise<{
         city: item.city ?? undefined,
         county: item.county ?? undefined,
         unit: item.unit ?? undefined,
+        underwrite: false,
+        budgetClass: "background",
       });
 
       await supabaseAdmin
@@ -177,16 +191,27 @@ export async function processBulkLookupBatch(limit = 20): Promise<{
         .eq("id", item.id);
       succeeded++;
     } catch (e: any) {
+      const message = String(e?.message ?? e);
+      if (e?.code === "REALIE_BUDGET_EXHAUSTED" || message.includes("REALIE_BUDGET_EXHAUSTED")) {
+        await supabaseAdmin
+          .from("bulk_lookup_items")
+          .update({ status: "pending", error: "Realie background budget exhausted" })
+          .eq("id", item.id);
+        processed--;
+        break;
+      }
+      const attempts = (item.attempts ?? 0) + 1;
+      const terminal = attempts >= (item.max_attempts ?? 3);
       await supabaseAdmin
         .from("bulk_lookup_items")
         .update({
-          status: "failed",
-          attempts: (item.attempts ?? 0) + 1,
-          processed_at: new Date().toISOString(),
-          error: String(e?.message ?? e).slice(0, 500),
+          status: terminal ? "failed" : "pending",
+          attempts,
+          processed_at: terminal ? new Date().toISOString() : null,
+          error: message.slice(0, 500),
         })
         .eq("id", item.id);
-      failed++;
+      if (terminal) failed++;
     }
   }
 
@@ -197,7 +222,9 @@ export async function processBulkLookupBatch(limit = 20): Promise<{
       .select("status")
       .eq("job_id", jobId);
     const total = counts?.length ?? 0;
-    const done = (counts ?? []).filter((c) => c.status !== "pending").length;
+    const done = (counts ?? []).filter((c) =>
+      ["succeeded", "failed", "skipped"].includes(c.status),
+    ).length;
     const okN = (counts ?? []).filter((c) => c.status === "succeeded").length;
     const failN = (counts ?? []).filter((c) => c.status === "failed").length;
     const finished = done === total;
@@ -214,7 +241,7 @@ export async function processBulkLookupBatch(limit = 20): Promise<{
       .eq("id", jobId);
   }
 
-  return { processed: (pending ?? []).length, succeeded, failed };
+  return { processed, succeeded, failed };
 }
 
 /**
@@ -260,7 +287,9 @@ export const resumeFailedInJob = createServerFn({ method: "POST" })
         .from("bulk_lookup_items")
         .select("status")
         .eq("job_id", jobId);
-      const done = (counts ?? []).filter((c) => c.status !== "pending").length;
+      const done = (counts ?? []).filter((c) =>
+        ["succeeded", "failed", "skipped"].includes(c.status),
+      ).length;
       const okN = (counts ?? []).filter((c) => c.status === "succeeded").length;
       const failN = (counts ?? []).filter((c) => c.status === "failed").length;
       await supabaseAdmin

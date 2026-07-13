@@ -20,7 +20,11 @@ export default defineTool({
       return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
     }
     try {
-      const result = await lookupParcelByAddressCore(input);
+      const result = await lookupParcelByAddressCore({
+        ...input,
+        underwrite: true,
+        budgetClass: "interactive",
+      });
       return {
         content: [{ type: "text", text: JSON.stringify(result) }],
         structuredContent: result as Record<string, unknown>,

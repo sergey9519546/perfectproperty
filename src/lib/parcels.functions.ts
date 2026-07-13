@@ -128,7 +128,11 @@ export const lookupParcelByAddress = createServerFn({ method: "POST" })
   .validator((data: unknown) => LookupInput.parse(data))
   .handler(async ({ data }) => {
     const { lookupParcelByAddressCore } = await import("@/lib/parcels-core");
-    return lookupParcelByAddressCore(data);
+    return lookupParcelByAddressCore({
+      ...data,
+      underwrite: true,
+      budgetClass: "interactive",
+    });
   });
 
 export const getCoverage = createServerFn({ method: "GET" })

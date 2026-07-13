@@ -1,19 +1,14 @@
 /**
- * Cron endpoint: dequeue N parcels from enrichment_queue and fill in
- * living_sqft / year_built / beds / baths via Realie.
+ * Credit-bounded Realie enrichment worker.
  *
- * Auth: shared CRON_SECRET in the `x-cron-secret` header, timing-safe
- * compared. A Supabase publishable key is intentionally not accepted.
- *
- * Body: { batch?: number }  // default 25, hard cap 100 per invocation
- *
- * Each enriched parcel is re-underwritten as a side-effect of
- * lookupParcelByAddressCore(). Emits one ingestion_runs row per county
- * in the batch with source = "REALIE:enrichment".
+ * Claims up to 100 queue rows atomically, reuses full-response and negative
+ * caches, groups nearby parcels into location searches, and falls back to an
+ * exact lookup only for unmatched addresses. It never requests premium comps.
  */
-
 import { createFileRoute } from "@tanstack/react-router";
-import { timingSafeEqual } from "crypto";
+import { timingSafeEqual } from "node:crypto";
+import type { RealieAuditEntry, RealieProperty } from "@/lib/adapters/realie";
+import type { RealieBatchRequest } from "@/lib/realie-batch";
 
 function authorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
@@ -29,279 +24,415 @@ function authorized(request: Request): boolean {
   }
 }
 
+function isBudgetExhausted(error: unknown): boolean {
+  return (
+    (error as { code?: string } | null)?.code === "REALIE_BUDGET_EXHAUSTED" ||
+    String((error as Error | null)?.message ?? error).includes("budget exhausted")
+  );
+}
+
+type QueueItem = {
+  parcel_id: string;
+  reason: string;
+  priority: number;
+  attempts: number;
+};
+
+type WorkItem = RealieBatchRequest & {
+  queue: QueueItem;
+  county?: string;
+};
+
+type WorkResult = {
+  parcel_id: string;
+  status: "enriched" | "failed" | "deferred";
+  note: string;
+};
+
 export const Route = createFileRoute("/api/public/run-realie-enrichment")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        if (!authorized(request)) {
-          return new Response("Unauthorized", { status: 401 });
-        }
+        if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
 
-        let batch = 25;
-        try {
-          const body = (await request.json().catch(() => ({}))) as { batch?: number };
-          if (typeof body.batch === "number" && body.batch > 0) {
-            batch = Math.min(Math.floor(body.batch), 100);
-          }
-        } catch {
-          /* keep default */
-        }
-
+        const body = (await request.json().catch(() => ({}))) as { batch?: number };
+        const requestedBatch = Number(body.batch ?? 25);
+        const batch = Number.isFinite(requestedBatch)
+          ? Math.min(100, Math.max(1, Math.floor(requestedBatch)))
+          : 25;
         const startedAt = new Date().toISOString();
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { lookupParcelByAddressCore } = await import("@/lib/parcels-core");
 
-        // Atomically claim work with SKIP LOCKED; the RPC also recovers stale
-        // inflight rows left behind by crashed workers.
-        const { data: queueItems, error: qErr } = await (supabaseAdmin as any).rpc(
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const {
+          cacheRealieMissCore,
+          isRealieNegativeCachedCore,
+          lookupParcelByAddressCore,
+          persistRealiePropertyCore,
+          readRealieSnapshotCore,
+        } = await import("@/lib/parcels-core");
+        const { realieLocationSearch, setRealieAuditSink } = await import("@/lib/adapters/realie");
+        const { buildRealieLocationBatches, matchRealieProperties, realieLookupKey } =
+          await import("@/lib/realie-batch");
+
+        const { data: claimed, error: claimError } = await (supabaseAdmin as any).rpc(
           "claim_enrichment_queue",
           { p_limit: batch },
         );
-        if (qErr) {
-          return new Response(`Queue read failed: ${qErr.message}`, { status: 500 });
+        if (claimError)
+          return new Response(`Queue claim failed: ${claimError.message}`, { status: 500 });
+        const queueItems = (claimed ?? []) as QueueItem[];
+        if (queueItems.length === 0) {
+          return Response.json({ ok: true, processed: 0, enriched: 0, failed: 0, deferred: 0 });
         }
 
-        const items = queueItems ?? [];
-        if (items.length === 0) {
-          return Response.json({
-            ok: true,
-            processed: 0,
-            enriched: 0,
-            failed: 0,
-            note: "queue empty",
+        const parcelIds = queueItems.map((item) => item.parcel_id);
+        const { data: parcelRows, error: parcelError } = await supabaseAdmin
+          .from("parcels")
+          .select("id, apn, address, city, state, zip, county_fips, lat, lng")
+          .in("id", parcelIds);
+        if (parcelError)
+          return new Response(`Parcel read failed: ${parcelError.message}`, { status: 500 });
+
+        const fipsValues = [
+          ...new Set((parcelRows ?? []).map((row) => row.county_fips).filter(Boolean)),
+        ];
+        const countyNames = new Map<string, string>();
+        if (fipsValues.length > 0) {
+          const { data: counties } = await supabaseAdmin
+            .from("counties")
+            .select("fips, name")
+            .in("fips", fipsValues as string[]);
+          for (const county of counties ?? []) countyNames.set(county.fips, county.name);
+        }
+
+        const queueByParcel = new Map(queueItems.map((item) => [item.parcel_id, item]));
+        const work = (parcelRows ?? [])
+          .filter((parcel) => parcel.address && parcel.state && queueByParcel.has(parcel.id))
+          .map<WorkItem>((parcel) => ({
+            parcel_id: parcel.id,
+            apn: parcel.apn,
+            address: parcel.address!,
+            city: parcel.city,
+            state: parcel.state,
+            zip: parcel.zip,
+            county_fips: parcel.county_fips,
+            county: countyNames.get(parcel.county_fips),
+            lat: parcel.lat,
+            lng: parcel.lng,
+            queue: queueByParcel.get(parcel.id)!,
+          }));
+        const workById = new Map(work.map((item) => [item.parcel_id, item]));
+        const remaining = new Map(workById);
+        const results: WorkResult[] = [];
+
+        const markFailure = async (item: WorkItem, message: string) => {
+          const attempts = item.queue.attempts + 1;
+          const terminal = attempts >= 3;
+          await supabaseAdmin
+            .from("enrichment_queue")
+            .update({
+              status: terminal ? "failed" : "pending",
+              attempts,
+              started_at: null,
+              last_error: message.slice(0, 500),
+              completed_at: terminal ? new Date().toISOString() : null,
+            })
+            .eq("parcel_id", item.parcel_id);
+          remaining.delete(item.parcel_id);
+          results.push({ parcel_id: item.parcel_id, status: "failed", note: message });
+        };
+
+        const markEnriched = async (item: WorkItem) => {
+          const { data: fresh } = await supabaseAdmin
+            .from("parcels")
+            .select("living_sqft, year_built")
+            .eq("id", item.parcel_id)
+            .maybeSingle();
+          const missing = [
+            !fresh?.living_sqft ? "living_sqft" : null,
+            !fresh?.year_built ? "year_built" : null,
+          ].filter(Boolean) as string[];
+          if (missing.length > 0) {
+            await markFailure(item, `insufficient: missing ${missing.join(",")}`);
+            return;
+          }
+          await supabaseAdmin
+            .from("enrichment_queue")
+            .update({
+              status: "done",
+              attempts: item.queue.attempts + 1,
+              started_at: null,
+              last_error: null,
+              completed_at: new Date().toISOString(),
+            })
+            .eq("parcel_id", item.parcel_id);
+          remaining.delete(item.parcel_id);
+          results.push({ parcel_id: item.parcel_id, status: "enriched", note: "enriched" });
+        };
+
+        const writeAuditEntries = async (
+          entries: RealieAuditEntry[],
+          context: { parcel_id?: string | null; county_fips?: string | null; outcome: string },
+        ) => {
+          if (entries.length === 0) return;
+          await supabaseAdmin.from("realie_audit").insert(
+            entries.map((entry) => ({
+              parcel_id: context.parcel_id ?? null,
+              county_fips: context.county_fips ?? null,
+              endpoint: entry.endpoint,
+              request_params: entry.params as any,
+              http_status: entry.http_status,
+              ok: entry.ok,
+              duration_ms: entry.duration_ms,
+              outcome: context.outcome,
+              error_code: entry.error_code,
+              error_message: entry.error_message,
+              response_sample: entry.response_sample as any,
+            })) as any,
+          );
+        };
+
+        // Missing inputs cannot ever succeed through another paid attempt.
+        for (const item of queueItems) {
+          if (workById.has(item.parcel_id)) continue;
+          await supabaseAdmin
+            .from("enrichment_queue")
+            .update({
+              status: "failed",
+              attempts: item.attempts + 1,
+              started_at: null,
+              last_error: "missing address or state",
+              completed_at: new Date().toISOString(),
+            })
+            .eq("parcel_id", item.parcel_id);
+          results.push({
+            parcel_id: item.parcel_id,
+            status: "failed",
+            note: "missing address or state",
           });
         }
 
-        const ids = items.map((r: any) => r.parcel_id);
-        // Load the parcel rows we need addresses from.
-        const { data: parcels, error: pErr } = await supabaseAdmin
-          .from("parcels")
-          .select("id, address, city, state, county_fips")
-          .in("id", ids);
-        if (pErr) {
-          return new Response(`Parcel read failed: ${pErr.message}`, { status: 500 });
-        }
-        const byId = new Map((parcels ?? []).map((p) => [p.id, p]));
-
-        // Map county_fips → Realie-friendly county name. Realie rejects
-        // `{city, state}` without a county, so we always supply one.
-        // NYC boroughs collapse to "New York" for Realie's purposes.
-        const countyByFips: Record<string, string> = {
-          "06037": "Los Angeles",
-          "06075": "San Francisco",
-          "06073": "San Diego",
-          "12086": "Miami-Dade",
-          "12011": "Broward",
-          "17031": "Cook",
-          "36005": "Bronx",
-          "36047": "Kings",
-          "36061": "New York",
-          "36081": "Queens",
-          "36085": "Richmond",
-        };
-
-        // 4. Enrich one-by-one (Realie is per-address, no bulk endpoint).
-        const { setRealieAuditSink } = await import("@/lib/adapters/realie");
-        const results: Array<{ parcel_id: string; ok: boolean; note: string }> = [];
-        for (const item of items) {
-          const p = byId.get(item.parcel_id);
-          if (!p || !p.address || !p.state) {
-            await supabaseAdmin
-              .from("enrichment_queue")
-              .update({
-                status: "failed",
-                attempts: item.attempts + 1,
-                last_error: "missing address or state",
-                completed_at: new Date().toISOString(),
-              })
-              .eq("parcel_id", item.parcel_id);
-            await supabaseAdmin.from("realie_audit").insert({
-              parcel_id: item.parcel_id,
-              county_fips: p?.county_fips ?? null,
-              endpoint: "/public/property/address/",
-              request_params: { address: p?.address ?? null, state: p?.state ?? null } as any,
-              http_status: null,
-              ok: false,
-              duration_ms: 0,
-              outcome: "skipped_missing_address",
-              error_code: "MISSING_INPUT",
-              error_message: "missing address or state",
-            } as any);
-            results.push({ parcel_id: item.parcel_id, ok: false, note: "missing address" });
-            continue;
-          }
-          const county = p.county_fips ? countyByFips[p.county_fips] : undefined;
-          const reqParams = {
-            address: p.address,
-            state: p.state.toUpperCase(),
-            city: county ? (p.city ?? undefined) : undefined,
-            county,
-            existingParcelId: item.parcel_id,
-          };
-
-          // Capture every HTTP call the adapter makes during this lookup.
-          const captured: any[] = [];
-          setRealieAuditSink((e) => captured.push(e));
-
+        // Reuse snapshots and suppress known misses before any metered request.
+        for (const item of [...remaining.values()]) {
+          const lookupKey = realieLookupKey(item);
           try {
-            const lookup = await lookupParcelByAddressCore(reqParams);
-
-            const { data: fresh } = await supabaseAdmin
-              .from("parcels")
-              .select("living_sqft, year_built, property_type")
-              .eq("id", lookup.parcel_id)
-              .maybeSingle();
-            const missing: string[] = [];
-            if (!fresh?.living_sqft) missing.push("living_sqft");
-            if (!fresh?.year_built) missing.push("year_built");
-            if (!fresh?.property_type) missing.push("property_type");
-            const returned = ["living_sqft", "year_built", "property_type"].filter(
-              (f) => !missing.includes(f),
-            );
-
-            const primary = captured[0] ?? {
-              endpoint: "/public/property/address/",
-              params: reqParams,
-              http_status: null,
-              ok: true,
-              duration_ms: 0,
-              error_code: null,
-              error_message: null,
-              response_sample: null,
-            };
-            await supabaseAdmin.from("realie_audit").insert({
-              parcel_id: item.parcel_id,
-              county_fips: p.county_fips ?? null,
-              endpoint: primary.endpoint,
-              request_params: primary.params as any,
-              http_status: primary.http_status,
-              ok: missing.length === 0,
-              duration_ms: primary.duration_ms,
-              outcome: missing.length === 0 ? "enriched" : "insufficient",
-              error_code: missing.length ? "INSUFFICIENT_FIELDS" : null,
-              error_message: missing.length ? `missing ${missing.join(",")}` : null,
-              fields_returned: returned,
-              fields_missing: missing.length ? missing : null,
-              response_sample:
-                lookup.parcel_id === item.parcel_id
-                  ? null
-                  : ({ matched_parcel_id: lookup.parcel_id } as any),
-            } as any);
-
-            if (missing.length) {
-              await supabaseAdmin
-                .from("enrichment_queue")
-                .update({
-                  status: "failed",
-                  attempts: item.attempts + 1,
-                  last_error: `insufficient: missing ${missing.join(",")}`,
-                  completed_at: new Date().toISOString(),
-                })
-                .eq("parcel_id", item.parcel_id);
-              results.push({
-                parcel_id: item.parcel_id,
-                ok: false,
-                note: `insufficient (${missing.join(",")})`,
+            const snapshot = await readRealieSnapshotCore({
+              parcelId: item.parcel_id,
+              lookupKey,
+            });
+            if (snapshot) {
+              await persistRealiePropertyCore(snapshot, {
+                existingParcelId: item.parcel_id,
+                fallbackState: item.state,
+                county: item.county,
+                endpoint: "cache",
+                matchMethod: "snapshot",
+                lookupKey,
+                persistSnapshot: false,
               });
+              await markEnriched(item);
               continue;
             }
+            if (await isRealieNegativeCachedCore(lookupKey)) {
+              await markFailure(item, "address not found in Realie (cached)");
+            }
+          } catch (error) {
+            await markFailure(item, String((error as Error)?.message ?? error));
+          }
+        }
 
-            await supabaseAdmin
-              .from("enrichment_queue")
-              .update({
-                status: "done",
-                attempts: item.attempts + 1,
-                last_error: null,
-                completed_at: new Date().toISOString(),
-              })
-              .eq("parcel_id", item.parcel_id);
-            results.push({ parcel_id: item.parcel_id, ok: true, note: "enriched" });
-          } catch (e: any) {
-            const msg = String(e?.message ?? e).slice(0, 500);
-            const nextAttempts = item.attempts + 1;
-            const primary = captured[0] ?? null;
-            await supabaseAdmin.from("realie_audit").insert({
-              parcel_id: item.parcel_id,
-              county_fips: p.county_fips ?? null,
-              endpoint: primary?.endpoint ?? "/public/property/address/",
-              request_params: (primary?.params ?? reqParams) as any,
-              http_status: primary?.http_status ?? null,
-              ok: false,
-              duration_ms: primary?.duration_ms ?? 0,
-              outcome: "error",
-              error_code: primary?.error_code ?? "EXCEPTION",
-              error_message: msg,
-              response_sample: primary?.response_sample ?? null,
-            } as any);
-            await supabaseAdmin
-              .from("enrichment_queue")
-              .update({
-                status: nextAttempts >= 3 ? "failed" : "pending",
-                attempts: nextAttempts,
-                last_error: msg,
-                completed_at: nextAttempts >= 3 ? new Date().toISOString() : null,
-              })
-              .eq("parcel_id", item.parcel_id);
-            results.push({ parcel_id: item.parcel_id, ok: false, note: msg });
+        let budgetExhausted = false;
+        const locationBatches = buildRealieLocationBatches([...remaining.values()]);
+        for (const locationBatch of locationBatches) {
+          const batchItems = locationBatch.requests.filter((item) => remaining.has(item.parcel_id));
+          if (batchItems.length < 2) continue;
+          const captured: RealieAuditEntry[] = [];
+          setRealieAuditSink((entry) => captured.push(entry));
+          try {
+            const properties = await realieLocationSearch({
+              latitude: locationBatch.latitude,
+              longitude: locationBatch.longitude,
+              radius: locationBatch.radius,
+              limit: 100,
+              includeUnassignedAddress: false,
+              residential: true,
+              budgetClass: "background",
+            });
+            const matches = matchRealieProperties(batchItems, properties);
+            await writeAuditEntries(captured, {
+              parcel_id: null,
+              county_fips:
+                new Set(batchItems.map((item) => item.county_fips).filter(Boolean)).size === 1
+                  ? batchItems[0].county_fips
+                  : null,
+              outcome: `batch_location_${matches.size}_of_${batchItems.length}`,
+            });
+            for (const item of batchItems) {
+              const property = matches.get(item.parcel_id) as RealieProperty | undefined;
+              if (!property) continue;
+              try {
+                await persistRealiePropertyCore(property, {
+                  existingParcelId: item.parcel_id,
+                  fallbackState: item.state,
+                  county: item.county,
+                  endpoint: "/public/property/location/",
+                  matchMethod: "location_exact_match",
+                  lookupKey: realieLookupKey(item),
+                });
+                await markEnriched(item);
+              } catch (error) {
+                await markFailure(item, String((error as Error)?.message ?? error));
+              }
+            }
+          } catch (error) {
+            await writeAuditEntries(captured, {
+              parcel_id: null,
+              county_fips: null,
+              outcome: "batch_location_error",
+            });
+            if (isBudgetExhausted(error)) {
+              budgetExhausted = true;
+              break;
+            }
+            const message = String((error as Error)?.message ?? error);
+            for (const item of batchItems) await markFailure(item, message);
           } finally {
             setRealieAuditSink(null);
           }
         }
 
-        const enriched = results.filter((r) => r.ok).length;
-        const failed = results.length - enriched;
-
-        // 5. One summary row per county in this batch (ingestion_runs requires county_fips).
-        const byCounty = new Map<string, { ok: number; fail: number }>();
-        for (const r of results) {
-          const cf = byId.get(r.parcel_id)?.county_fips;
-          if (!cf) continue;
-          const b = byCounty.get(cf) ?? { ok: 0, fail: 0 };
-          if (r.ok) b.ok++;
-          else b.fail++;
-          byCounty.set(cf, b);
+        // Exact fallback is required for singletons and location results that
+        // did not contain an exact APN/address match.
+        if (!budgetExhausted) {
+          for (const item of [...remaining.values()]) {
+            const captured: RealieAuditEntry[] = [];
+            setRealieAuditSink((entry) => captured.push(entry));
+            try {
+              await lookupParcelByAddressCore({
+                address: item.address,
+                state: item.state,
+                city: item.county ? (item.city ?? undefined) : undefined,
+                county: item.county,
+                existingParcelId: item.parcel_id,
+                underwrite: false,
+                budgetClass: "background",
+              });
+              await writeAuditEntries(captured, {
+                parcel_id: item.parcel_id,
+                county_fips: item.county_fips,
+                outcome: "exact_lookup",
+              });
+              await markEnriched(item);
+            } catch (error) {
+              await writeAuditEntries(captured, {
+                parcel_id: item.parcel_id,
+                county_fips: item.county_fips,
+                outcome: "exact_lookup_error",
+              });
+              if (isBudgetExhausted(error)) {
+                budgetExhausted = true;
+                break;
+              }
+              if (String((error as Error)?.message ?? error).match(/not found/i)) {
+                await cacheRealieMissCore(
+                  realieLookupKey(item),
+                  "address_not_found",
+                  404,
+                  item.city && !item.county
+                    ? "/public/property/search/"
+                    : "/public/property/address/",
+                );
+              }
+              await markFailure(item, String((error as Error)?.message ?? error));
+            } finally {
+              setRealieAuditSink(null);
+            }
+          }
         }
-        for (const [cf, b] of byCounty) {
-          const { error: runError } = await supabaseAdmin.from("ingestion_runs").insert({
-            county_fips: cf,
+
+        // A daily cap is normal flow. Return untouched claims to pending and do
+        // not consume their retry allowance.
+        if (budgetExhausted && remaining.size > 0) {
+          const deferredIds = [...remaining.keys()];
+          await supabaseAdmin
+            .from("enrichment_queue")
+            .update({
+              status: "pending",
+              started_at: null,
+              completed_at: null,
+              last_error: "Realie background budget exhausted",
+            })
+            .in("parcel_id", deferredIds);
+          for (const parcelId of deferredIds) {
+            results.push({
+              parcel_id: parcelId,
+              status: "deferred",
+              note: "daily budget exhausted",
+            });
+          }
+          remaining.clear();
+        }
+
+        const enriched = results.filter((result) => result.status === "enriched").length;
+        const failed = results.filter((result) => result.status === "failed").length;
+        const deferred = results.filter((result) => result.status === "deferred").length;
+
+        const countySummary = new Map<string, { ok: number; fail: number; deferred: number }>();
+        for (const result of results) {
+          const fips = workById.get(result.parcel_id)?.county_fips;
+          if (!fips) continue;
+          const summary = countySummary.get(fips) ?? { ok: 0, fail: 0, deferred: 0 };
+          if (result.status === "enriched") summary.ok++;
+          else if (result.status === "failed") summary.fail++;
+          else summary.deferred++;
+          countySummary.set(fips, summary);
+        }
+        for (const [countyFips, summary] of countySummary) {
+          await supabaseAdmin.from("ingestion_runs").insert({
+            county_fips: countyFips,
             source: "REALIE:enrichment",
-            status: b.fail === 0 ? "OK" : b.ok > 0 ? "PARTIAL" : "FAIL",
-            rows_ingested: b.ok,
+            status:
+              summary.fail === 0 && summary.deferred === 0
+                ? "OK"
+                : summary.ok > 0
+                  ? "PARTIAL"
+                  : summary.deferred > 0 && summary.fail === 0
+                    ? "DEFERRED"
+                    : "FAIL",
+            rows_ingested: summary.ok,
             started_at: startedAt,
             finished_at: new Date().toISOString(),
-            notes: `enriched ${b.ok} / failed ${b.fail}`,
+            notes: `enriched ${summary.ok} / failed ${summary.fail} / deferred ${summary.deferred}`,
           } as any);
-          if (runError)
-            throw new Error(`Failed to record Realie ingestion run: ${runError.message}`);
         }
 
-        // 6. When any parcel was successfully enriched, re-score all parcels
-        // so /deals reflects the fresh living_sqft / year_built immediately,
-        // then refresh the monitoring snapshot. Failures here are logged but
-        // do NOT fail the enrichment run itself.
+        // Score once after the complete batch. No per-parcel premium-comps
+        // calls occur in this worker.
         let rescored = 0;
-        let monitoring_refreshed = false;
+        let monitoringRefreshed = false;
         if (enriched > 0) {
           try {
             const { scoreAllCore } = await import("@/lib/ingest-core");
-            const r = await scoreAllCore();
-            rescored = r.scored ?? 0;
-          } catch (e: any) {
-            console.error("post-enrichment scoreAll failed:", e?.message ?? e);
+            const scoreResult = await scoreAllCore();
+            rescored = scoreResult.scored ?? 0;
+          } catch (error) {
+            console.error("post-enrichment scoreAll failed:", (error as Error).message);
           }
           try {
-            const origin = new URL(request.url).origin;
-            const res = await fetch(`${origin}/api/public/run-monitoring`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "x-cron-secret": process.env.CRON_SECRET!,
+            const response = await fetch(
+              `${new URL(request.url).origin}/api/public/run-monitoring`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-cron-secret": process.env.CRON_SECRET!,
+                },
+                body: "{}",
               },
-              body: "{}",
-            });
-            monitoring_refreshed = res.ok;
-          } catch (e: any) {
-            console.error("post-enrichment monitoring refresh failed:", e?.message ?? e);
+            );
+            monitoringRefreshed = response.ok;
+          } catch (error) {
+            console.error("post-enrichment monitoring refresh failed:", (error as Error).message);
           }
         }
 
@@ -310,8 +441,9 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
           processed: results.length,
           enriched,
           failed,
+          deferred,
           rescored,
-          monitoring_refreshed,
+          monitoring_refreshed: monitoringRefreshed,
           results,
         });
       },

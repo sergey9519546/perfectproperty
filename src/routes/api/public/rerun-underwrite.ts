@@ -17,7 +17,11 @@ function authorized(request: Request): boolean {
   const a = Buffer.from(secret, "utf8");
   const b = Buffer.from(header.trim(), "utf8");
   if (a.length !== b.length) return false;
-  try { return timingSafeEqual(a, b); } catch { return false; }
+  try {
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
 }
 
 export const Route = createFileRoute("/api/public/rerun-underwrite")({
@@ -41,20 +45,36 @@ export const Route = createFileRoute("/api/public/rerun-underwrite")({
           .limit(limit);
         if (error) return new Response(`List failed: ${error.message}`, { status: 500 });
 
-        let ok = 0, fail = 0;
+        let ok = 0,
+          fail = 0;
         const errors: Array<{ parcel_id: string; error: string }> = [];
         for (const r of rows ?? []) {
           try {
-            await rerunUnderwriteCore(r.parcel_id as string);
+            await rerunUnderwriteCore(r.parcel_id as string, {
+              allowPremiumComps: false,
+              budgetClass: "background",
+            });
             ok++;
           } catch (e: any) {
             fail++;
-            errors.push({ parcel_id: r.parcel_id as string, error: String(e?.message ?? e).slice(0, 300) });
+            errors.push({
+              parcel_id: r.parcel_id as string,
+              error: String(e?.message ?? e).slice(0, 300),
+            });
           }
         }
-        return new Response(JSON.stringify({ ok: true, processed: rows?.length ?? 0, succeeded: ok, failed: fail, errors: errors.slice(0, 20) }), {
-          headers: { "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            processed: rows?.length ?? 0,
+            succeeded: ok,
+            failed: fail,
+            errors: errors.slice(0, 20),
+          }),
+          {
+            headers: { "Content-Type": "application/json" },
+          },
+        );
       },
     },
   },
