@@ -20,12 +20,17 @@ export const listRankedParcels = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const supabase = context.supabase;
     // Always LIVE — fixture rows were purged 2026-07-13.
+    // Only surface deals backed by real underwriting inputs — parcels missing
+    // living_sqft or year_built get scored off defaults and collapse into
+    // identical "mock" rows. Filter them out at the source.
     let q = supabase
       .from("parcel_scores")
       .select(
         "parcel_id, perfect_score, gross_profit, risk_adjusted_profit, modeled_offer, acquisition_probability, exit_days, ring, confidence_grade, skeptic_flags, recommended_scope, reno_cost, data_source, computed_at, mc_profit_p5, mc_profit_p50, mc_p_loss, cosmetic_arv, full_reno_arv, expanded_arv, as_is_value, carry_cost, selling_cost, ead, pd_credit, lgd, risk_adjusted_profit_credit, parcels!inner(id, address, city, state, zip, lat, lng, living_sqft, year_built, bedrooms, bathrooms, condition_grade, owner_is_absentee, is_listed, is_vacant, county_fips, data_source)",
       )
       .eq("data_source", "LIVE")
+      .not("parcels.living_sqft", "is", null)
+      .not("parcels.year_built", "is", null)
       .order("perfect_score", { ascending: false })
       .limit(data.limit);
 
