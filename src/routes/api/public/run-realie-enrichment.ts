@@ -93,6 +93,7 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
         };
 
         // 4. Enrich one-by-one (Realie is per-address, no bulk endpoint).
+        const { setRealieAuditSink } = await import("@/lib/adapters/realie");
         const results: Array<{ parcel_id: string; ok: boolean; note: string }> = [];
         for (const item of items) {
           const p = byId.get(item.parcel_id);
@@ -106,22 +107,36 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
                 completed_at: new Date().toISOString(),
               })
               .eq("parcel_id", item.parcel_id);
+            await supabaseAdmin.from("realie_audit").insert({
+              parcel_id: item.parcel_id,
+              county_fips: p?.county_fips ?? null,
+              endpoint: "/public/property/address/",
+              request_params: { address: p?.address ?? null, state: p?.state ?? null } as any,
+              http_status: null,
+              ok: false,
+              duration_ms: 0,
+              outcome: "skipped_missing_address",
+              error_code: "MISSING_INPUT",
+              error_message: "missing address or state",
+            } as any);
             results.push({ parcel_id: item.parcel_id, ok: false, note: "missing address" });
             continue;
           }
-          try {
-            const county = p.county_fips ? countyByFips[p.county_fips] : undefined;
-            await lookupParcelByAddressCore({
-              address: p.address,
-              state: p.state.toUpperCase(),
-              // Only pass city when we also have a county (Realie requires both).
-              city: county ? (p.city ?? undefined) : undefined,
-              county,
-            });
+          const county = p.county_fips ? countyByFips[p.county_fips] : undefined;
+          const reqParams = {
+            address: p.address,
+            state: p.state.toUpperCase(),
+            city: county ? (p.city ?? undefined) : undefined,
+            county,
+          };
 
-            // Contract check: after Realie writes + underwrite runs, the
-            // parcel must have every REQUIRED field. If any is still null
-            // we treat the enrichment as insufficient — no partial win.
+          // Capture every HTTP call the adapter makes during this lookup.
+          const captured: any[] = [];
+          setRealieAuditSink((e) => captured.push(e));
+
+          try {
+            await lookupParcelByAddressCore(reqParams);
+
             const { data: fresh } = await supabaseAdmin
               .from("parcels")
               .select("living_sqft, year_built, property_type")
@@ -130,6 +145,27 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
             if (!fresh?.living_sqft) missing.push("living_sqft");
             if (!fresh?.year_built) missing.push("year_built");
             if (!fresh?.property_type) missing.push("property_type");
+            const returned = ["living_sqft", "year_built", "property_type"].filter((f) => !missing.includes(f));
+
+            const primary = captured[0] ?? {
+              endpoint: "/public/property/address/",
+              params: reqParams, http_status: null, ok: true, duration_ms: 0,
+              error_code: null, error_message: null, response_sample: null,
+            };
+            await supabaseAdmin.from("realie_audit").insert({
+              parcel_id: item.parcel_id,
+              county_fips: p.county_fips ?? null,
+              endpoint: primary.endpoint,
+              request_params: primary.params as any,
+              http_status: primary.http_status,
+              ok: missing.length === 0,
+              duration_ms: primary.duration_ms,
+              outcome: missing.length === 0 ? "enriched" : "insufficient",
+              error_code: missing.length ? "INSUFFICIENT_FIELDS" : null,
+              error_message: missing.length ? `missing ${missing.join(",")}` : null,
+              fields_returned: returned,
+              fields_missing: missing.length ? missing : null,
+            } as any);
 
             if (missing.length) {
               await supabaseAdmin
@@ -158,6 +194,20 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
           } catch (e: any) {
             const msg = String(e?.message ?? e).slice(0, 500);
             const nextAttempts = item.attempts + 1;
+            const primary = captured[0] ?? null;
+            await supabaseAdmin.from("realie_audit").insert({
+              parcel_id: item.parcel_id,
+              county_fips: p.county_fips ?? null,
+              endpoint: primary?.endpoint ?? "/public/property/address/",
+              request_params: (primary?.params ?? reqParams) as any,
+              http_status: primary?.http_status ?? null,
+              ok: false,
+              duration_ms: primary?.duration_ms ?? 0,
+              outcome: "error",
+              error_code: primary?.error_code ?? "EXCEPTION",
+              error_message: msg,
+              response_sample: primary?.response_sample ?? null,
+            } as any);
             await supabaseAdmin
               .from("enrichment_queue")
               .update({
@@ -168,8 +218,11 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
               })
               .eq("parcel_id", item.parcel_id);
             results.push({ parcel_id: item.parcel_id, ok: false, note: msg });
+          } finally {
+            setRealieAuditSink(null);
           }
         }
+
 
         const enriched = results.filter((r) => r.ok).length;
         const failed = results.length - enriched;
@@ -195,13 +248,43 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
           } as any);
         }
 
+        // 6. When any parcel was successfully enriched, re-score all parcels
+        // so /deals reflects the fresh living_sqft / year_built immediately,
+        // then refresh the monitoring snapshot. Failures here are logged but
+        // do NOT fail the enrichment run itself.
+        let rescored = 0;
+        let monitoring_refreshed = false;
+        if (enriched > 0) {
+          try {
+            const { scoreAllCore } = await import("@/lib/ingest-core");
+            const r = await scoreAllCore();
+            rescored = r.scored ?? 0;
+          } catch (e: any) {
+            console.error("post-enrichment scoreAll failed:", e?.message ?? e);
+          }
+          try {
+            const origin = new URL(request.url).origin;
+            const res = await fetch(`${origin}/api/public/run-monitoring`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", apikey: expectedKey! },
+              body: "{}",
+            });
+            monitoring_refreshed = res.ok;
+          } catch (e: any) {
+            console.error("post-enrichment monitoring refresh failed:", e?.message ?? e);
+          }
+        }
+
         return Response.json({
           ok: failed === 0,
           processed: results.length,
           enriched,
           failed,
+          rescored,
+          monitoring_refreshed,
           results,
         });
+
       },
     },
   },

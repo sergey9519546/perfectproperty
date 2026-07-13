@@ -1093,6 +1093,68 @@ export type Database = {
         }
         Relationships: []
       }
+      realie_audit: {
+        Row: {
+          county_fips: string | null
+          created_at: string
+          duration_ms: number | null
+          endpoint: string
+          error_code: string | null
+          error_message: string | null
+          fields_missing: string[] | null
+          fields_returned: string[] | null
+          http_status: number | null
+          id: string
+          ok: boolean
+          outcome: string
+          parcel_id: string | null
+          request_params: Json
+          response_sample: Json | null
+        }
+        Insert: {
+          county_fips?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          endpoint: string
+          error_code?: string | null
+          error_message?: string | null
+          fields_missing?: string[] | null
+          fields_returned?: string[] | null
+          http_status?: number | null
+          id?: string
+          ok?: boolean
+          outcome: string
+          parcel_id?: string | null
+          request_params?: Json
+          response_sample?: Json | null
+        }
+        Update: {
+          county_fips?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          endpoint?: string
+          error_code?: string | null
+          error_message?: string | null
+          fields_missing?: string[] | null
+          fields_returned?: string[] | null
+          http_status?: number | null
+          id?: string
+          ok?: boolean
+          outcome?: string
+          parcel_id?: string | null
+          request_params?: Json
+          response_sample?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "realie_audit_parcel_id_fkey"
+            columns: ["parcel_id"]
+            isOneToOne: false
+            referencedRelation: "parcels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales: {
         Row: {
           address: string | null

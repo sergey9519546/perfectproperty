@@ -60,6 +60,28 @@ export interface RealieComp {
 
 const BASE = "https://app.realie.ai/api";
 
+/**
+ * Optional audit sink. Callers (e.g. the nightly enrichment endpoint) can
+ * register a hook via `setRealieAuditSink` to capture every HTTP call —
+ * endpoint, request params, response code, duration, and normalized error.
+ * Kept as a module-level mutable ref for Worker compatibility (no
+ * AsyncLocalStorage required). Callers should set/clear per invocation.
+ */
+export type RealieAuditEntry = {
+  endpoint: string;
+  params: Record<string, unknown>;
+  http_status: number | null;
+  ok: boolean;
+  duration_ms: number;
+  error_code: string | null;
+  error_message: string | null;
+  response_sample: unknown | null;
+};
+let auditSink: ((e: RealieAuditEntry) => void) | null = null;
+export function setRealieAuditSink(fn: ((e: RealieAuditEntry) => void) | null) {
+  auditSink = fn;
+}
+
 async function call<T>(path: string, params: Record<string, string | number | undefined>): Promise<T> {
   const key = process.env.REALIE_API_KEY;
   if (!key) throw new Error("REALIE_API_KEY is not configured");
@@ -71,20 +93,58 @@ async function call<T>(path: string, params: Record<string, string | number | un
   const url = `${BASE}${path}${q.toString() ? `?${q}` : ""}`;
   const { retryWithBackoff } = await import("@/lib/retry");
   return retryWithBackoff(async () => {
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { Authorization: key, Accept: "application/json" },
-    });
-    const text = await res.text();
+    const started = Date.now();
+    let status: number | null = null;
     let body: any = null;
-    try { body = text ? JSON.parse(text) : null; } catch { body = { raw: text }; }
-    if (!res.ok) {
-      const msg = body?.error ?? res.statusText ?? `HTTP ${res.status}`;
-      throw new Error(`Realie ${res.status}: ${msg}`);
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        headers: { Authorization: key, Accept: "application/json" },
+      });
+      status = res.status;
+      const text = await res.text();
+      try { body = text ? JSON.parse(text) : null; } catch { body = { raw: text }; }
+      if (!res.ok) {
+        const msg = body?.error ?? res.statusText ?? `HTTP ${res.status}`;
+        const err = new Error(`Realie ${res.status}: ${msg}`);
+        (err as any).status = res.status;
+        throw err;
+      }
+      if (auditSink) {
+        try {
+          auditSink({
+            endpoint: path,
+            params,
+            http_status: status,
+            ok: true,
+            duration_ms: Date.now() - started,
+            error_code: null,
+            error_message: null,
+            response_sample: null,
+          });
+        } catch { /* never let audit break the call */ }
+      }
+      return body as T;
+    } catch (e: any) {
+      if (auditSink) {
+        try {
+          auditSink({
+            endpoint: path,
+            params,
+            http_status: status,
+            ok: false,
+            duration_ms: Date.now() - started,
+            error_code: status ? `HTTP_${status}` : "NETWORK",
+            error_message: String(e?.message ?? e).slice(0, 500),
+            response_sample: body && typeof body === "object" ? body : null,
+          });
+        } catch { /* swallow */ }
+      }
+      throw e;
     }
-    return body as T;
   }, { retries: 3, baseMs: 500 });
 }
+
 
 export async function realieLookupAddress(args: {
   address: string;
