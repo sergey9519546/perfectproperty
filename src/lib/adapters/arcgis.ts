@@ -41,12 +41,27 @@ export async function arcgisQuery(baseUrl: string, opts: ArcGISQueryOpts = {}): 
     params.set("spatialRel", "esriSpatialRelIntersects");
   }
   const url = `${baseUrl}/query?${params.toString()}`;
-  const res = await fetch(url, { headers: { "user-agent": "PerfectPropertyEngine/1.0" } });
-  if (!res.ok) throw new Error(`ArcGIS ${res.status}: ${await res.text().catch(() => "")}`);
-  const json = await res.json();
-  if (json.error) throw new Error(`ArcGIS ${json.error.code}: ${json.error.message}`);
+
+  // Try direct first — cheap, no Zyte credit burn.
+  let json: any;
+  try {
+    const res = await fetch(url, { headers: { "user-agent": "PerfectPropertyEngine/1.0" } });
+    if (!res.ok) throw new Error(`ArcGIS ${res.status}: ${await res.text().catch(() => "")}`);
+    json = await res.json();
+    if (json?.error) throw new Error(`ArcGIS ${json.error.code}: ${json.error.message}`);
+  } catch (directErr) {
+    // Fallback through Zyte extraction (bypasses IP blocks / anti-bot).
+    // Only fires when ZYTE_API_KEY is set; otherwise we rethrow the original.
+    const { zyteFetchLike, zyteEnabled } = await import("@/lib/zyte.server");
+    if (!zyteEnabled()) throw directErr;
+    const z = await zyteFetchLike(url);
+    if (!z.ok) throw new Error(`ArcGIS direct failed (${(directErr as Error).message}); Zyte fallback: ${z._note}`);
+    json = await z.json();
+    if (json?.error) throw new Error(`ArcGIS ${json.error.code}: ${json.error.message}`);
+  }
   return json.features ?? [];
 }
+
 
 // Centroid from ring geometry (polygon parcels)
 export function featureCentroid(f: ArcGISFeature): { lat: number; lng: number } | null {

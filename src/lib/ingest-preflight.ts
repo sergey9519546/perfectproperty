@@ -25,22 +25,35 @@ export interface PreflightResult {
 async function pingUrl(url: string): Promise<{ ok: boolean; note: string }> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  const sep = url.includes("?") ? "&" : "?";
+  const probeUrl = url.includes("arcgis")
+    ? `${url}${sep}where=1%3D1&returnCountOnly=true&f=json`
+    : `${url}${sep}$limit=1`;
   try {
-    // ArcGIS + Socrata both answer to GET with query string; a cheap probe with
-    // limit=1 works better than HEAD (many portals reject HEAD).
-    const sep = url.includes("?") ? "&" : "?";
-    const probeUrl = url.includes("arcgis")
-      ? `${url}${sep}where=1%3D1&returnCountOnly=true&f=json`
-      : `${url}${sep}$limit=1`;
     const res = await fetch(probeUrl, { method: "GET", signal: ctrl.signal });
-    if (!res.ok) return { ok: false, note: `HTTP ${res.status}` };
-    return { ok: true, note: "OK" };
+    if (res.ok) return { ok: true, note: "OK" };
+    // Direct failed — try Zyte as a second opinion before tripping the breaker.
+    const { zyteFetchLike, zyteEnabled } = await import("@/lib/zyte.server");
+    if (zyteEnabled()) {
+      const z = await zyteFetchLike(probeUrl);
+      if (z.ok) return { ok: true, note: `OK via zyte (direct ${res.status})` };
+      return { ok: false, note: `HTTP ${res.status}; zyte ${z._note}` };
+    }
+    return { ok: false, note: `HTTP ${res.status}` };
   } catch (e: any) {
-    return { ok: false, note: String(e?.message ?? e).slice(0, 200) };
+    const directNote = String(e?.message ?? e).slice(0, 200);
+    const { zyteFetchLike, zyteEnabled } = await import("@/lib/zyte.server");
+    if (zyteEnabled()) {
+      const z = await zyteFetchLike(probeUrl);
+      if (z.ok) return { ok: true, note: `OK via zyte (direct: ${directNote})` };
+      return { ok: false, note: `${directNote}; zyte ${z._note}` };
+    }
+    return { ok: false, note: directNote };
   } finally {
     clearTimeout(t);
   }
 }
+
 
 export async function checkSource(src: CountySource): Promise<PreflightResult> {
   if (!src.parcels) return { ok: false, status: "red", tripped: true, note: "No parcel source configured" };
