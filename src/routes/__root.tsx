@@ -113,25 +113,27 @@ function RootComponent() {
 }
 
 function TopNav() {
-  const links: { to: string; label: string; hint: string }[] = [
-    { to: "/", label: "Map", hint: "See every scored property on a live map" },
+  const primary: { to: string; label: string; hint: string }[] = [
+    { to: "/", label: "Map", hint: "Every scored property on a live map" },
     { to: "/deals", label: "Deals", hint: "Ranked list of the best properties to buy" },
-    { to: "/shadow", label: "Off-Market", hint: "Owners likely to sell, but not yet listed" },
-    { to: "/prophecy", label: "Predicted", hint: "Properties we expect to hit the market soon" },
-    { to: "/accuracy", label: "Model Accuracy", hint: "How close our predictions have been to reality" },
-    { to: "/monitoring", label: "Portfolio Health", hint: "Overall risk and performance of the book" },
-    { to: "/admin", label: "Data Sources", hint: "Pull in new counties and refresh data" },
-    { to: "/admin/health", label: "Health", hint: "Ingestion health, failures, and source rings" },
+  ];
+  const more: { to: string; label: string; hint: string; group: "signals" | "insight" | "operator" }[] = [
+    { to: "/shadow", label: "Off-Market", hint: "Owners likely to sell, but not yet listed", group: "signals" },
+    { to: "/prophecy", label: "Predicted", hint: "Properties we expect to hit the market soon", group: "signals" },
+    { to: "/accuracy", label: "Model Accuracy", hint: "How close our predictions have been to reality", group: "insight" },
+    { to: "/monitoring", label: "Portfolio Health", hint: "Overall risk and performance of the book", group: "insight" },
+    { to: "/admin", label: "Data Sources", hint: "Pull in new counties and refresh data", group: "operator" },
+    { to: "/admin/health", label: "Ingest Health", hint: "Failures, source rings, spider jobs", group: "operator" },
   ];
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-8 px-6">
+      <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-6 px-6">
         <Link to="/" className="flex items-center gap-2.5">
           <div className="h-2.5 w-2.5 rounded-full bg-opportunity opp-pulse text-opportunity" />
           <span className="text-[14px] font-semibold tracking-wide">Perfect Property</span>
         </Link>
         <nav className="flex items-center gap-1 text-[14px]">
-          {links.map((l) => (
+          {primary.map((l) => (
             <Link
               key={l.to}
               to={l.to}
@@ -143,10 +145,46 @@ function TopNav() {
               {l.label}
             </Link>
           ))}
+          <DropdownMenu>
+            <DropdownMenuTrigger className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:bg-surface hover:text-foreground data-[state=open]:bg-surface data-[state=open]:text-foreground">
+              More <ChevronDown className="h-3.5 w-3.5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-64">
+              <DropdownMenuLabel className="text-[11px] font-normal uppercase tracking-wider text-muted-foreground">Signals</DropdownMenuLabel>
+              {more.filter((m) => m.group === "signals").map((m) => (
+                <DropdownMenuItem key={m.to} asChild>
+                  <Link to={m.to} className="flex flex-col items-start">
+                    <span className="text-sm">{m.label}</span>
+                    <span className="text-[11px] text-muted-foreground">{m.hint}</span>
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-[11px] font-normal uppercase tracking-wider text-muted-foreground">Insight</DropdownMenuLabel>
+              {more.filter((m) => m.group === "insight").map((m) => (
+                <DropdownMenuItem key={m.to} asChild>
+                  <Link to={m.to} className="flex flex-col items-start">
+                    <span className="text-sm">{m.label}</span>
+                    <span className="text-[11px] text-muted-foreground">{m.hint}</span>
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-[11px] font-normal uppercase tracking-wider text-muted-foreground">Operator</DropdownMenuLabel>
+              {more.filter((m) => m.group === "operator").map((m) => (
+                <DropdownMenuItem key={m.to} asChild>
+                  <Link to={m.to} className="flex flex-col items-start">
+                    <span className="text-sm">{m.label}</span>
+                    <span className="text-[11px] text-muted-foreground">{m.hint}</span>
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </nav>
         <div className="ml-auto flex items-center gap-2 text-[12px] text-muted-foreground">
           <span className="h-1.5 w-1.5 rounded-full bg-profit-strong" />
-          <span>Updated nightly · CA + FL pilot</span>
+          <span>Updated nightly</span>
         </div>
       </div>
     </header>
