@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.recompute_scrape_priorities() FROM PUBLIC, anon, authenticated;
