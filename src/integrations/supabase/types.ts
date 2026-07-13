@@ -356,6 +356,50 @@ export type Database = {
           },
         ]
       }
+      enrichment_queue: {
+        Row: {
+          attempts: number
+          completed_at: string | null
+          last_error: string | null
+          parcel_id: string
+          priority: number
+          reason: string
+          requested_at: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          completed_at?: string | null
+          last_error?: string | null
+          parcel_id: string
+          priority?: number
+          reason: string
+          requested_at?: string
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          completed_at?: string | null
+          last_error?: string | null
+          parcel_id?: string
+          priority?: number
+          reason?: string
+          requested_at?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrichment_queue_parcel_id_fkey"
+            columns: ["parcel_id"]
+            isOneToOne: true
+            referencedRelation: "parcels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ingestion_failures: {
         Row: {
           county_fips: string | null
@@ -1091,6 +1135,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      enqueue_enrichment_for_parcel: {
+        Args: { _parcel_id: string; _priority?: number; _reason: string }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1121,6 +1169,12 @@ export type Database = {
       }
       normalize_address: { Args: { _addr: string }; Returns: string }
       normalize_address_full: { Args: { _addr: string }; Returns: string }
+      parcels_with_active_trigger: {
+        Args: { _days?: number }
+        Returns: {
+          parcel_id: string
+        }[]
+      }
       pick_comps: {
         Args: {
           max_km?: number
