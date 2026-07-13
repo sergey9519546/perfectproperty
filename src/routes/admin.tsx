@@ -600,12 +600,13 @@ function AdminPage() {
               <div className="text-[11px] text-muted-foreground">Linked to parcels: {(sales.data?.linked_to_parcels ?? 0).toLocaleString()}</div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Demo (FIXTURE) parcels</div>
-              <div className="mt-1 text-2xl font-semibold text-muted-foreground">
-                {(cov.data?.total_fixture_parcels ?? 0).toLocaleString()}
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Scored parcels</div>
+              <div className="mt-1 text-2xl font-semibold text-primary">
+                {(cov.data?.live_totals?.scored ?? 0).toLocaleString()}
               </div>
-              <div className="text-[11px] text-muted-foreground">Hidden from /deals by default</div>
+              <div className="text-[11px] text-muted-foreground">Underwritten by the engine.</div>
             </div>
+
             <div>
               <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Graded predictions</div>
               <div className="mt-1 text-2xl font-semibold">{(cov.data?.accuracy?.total ?? 0).toLocaleString()}</div>
@@ -623,8 +624,7 @@ function AdminPage() {
               <thead className="bg-surface-2 text-[10px] uppercase tracking-widest text-muted-foreground">
                 <tr>
                   <th className="px-4 py-2 text-left">County</th>
-                  <th className="px-4 py-2 text-right">Live</th>
-                  <th className="px-4 py-2 text-right">Fixture</th>
+                  <th className="px-4 py-2 text-right">Parcels</th>
                   <th className="px-4 py-2 text-left">Last ingest</th>
                 </tr>
               </thead>
@@ -633,14 +633,14 @@ function AdminPage() {
                   <tr key={c.fips} className="border-t border-border">
                     <td className="px-4 py-2">{c.state} · {c.name}</td>
                     <td className="num px-4 py-2 text-right text-profit-strong">{(c.live_parcels ?? 0).toLocaleString()}</td>
-                    <td className="num px-4 py-2 text-right text-muted-foreground">{(c.fixture_parcels ?? 0).toLocaleString()}</td>
                     <td className="num px-4 py-2 text-muted-foreground text-[11px]">{c.last_ingested_at ? new Date(c.last_ingested_at).toLocaleString() : "—"}</td>
                   </tr>
                 ))}
                 {(cov.data?.counties.length ?? 0) === 0 && (
-                  <tr><td colSpan={4} className="px-4 py-6 text-center text-muted-foreground text-sm">No counties yet — click Scan live sources.</td></tr>
+                  <tr><td colSpan={3} className="px-4 py-6 text-center text-muted-foreground text-sm">No counties yet — click Scan live sources.</td></tr>
                 )}
               </tbody>
+
             </table>
           </div>
         </section>
