@@ -147,8 +147,103 @@ function HealthView() {
         </div>
       </section>
 
+      <OrchestratorPanel />
       <ZytePanel />
     </div>
+  );
+}
+
+function OrchestratorPanel() {
+  const fn = useServerFn(getOrchestratorStats);
+  const q = useQuery({
+    queryKey: ["orchestrator-stats"],
+    queryFn: () => fn(),
+    refetchInterval: 60_000,
+  });
+  if (q.isLoading || !q.data) return null;
+  const d = q.data as any;
+  const cfg = d.config ?? {};
+  const today = d.today ?? {};
+  const spend = Number(today.zyte_spent_usd ?? 0);
+  const budget = Number(cfg.zyte_daily_budget_usd ?? 25);
+  const pctUsed = budget > 0 ? Math.min(100, (spend / budget) * 100) : 0;
+
+  const counties = Object.keys(d.coverage_matrix ?? {}).sort();
+  const sourceKinds = Array.from(new Set(
+    counties.flatMap((c: string) => Object.keys(d.coverage_matrix[c] ?? {})),
+  )).sort();
+
+  return (
+    <section className="rounded-lg border border-border bg-surface p-4">
+      <div className="flex items-baseline justify-between">
+        <div>
+          <h2 className="text-sm font-semibold">Scrapy orchestrator</h2>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Priority-weighted target queue. Scrapy pulls from{" "}
+            <code className="rounded bg-surface-2 px-1">/api/public/next-scrape-targets</code>{" "}
+            and reports back to{" "}
+            <code className="rounded bg-surface-2 px-1">/api/public/scrape-run-complete</code>.
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-5">
+        <Card title="Zyte spend today" value={`$${spend.toFixed(2)}`} sub={`of $${budget.toFixed(0)} budget`} />
+        <Card title="Requests today" value={Number(today.requests_made ?? 0).toLocaleString()} />
+        <Card title="Triggers produced" value={Number(today.triggers_produced ?? 0).toLocaleString()} sub="distress+listing rows" />
+        <Card title="Blocked runs" value={Number(today.blocks ?? 0).toLocaleString()} />
+        <Card title="Targets tracked" value={(d.targets ?? []).length.toLocaleString()} />
+      </div>
+      <div className="mt-3 h-1.5 w-full overflow-hidden rounded bg-surface-2">
+        <div
+          className={`h-full ${pctUsed >= 90 ? "bg-destructive" : pctUsed >= 60 ? "bg-amber-400" : "bg-profit-strong"}`}
+          style={{ width: `${pctUsed}%` }}
+        />
+      </div>
+
+      {counties.length > 0 && (
+        <div className="mt-4">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            Coverage matrix — hours since last success (blank = never)
+          </div>
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full text-[11px]">
+              <thead className="text-left text-muted-foreground">
+                <tr>
+                  <th className="pb-2 pr-3">County</th>
+                  {sourceKinds.map((k) => <th key={k} className="pb-2 pr-3 text-right">{k}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {counties.slice(0, 20).map((c) => (
+                  <tr key={c} className="border-t border-border/40">
+                    <td className="py-1.5 pr-3 font-mono">{c}</td>
+                    {sourceKinds.map((k) => {
+                      const h = d.coverage_matrix[c]?.[k];
+                      const color = h == null ? "text-destructive"
+                        : h < 24 ? "text-profit-strong"
+                        : h < 168 ? "text-amber-400"
+                        : "text-destructive";
+                      return (
+                        <td key={k} className={`py-1.5 pr-3 text-right num ${color}`}>
+                          {h == null ? "—" : h < 24 ? `${h.toFixed(1)}h` : `${(h / 24).toFixed(1)}d`}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {(d.targets ?? []).length === 0 && (
+        <div className="mt-4 rounded-md border border-amber-400/30 bg-amber-400/5 p-3 text-[11px] text-muted-foreground">
+          No scrape targets configured yet. Seed <code>public.scrape_targets</code> with county × source_kind rows
+          so the orchestrator has something to hand out.
+        </div>
+      )}
+    </section>
   );
 }
 
