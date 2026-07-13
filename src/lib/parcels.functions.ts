@@ -11,7 +11,6 @@ const ListInput = z.object({
   min_score: z.number().optional(),
   min_profit: z.number().optional(),
   max_offer: z.number().optional(),
-  include_fixture: z.boolean().default(false),
   limit: z.number().int().max(500).default(100),
 });
 
@@ -20,15 +19,16 @@ export const listRankedParcels = createServerFn({ method: "POST" })
   .validator((data: unknown) => ListInput.parse(data ?? {}))
   .handler(async ({ data, context }) => {
     const supabase = context.supabase;
+    // Always LIVE — fixture rows were purged 2026-07-13.
     let q = supabase
       .from("parcel_scores")
       .select(
         "parcel_id, perfect_score, gross_profit, risk_adjusted_profit, modeled_offer, acquisition_probability, exit_days, ring, confidence_grade, skeptic_flags, recommended_scope, reno_cost, data_source, computed_at, mc_profit_p5, mc_profit_p50, mc_p_loss, cosmetic_arv, full_reno_arv, expanded_arv, as_is_value, carry_cost, selling_cost, ead, pd_credit, lgd, risk_adjusted_profit_credit, parcels!inner(id, address, city, state, zip, lat, lng, living_sqft, year_built, bedrooms, bathrooms, condition_grade, owner_is_absentee, is_listed, is_vacant, county_fips, data_source)",
       )
+      .eq("data_source", "LIVE")
       .order("perfect_score", { ascending: false })
       .limit(data.limit);
 
-    if (!data.include_fixture) q = q.eq("data_source", "LIVE");
     if (data.ring) q = q.eq("ring", data.ring);
     if (data.min_score !== undefined) q = q.gte("perfect_score", data.min_score);
     if (data.min_profit !== undefined) q = q.gte("gross_profit", data.min_profit);
@@ -39,6 +39,7 @@ export const listRankedParcels = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return rows ?? [];
   });
+
 
 export const getDossier = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -87,16 +88,14 @@ export const getCoverage = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
   const supabase = context.supabase;
-  const [counties, runs, scores, outcomes, liveByCounty, fixtureByCounty] = await Promise.all([
+  const [counties, runs, scores, outcomes, liveByCounty] = await Promise.all([
     supabase.from("counties").select("*").order("state").order("name"),
     supabase.from("ingestion_runs").select("*").order("started_at", { ascending: false }).limit(30),
-    supabase.from("parcel_scores").select("perfect_score, ring, confidence_grade, data_source"),
+    supabase.from("parcel_scores").select("perfect_score, ring, confidence_grade, data_source").eq("data_source", "LIVE"),
     supabase.from("prediction_outcomes").select("outcome, error_pct, predicted_profit, actual_profit"),
     supabase.from("parcels").select("county_fips").eq("data_source", "LIVE"),
-    supabase.from("parcels").select("county_fips").eq("data_source", "FIXTURE"),
   ]);
-  const s = (scores.data ?? []) as any[];
-  const sLive = s.filter((x: any) => x.data_source === "LIVE");
+  const sLive = (scores.data ?? []) as any[];
   const tiers = {
     exceptional: sLive.filter((x: any) => x.perfect_score >= 80).length,
     strong: sLive.filter((x: any) => x.perfect_score >= 65 && x.perfect_score < 80).length,
@@ -109,13 +108,10 @@ export const getCoverage = createServerFn({ method: "GET" })
     r3: sLive.filter((x: any) => x.ring === 3).length,
   };
   const liveCounts: Record<string, number> = {};
-  const fxCounts: Record<string, number> = {};
   for (const r of (liveByCounty.data ?? []) as any[]) liveCounts[r.county_fips] = (liveCounts[r.county_fips] ?? 0) + 1;
-  for (const r of (fixtureByCounty.data ?? []) as any[]) fxCounts[r.county_fips] = (fxCounts[r.county_fips] ?? 0) + 1;
   const countiesEnriched = (counties.data ?? []).map((c: any) => ({
     ...c,
     live_parcels: liveCounts[c.fips] ?? 0,
-    fixture_parcels: fxCounts[c.fips] ?? 0,
   }));
 
   const o = (outcomes.data ?? []) as any[];
@@ -131,7 +127,6 @@ export const getCoverage = createServerFn({ method: "GET" })
     tiers,
     rings,
     total_parcels: sLive.length,
-    total_fixture_parcels: s.length - sLive.length,
     live_totals: { parcels: (liveByCounty.data ?? []).length, scored: sLive.length },
     accuracy: {
       total: o.length,
@@ -144,3 +139,4 @@ export const getCoverage = createServerFn({ method: "GET" })
     outcomes: o,
   };
 });
+

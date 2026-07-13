@@ -35,10 +35,9 @@ export const Route = createFileRoute("/deals")({
 function DealsPage() {
   const listFn = useServerFn(listRankedParcels);
   const [selected, setSelected] = useState<string | null>(null);
-  const [includeFixture, setIncludeFixture] = useState(false);
   const q = useQuery({
-    queryKey: ["ranked-all", includeFixture],
-    queryFn: () => listFn({ data: { limit: 500, include_fixture: includeFixture } }),
+    queryKey: ["ranked-all"],
+    queryFn: () => listFn({ data: { limit: 500 } }),
   });
   return (
     <>
@@ -51,15 +50,12 @@ function DealsPage() {
         <HelpStrip />
 
         <div className="mt-4 flex flex-wrap items-center gap-3 text-[13px]">
-          <label className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-1.5">
-            <input type="checkbox" checked={includeFixture} onChange={(e) => setIncludeFixture(e.target.checked)} />
-            Include demo data
-          </label>
           <span className="text-muted-foreground">
-            Showing <span className="font-semibold text-foreground">{q.data?.length ?? 0}</span> {includeFixture ? "properties (live + demo)" : "live properties"}
+            Showing <span className="font-semibold text-foreground">{q.data?.length ?? 0}</span> live scored properties
           </span>
         </div>
         <RealieLookup onCreated={(id) => setSelected(id)} />
+
         <BulkLookupPanel />
         <StressPanel rows={q.data ?? []} />
         <div className="mt-6 overflow-hidden rounded-lg border border-border bg-surface">
