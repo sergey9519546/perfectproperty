@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { CheckCircle } from "@phosphor-icons/react";
 import { useNavigate } from "@tanstack/react-router";
@@ -34,6 +34,7 @@ export function MarketWorkspace() {
   const [selected, setSelected] = useState<Market | null>(markets[0]);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
 
   const filteredMarkets = useMemo(
     () =>
@@ -48,10 +49,13 @@ export function MarketWorkspace() {
   );
 
   useEffect(() => {
-    if (filteredMarkets.length && selected && !filteredMarkets.some((market) => market.id === selected.id)) {
+    if (!filteredMarkets.length) {
+      setSelected(null);
+      return;
+    }
+    if (!selected || !filteredMarkets.some((market) => market.id === selected.id)) {
       setSelected(filteredMarkets[0]);
     }
-    if (!filteredMarkets.length) setSelected(null);
   }, [filteredMarkets, selected]);
 
   useEffect(() => {
@@ -65,10 +69,21 @@ export function MarketWorkspace() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  const notify = (message: string) => {
+  useEffect(
+    () => () => {
+      if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
+    },
+    [],
+  );
+
+  const notify = useCallback((message: string) => {
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current);
     setToast(message);
-    window.setTimeout(() => setToast(null), 2600);
-  };
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 2600);
+  }, []);
 
   const selectFromDeal = (marketName: string) => {
     const [name] = marketName.split(",");
@@ -95,6 +110,7 @@ export function MarketWorkspace() {
     <div className="perfect-property-ui app-shell min-h-[100dvh] bg-[#01070c] text-[#f3f6f8]">
       <TopBar
         onHome={() => void navigate({ to: "/" })}
+        onAccount={() => void navigate({ to: "/auth", search: { next: "/workspace" } })}
         onOpenPalette={() => setPaletteOpen(true)}
         onExport={() => notify("Investment brief exported")}
       />
@@ -138,6 +154,9 @@ export function MarketWorkspace() {
       <AnimatePresence>
         {toast ? (
           <motion.div
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
             initial={{ opacity: 0, y: 14, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8 }}

@@ -48,7 +48,9 @@ export const EPS = 1e-9;
 
 export const ln_safe = (x: number) => Math.log(Math.max(x, EPS));
 export const sqrt_safe = (v: number) => Math.sqrt(Math.max(v, 0));
-export const div_safe = (a: number, b: number) => a / Math.max(Math.abs(b), EPS);
+// Sign-preserving: clamp denom in the SAME direction as b so div_safe(1, -2) = -0.5, not +0.5.
+export const div_safe = (a: number, b: number) =>
+  a / (b === 0 ? EPS : b >= 0 ? Math.max(b, EPS) : Math.min(b, -EPS));
 export const clip01 = (p: number) => Math.min(1, Math.max(0, p));
 export const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
 export const positive = (x: number) => Math.max(x, EPS);
@@ -112,6 +114,16 @@ export function median(xs: number[]): number {
   return s.length % 2 ? s[m] : 0.5 * (s[m - 1] + s[m]);
 }
 
+// Type-7 quantile (linear interpolation, default in numpy/R/Excel).
+// Replaces the old floor((p*n)) convention that was systematically 0.5&ndash;1 draw high.
+// h = (n-1)*p;     result = sorted[&lfloor;h&rfloor;] + (h&minus;&lfloor;h&rfloor;)*(sorted[&lceil;h&rceil;]-sorted[&lfloor;h&rfloor;])
+export function quantileInterp(sorted: number[], p: number, n: number = sorted.length): number {
+  if (!n) return 0;
+  const h = (n - 1) * p;
+  const lo = Math.floor(h);
+  const hi = Math.min(n - 1, lo + 1);
+  return sorted[lo] + (h - lo) * (sorted[hi] - sorted[lo]);
+}
 export function madFilterIndices(adjPrice: number[], threshold = 3): number[] {
   if (adjPrice.length === 0) return [];
   const med = median(adjPrice);
@@ -195,10 +207,23 @@ export function hedonicAdjustLog(
 // 0E.3.4  ARV point (weighted median) + split-conformal log-space interval
 // =============================================================================
 export function weightedMedian(values: number[], weights: number[]): number {
+  // Return the weight-carrying median; for even-N splits, linearly interpolate
+  // between the two straddling values (was picking lower, now unbiased).
   const idx = values.map((_, i) => i).sort((a, b) => values[a] - values[b]);
   const W = weights.reduce((a, b) => a + b, 0);
+  if (W <= 0) return values.length ? values[0] : 0;
   let acc = 0;
-  for (const i of idx) { acc += weights[i]; if (acc >= W / 2) return values[i]; }
+  for (let k = 0; k < idx.length; k++) {
+    const w = weights[idx[k]];
+    if (w <= 0) continue;
+    acc += w;
+    // If we have straddled the 50% mark exactly AND have a next value,
+    // interpolate between the current and the next.
+    if (acc === W / 2 && k + 1 < idx.length) {
+      return 0.5 * (values[idx[k]] + values[idx[k + 1]]);
+    }
+    if (acc >= W / 2) return values[idx[k]];
+  }
   return values[idx[idx.length - 1]];
 }
 export function conformalLogInterval(
@@ -419,7 +444,7 @@ export function runMonteCarlo(m: MCInputs & { return_draws?: boolean }): MCResul
     profits[k] = profit; arvExits[k] = arvExit; holds[k] = holdMonths; rehabs[k] = rehab;
   }
   const sorted = [...profits].sort((a, b) => a - b);
-  const q = (p: number) => sorted[Math.min(sorted.length - 1, Math.max(0, Math.floor(p * sorted.length)))];
+  const q = (p: number) => quantileInterp(sorted, p);  // type-7 interpolated (was floor bias)
   const meanProfit = profits.reduce((a, b) => a + b, 0) / profits.length;
   const P_loss = profits.filter((p) => p < 0).length / profits.length;
   const tail = sorted.filter((p) => p <= q(0.05));

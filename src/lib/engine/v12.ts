@@ -35,6 +35,7 @@ import {
   weightedMedian,
   sampleBetaPert,
   hedonicAdjustLog,
+  quantileInterp,
   type HedonicSubject,
   type HedonicBetas,
 } from "./v11";
@@ -230,7 +231,7 @@ export function downsideDisplay(profitDraws: number[], alpha = 0.05): DownsideDi
   const n = profitDraws.length;
   if (!n) return { p5: 0, p25: 0, p50: 0, p75: 0, p95: 0, p_loss: 0, cvar_loss: 0, dqr: 0 };
   const s = [...profitDraws].sort((a, b) => a - b);
-  const q = (p: number) => s[Math.min(n - 1, Math.max(0, Math.floor(p * n)))];
+  const q = (p: number) => quantileInterp(s, p, n);  // type-7 interpolated
   const losses = s.filter((x) => x < 0);
   const p_loss = losses.length / n;
   const tail = s.slice(0, Math.max(1, Math.floor(alpha * n)));

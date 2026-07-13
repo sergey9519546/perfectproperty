@@ -371,8 +371,11 @@
   background: linear-gradient(90deg, rgba(1, 7, 12, 0.98) 0%, rgba(1, 7, 12, 0.91) 8%, rgba(1, 7, 12, 0.68) 27%, rgba(1, 7, 12, 0.14) 53%, rgba(1, 7, 12, 0.17) 70%, rgba(1, 7, 12, 0.73) 100%), linear-gradient(180deg, rgba(0, 0, 0, 0.06), transparent 46%, rgba(1, 7, 12, 0.24) 72%, rgba(1, 7, 12, 0.9) 100%);
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1180px) {
   .perfect-property-ui .landing-menu-button { display: grid; }
+}
+
+@media (max-width: 1023px) {
   .perfect-property-ui .app-body { height: auto; }
   .perfect-property-ui .product-grid { display: flex; flex-direction: column; }
   .perfect-property-ui .evidence-panel {
@@ -391,9 +394,13 @@
     background: linear-gradient(90deg, rgba(1, 7, 12, 0.96), rgba(1, 7, 12, 0.68) 66%, rgba(1, 7, 12, 0.45)), linear-gradient(180deg, rgba(1, 7, 12, 0.08), rgba(1, 7, 12, 0.12) 48%, rgba(1, 7, 12, 0.98) 88%);
   }
   .perfect-property-ui .topbar { position: sticky; top: 0; z-index: 10; }
-  .perfect-property-ui .nav-rail { position: sticky; top: 72px; z-index: 9; }
+  .perfect-property-ui .nav-rail { position: sticky; top: 68px; z-index: 9; }
   .perfect-property-ui .deal-table { max-height: 360px; }
   .perfect-property-ui .evidence-panel { max-height: none; }
+}
+
+@media (max-width: 639px) {
+  .perfect-property-ui .landing-cta { height: 38px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

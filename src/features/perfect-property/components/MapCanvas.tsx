@@ -53,6 +53,7 @@ export function MapCanvas(props: Props) {
 
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
+    let mounted = true
     const initialView = defaultView()
     const map = new maplibregl.Map({
       container: mapContainer.current,
@@ -86,7 +87,7 @@ export function MapCanvas(props: Props) {
       map.addLayer({ id: 'market-points', type: 'circle', source: 'markets', filter: ['!', ['has', 'point_count']], paint: { 'circle-color': ['interpolate', ['linear'], ['get', 'metric'], 0, '#40515d', 65, '#a47728', 100, '#efaa2d'], 'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 6, 8, 11], 'circle-stroke-width': 1.5, 'circle-stroke-color': '#ffd16f', 'circle-opacity': .96 } })
       map.addLayer({ id: 'selected-halo', type: 'circle', source: 'markets', filter: ['==', ['get', 'id'], ''], paint: { 'circle-color': 'rgba(0,0,0,0)', 'circle-radius': 20, 'circle-stroke-width': 2, 'circle-stroke-color': '#efaa2d', 'circle-stroke-opacity': .78 } })
       map.addLayer({ id: 'market-labels', type: 'symbol', source: 'markets', filter: ['!', ['has', 'point_count']], minzoom: 4.3, layout: { 'text-field': ['get', 'name'], 'text-offset': [0, 1.25], 'text-size': 11, 'text-anchor': 'top', 'text-font': ['Noto Sans Regular'] }, paint: { 'text-color': '#e7edf1', 'text-halo-color': '#02080d', 'text-halo-width': 1.2 } })
-      setStatus('ready')
+      if (mounted) setStatus('ready')
     })
 
     map.on('click', 'market-clusters', async (event) => {
@@ -112,8 +113,8 @@ export function MapCanvas(props: Props) {
         .setHTML(`<strong>${feature.properties.name}</strong><span>${Number(feature.properties.score).toFixed(1)} opportunity score</span>`).addTo(map)
     })
     map.on('mouseleave', 'market-points', () => { map.getCanvas().style.cursor = ''; popupRef.current?.remove() })
-    map.on('error', () => { if (!map.loaded()) setStatus('error') })
-    return () => { popupRef.current?.remove(); map.remove(); mapRef.current = null }
+    map.on('error', () => { if (mounted && !map.loaded()) setStatus('error') })
+    return () => { mounted = false; popupRef.current?.remove(); map.remove(); mapRef.current = null }
   }, [])
 
   useEffect(() => {
@@ -139,7 +140,7 @@ export function MapCanvas(props: Props) {
         {(['All markets', 'California', 'Florida'] as RegionFilter[]).map((item) => <FilterButton key={item} active={props.region === item} onClick={() => props.onRegionChange(item)}>{item}</FilterButton>)}
         <span className="mx-1 h-6 w-px bg-white/10"/>
         {(['All types', 'Multifamily', 'Build-to-rent', 'Office'] as PropertyFilter[]).map((item) => <FilterButton key={item} active={props.propertyType === item} onClick={() => props.onPropertyTypeChange(item)}>{item}</FilterButton>)}
-        <button type="button" className="filter-button ml-auto max-lg:hidden">May 12, 2024</button>
+        <time dateTime="2024-05-12" aria-label="Data snapshot date: May 12, 2024" className="filter-button ml-auto inline-flex items-center max-lg:hidden">May 12, 2024</time>
       </div>
 
       <div className="absolute left-3 top-20 z-[2] grid gap-1 rounded-[5px] border border-[#7893a5]/24 bg-[#06131c]/95 p-1 shadow-[0_12px_34px_rgba(0,5,9,.28),inset_0_1px_0_rgba(255,255,255,.045)]">
@@ -148,9 +149,9 @@ export function MapCanvas(props: Props) {
         <MapButton label="Fullscreen" onClick={() => mapContainer.current?.requestFullscreen()}><ArrowsOut size={18}/></MapButton>
       </div>
 
-      <div className="absolute right-3 top-20 z-[2] w-[210px]">
-        <button type="button" className="control-button w-full justify-between" onClick={() => setLayersOpen((open) => !open)}><span className="flex items-center gap-2"><Stack size={17} className="text-[#efaa2d]"/>{props.layer}</span></button>
-        <AnimatePresence>{layersOpen && <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{type:'spring',stiffness:210,damping:24}} className="mt-1 overflow-hidden rounded-[5px] border border-[#7893a5]/24 bg-[#06131c]/96 p-1 shadow-[0_18px_48px_rgba(0,5,9,.42),inset_0_1px_0_rgba(255,255,255,.045)] backdrop-blur-md">{layerModes.map((mode) => <button key={mode} onClick={() => { props.onLayerChange(mode); setLayersOpen(false) }} type="button" className={`flex w-full items-center gap-2 rounded-[3px] px-3 py-2 text-left text-[12px] ${mode === props.layer ? 'bg-[#efaa2d]/10 text-[#efaa2d]' : 'text-[#98a8b2] hover:bg-[#7aa0b8]/[.06]'}`}>{mode === props.layer ? <Eye size={15}/> : <EyeSlash size={15}/>} {mode}</button>)}</motion.div>}</AnimatePresence>
+      <div className="absolute right-3 top-20 z-[2] w-[210px] max-sm:right-6">
+        <button type="button" className="control-button w-full justify-between" aria-expanded={layersOpen} aria-controls="map-layer-options" onClick={() => setLayersOpen((open) => !open)}><span className="flex items-center gap-2"><Stack size={17} className="text-[#efaa2d]"/>{props.layer}</span></button>
+        <AnimatePresence>{layersOpen && <motion.div id="map-layer-options" aria-label="Map data layers" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{type:'spring',stiffness:210,damping:24}} className="mt-1 overflow-hidden rounded-[5px] border border-[#7893a5]/24 bg-[#06131c]/96 p-1 shadow-[0_18px_48px_rgba(0,5,9,.42),inset_0_1px_0_rgba(255,255,255,.045)] backdrop-blur-md">{layerModes.map((mode) => <button key={mode} onClick={() => { props.onLayerChange(mode); setLayersOpen(false) }} type="button" aria-pressed={mode === props.layer} className={`flex w-full items-center gap-2 rounded-[3px] px-3 py-2 text-left text-[12px] ${mode === props.layer ? 'bg-[#efaa2d]/10 text-[#efaa2d]' : 'text-[#98a8b2] hover:bg-[#7aa0b8]/[.06]'}`}>{mode === props.layer ? <Eye size={15}/> : <EyeSlash size={15}/>} {mode}</button>)}</motion.div>}</AnimatePresence>
       </div>
 
       <div className="absolute bottom-7 left-3 z-[2] w-[166px] border border-[#7893a5]/24 bg-[#06131c]/94 p-3 text-[11px] shadow-[inset_0_1px_0_rgba(255,255,255,.035)] backdrop-blur-md"><div className="mb-2 font-medium text-[#e7edf1]">{props.layer}</div>{[[80,'Excellent'],[60,'Strong'],[40,'Moderate'],[20,'Weak']].map(([value,label]) => <div key={label} className="flex items-center gap-2 py-1 text-[#93a4ae]"><i className="h-2.5 w-2.5 rounded-full" style={{background:Number(value)>=80?'#efaa2d':Number(value)>=60?'#a97828':Number(value)>=40?'#607482':'#34434d'}}/><span>{value}+</span><span className="ml-auto">{label}</span></div>)}</div>
@@ -163,6 +164,5 @@ export function MapCanvas(props: Props) {
   )
 }
 
-function FilterButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) { return <motion.button layout whileTap={{ scale: .97 }} type="button" onClick={onClick} className={`filter-button ${active ? 'active-filter' : ''}`}>{children}</motion.button> }
+function FilterButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) { return <motion.button layout whileTap={{ scale: .97 }} type="button" aria-pressed={active} onClick={onClick} className={`filter-button ${active ? 'active-filter' : ''}`}>{children}</motion.button> }
 function MapButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) { return <button aria-label={label} title={label} onClick={onClick} type="button" className="grid h-8 w-8 place-items-center rounded-[3px] text-[#c7cdca] hover:bg-white/[.06] active:translate-y-px">{children}</button> }
-

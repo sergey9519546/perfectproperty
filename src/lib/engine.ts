@@ -301,6 +301,7 @@ export interface UnderwriteResult {
 }
 
 import * as v11 from "./engine/v11";
+import { quantileInterp } from './engine/v11';
 import * as v12 from "./engine/v12";
 import * as credit from "./engine/credit";
 
@@ -463,7 +464,7 @@ export function underwrite(
   const sortedExits = [...arvExits].sort((a, b) => a - b);
   const qExit = (pct: number) =>
     sortedExits.length
-      ? sortedExits[Math.min(sortedExits.length - 1, Math.floor(pct * sortedExits.length))]
+      ? quantileInterp(sortedExits, pct, sortedExits.length)
       : arv;
   const arv_today = arv;
   const arv_exit_p5 = qExit(0.05);

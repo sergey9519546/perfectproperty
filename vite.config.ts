@@ -40,6 +40,11 @@ export default defineConfig({
                 priority: 25,
               },
               {
+                name: "motion-vendor",
+                test: /node_modules[\\/](?:motion|motion-dom|motion-utils)[\\/]/,
+                priority: 25,
+              },
+              {
                 name: "ui-vendor",
                 test: /node_modules[\\/](?:@radix-ui|@floating-ui|cmdk|vaul)[\\/]/,
                 priority: 20,

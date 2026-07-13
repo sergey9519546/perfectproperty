@@ -7,7 +7,7 @@
     "dev": "vite dev",
     "build": "vite build",
     "build:dev": "vite build --mode development",
-    "preview": "vite preview",
+    "preview": "wrangler dev --config .output/server/wrangler.json",
     "lint": "eslint .",
     "test": "vitest run",
     "format": "prettier --write .",
@@ -96,7 +96,8 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
     "vite": "^8.0.16",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "wrangler": "^4.110.0"
   },
   "overrides": {
     "esbuild": "0.28.1"
