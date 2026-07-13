@@ -14,7 +14,7 @@ Both are gated on `ZYTE_API_KEY` (server secret). Scrapy Cloud project id defaul
 
 ## Webhook contract (`/api/public/scrapy-ingest`)
 
-- **Auth**: HMAC-SHA256 over the raw request body using `SCRAPY_INGEST_SECRET`. Header: `x-scrapy-signature: sha256=<hex>`. Unsigned → `401 Invalid signature`.
+- **Auth**: HMAC-SHA256 (hex) over the raw request body using `SCRAPY_INGEST_SECRET`. Header: `x-signature: <hex>` (no `sha256=` prefix). Unsigned → `401 Invalid signature`.
 - **Body**: `{ recipe: string, items: object[] }`. `recipe` ∈ `foreclosure | probate | code_violation | sale | auction | parcel`.
 - **Routing**: writes to `distress_events` (foreclosure/probate/code_violation), `sales` (sale/auction), `parcels` (parcel). Every batch logs to `ingestion_runs` as `source = SCRAPY:<recipe>` — visible on `/admin`.
 - Item shape matches the adapter output for that recipe. See `src/routes/api/public/scrapy-ingest.ts` for the exact schema.
