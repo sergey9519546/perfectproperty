@@ -12,6 +12,8 @@ class SmokeSpider(scrapy.Spider):
     name = "smoke"
     recipe = "parcel"
     start_urls = ["https://example.com/"]  # any 200 will do
+    # smoke doesn't need Zyte API — bypass transparent mode
+    custom_settings = {"ZYTE_API_TRANSPARENT_MODE": False}
 
     def parse(self, response):
         yield {
