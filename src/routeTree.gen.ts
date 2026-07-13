@@ -23,6 +23,7 @@ import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } fr
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as ApiPublicScrapyIngestRouteImport } from './routes/api/public/scrapy-ingest'
 import { Route as ApiPublicRunRecipesRouteImport } from './routes/api/public/run-recipes'
+import { Route as ApiPublicRunRealieEnrichmentRouteImport } from './routes/api/public/run-realie-enrichment'
 import { Route as ApiPublicRunMonitoringRouteImport } from './routes/api/public/run-monitoring'
 import { Route as ApiPublicRunBulkLookupsRouteImport } from './routes/api/public/run-bulk-lookups'
 import { Route as ApiPublicRerunUnderwriteRouteImport } from './routes/api/public/rerun-underwrite'
@@ -102,6 +103,12 @@ const ApiPublicRunRecipesRoute = ApiPublicRunRecipesRouteImport.update({
   path: '/api/public/run-recipes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicRunRealieEnrichmentRoute =
+  ApiPublicRunRealieEnrichmentRouteImport.update({
+    id: '/api/public/run-realie-enrichment',
+    path: '/api/public/run-realie-enrichment',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicRunMonitoringRoute = ApiPublicRunMonitoringRouteImport.update({
   id: '/api/public/run-monitoring',
   path: '/api/public/run-monitoring',
@@ -154,6 +161,7 @@ export interface FileRoutesByFullPath {
   '/api/public/rerun-underwrite': typeof ApiPublicRerunUnderwriteRoute
   '/api/public/run-bulk-lookups': typeof ApiPublicRunBulkLookupsRoute
   '/api/public/run-monitoring': typeof ApiPublicRunMonitoringRoute
+  '/api/public/run-realie-enrichment': typeof ApiPublicRunRealieEnrichmentRoute
   '/api/public/run-recipes': typeof ApiPublicRunRecipesRoute
   '/api/public/scrapy-ingest': typeof ApiPublicScrapyIngestRoute
 }
@@ -176,6 +184,7 @@ export interface FileRoutesByTo {
   '/api/public/rerun-underwrite': typeof ApiPublicRerunUnderwriteRoute
   '/api/public/run-bulk-lookups': typeof ApiPublicRunBulkLookupsRoute
   '/api/public/run-monitoring': typeof ApiPublicRunMonitoringRoute
+  '/api/public/run-realie-enrichment': typeof ApiPublicRunRealieEnrichmentRoute
   '/api/public/run-recipes': typeof ApiPublicRunRecipesRoute
   '/api/public/scrapy-ingest': typeof ApiPublicScrapyIngestRoute
 }
@@ -199,6 +208,7 @@ export interface FileRoutesById {
   '/api/public/rerun-underwrite': typeof ApiPublicRerunUnderwriteRoute
   '/api/public/run-bulk-lookups': typeof ApiPublicRunBulkLookupsRoute
   '/api/public/run-monitoring': typeof ApiPublicRunMonitoringRoute
+  '/api/public/run-realie-enrichment': typeof ApiPublicRunRealieEnrichmentRoute
   '/api/public/run-recipes': typeof ApiPublicRunRecipesRoute
   '/api/public/scrapy-ingest': typeof ApiPublicScrapyIngestRoute
 }
@@ -223,6 +233,7 @@ export interface FileRouteTypes {
     | '/api/public/rerun-underwrite'
     | '/api/public/run-bulk-lookups'
     | '/api/public/run-monitoring'
+    | '/api/public/run-realie-enrichment'
     | '/api/public/run-recipes'
     | '/api/public/scrapy-ingest'
   fileRoutesByTo: FileRoutesByTo
@@ -245,6 +256,7 @@ export interface FileRouteTypes {
     | '/api/public/rerun-underwrite'
     | '/api/public/run-bulk-lookups'
     | '/api/public/run-monitoring'
+    | '/api/public/run-realie-enrichment'
     | '/api/public/run-recipes'
     | '/api/public/scrapy-ingest'
   id:
@@ -267,6 +279,7 @@ export interface FileRouteTypes {
     | '/api/public/rerun-underwrite'
     | '/api/public/run-bulk-lookups'
     | '/api/public/run-monitoring'
+    | '/api/public/run-realie-enrichment'
     | '/api/public/run-recipes'
     | '/api/public/scrapy-ingest'
   fileRoutesById: FileRoutesById
@@ -289,6 +302,7 @@ export interface RootRouteChildren {
   ApiPublicRerunUnderwriteRoute: typeof ApiPublicRerunUnderwriteRoute
   ApiPublicRunBulkLookupsRoute: typeof ApiPublicRunBulkLookupsRoute
   ApiPublicRunMonitoringRoute: typeof ApiPublicRunMonitoringRoute
+  ApiPublicRunRealieEnrichmentRoute: typeof ApiPublicRunRealieEnrichmentRoute
   ApiPublicRunRecipesRoute: typeof ApiPublicRunRecipesRoute
   ApiPublicScrapyIngestRoute: typeof ApiPublicScrapyIngestRoute
 }
@@ -393,6 +407,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicRunRecipesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/run-realie-enrichment': {
+      id: '/api/public/run-realie-enrichment'
+      path: '/api/public/run-realie-enrichment'
+      fullPath: '/api/public/run-realie-enrichment'
+      preLoaderRoute: typeof ApiPublicRunRealieEnrichmentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/run-monitoring': {
       id: '/api/public/run-monitoring'
       path: '/api/public/run-monitoring'
@@ -467,6 +488,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicRerunUnderwriteRoute: ApiPublicRerunUnderwriteRoute,
   ApiPublicRunBulkLookupsRoute: ApiPublicRunBulkLookupsRoute,
   ApiPublicRunMonitoringRoute: ApiPublicRunMonitoringRoute,
+  ApiPublicRunRealieEnrichmentRoute: ApiPublicRunRealieEnrichmentRoute,
   ApiPublicRunRecipesRoute: ApiPublicRunRecipesRoute,
   ApiPublicScrapyIngestRoute: ApiPublicScrapyIngestRoute,
 }

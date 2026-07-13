@@ -1,37 +1,154 @@
-## Ultraplan: Bulletproof Ingestion, Security & UI
 
-Scope: 4 phases across ingest, auth, UI resilience, and observability. Ship in one pass.
+## The real problem (not what it looks like)
 
-### Phase 1 — Ingestion hardening
-- **Preflight/circuit breaker**: add `src/lib/ingest-preflight.ts` — HEAD/GET ping each `COUNTY_SOURCES[i].parcels.url` with 5s timeout. Failures mark source as `tripped` in an in-memory + DB-persisted breaker (new column on `ingestion_runs` or new `source_health` table). `ingest-all.ts` skips tripped sources and logs.
-- **Exponential backoff**: wrap Realie calls (`realieLookupAddress`, `realieLookupParcelId`, `realieComparables`) in a shared `retryWithBackoff(fn, {retries:4, base:500, on429:true})` helper in `src/lib/retry.ts`. On 429/5xx, backoff; on final failure, push to DLQ.
-- **Dead Letter Queue**: new `ingestion_failures` table (parcel_ref, source, stage, error, stack, created_at). Insert from every `catch` in ingest/underwrite/score paths. Admin view surfaces recent failures.
+Today's DB tells a clearer story than "524 parcels missing sqft":
 
-### Phase 2 — Security & consistency
-- **Auth-gate interceptor**: root `__root.tsx` already invalidates on auth state; add a small `use401Interceptor()` hook that patches `fetch` to detect 401 responses from server fns and route to `/auth` cleanly.
-- **Atomic writes**: dossier + prediction + score updates go through a single Postgres function `public.record_underwrite_atomic(...)` (SECURITY INVOKER, transactional). Replace multi-step server-fn writes with one RPC call.
+| Table | Rows | Meaning |
+|---|---|---|
+| `parcels` (LIVE) | 1,014 | Addresses we know about |
+| `parcels` with sqft+year | 490 | Enough to underwrite |
+| `sales` | 4,939 | Comps (good) |
+| `distress_events` | **0** | **No reason any of these are deals** |
+| `listings` | **0** | **No on-market signal either** |
 
-### Phase 3 — Frontend resilience
-- **Error boundaries**: new `src/components/SectionBoundary.tsx` — minimalist gray wireframe fallback with "Data unavailable". Wrap `MapView`, deals table, off-market list, prophecy list.
-- **Hydration recovery**: set `<Hydrate suppressHydrationWarning>` on volatile timestamp nodes; on mismatch log to `reportLovableError` and let client re-render.
+Even the 490 "enriched" parcels are just houses with defaults for owner/vacancy/absentee — the score is math over assumptions, not over a real deal trigger. That's why the ranked list collapses to identical numbers.
 
-### Phase 4 — Observability
-- **Admin health page** `/admin/health`: cards for
-  - 24h ingested vs failed (from `ingestion_runs` + `ingestion_failures`)
-  - Realie credit-burn proxy: count of Realie calls / hour from `probe_runs`
-  - Per-county rings (green/yellow/red) from breaker state
-- **Freshness indicator**: `DataFreshness` component reads `parcel_scores.updated_at` or `parcels.last_seen_at`, renders "Underwritten 2h ago" in dossier + list rows.
+**The fix isn't more sqft. It's giving each parcel a reason to be shown.**
 
-### Technical details
-- New files: `src/lib/retry.ts`, `src/lib/ingest-preflight.ts`, `src/lib/dlq.ts`, `src/components/SectionBoundary.tsx`, `src/components/DataFreshness.tsx`, `src/routes/admin.health.tsx`.
-- Migration: create `ingestion_failures` + `source_health` tables with GRANTs + RLS (admin-only via `has_role`), and `record_underwrite_atomic` function.
-- Edits: `src/lib/adapters/realie.ts` (wrap calls), `src/lib/ingest-core.ts` (preflight + DLQ), `src/routes/api/public/ingest-all.ts` (skip tripped), `src/routes/index.tsx` + `deals.tsx` + `shadow.tsx` + `prophecy.tsx` (wrap in `SectionBoundary`, add `DataFreshness`).
+## Role of each source (one job each — stop overlapping them)
 
-### Order of execution
-1. DB migration (tables + RPC) — needs approval first
-2. Retry/DLQ/preflight libs
-3. Wire into ingest + underwrite paths
-4. Error boundaries + freshness component into pages
-5. Admin health route
+```text
+SCRAPY (discovery + signals)     realie enrichment (attributes)      ZYTE (transport)
+────────────────────────────     ──────────────────────────────      ────────────────
+- foreclosure filings            - sqft, year, beds/baths            - proxy + headless
+- probate cases                  - owner name, mailing addr          - used silently by
+- code violations                - assessed value, tax status          scrapy + arcgis
+- tax delinquents                - last sale price / date              adapters when the
+- absentee-owner rolls           - listing status (some markets)       county site blocks
+- MLS scrapes / new listings                                           direct fetch
+- county parcel drops (thin)     Called ONLY when a parcel has        
+                                 a fresh trigger AND is missing       Never a "source"
+Cheap. Volume. Nightly.          the fields underwriting needs.       on its own.
+                                 Metered $/call — must be gated.
+```
 
-Confirm and I'll start with the migration.
+Rule: **Realie is the wallet. Scrapy is the funnel. Zyte is the pipe.** Never call Realie for a parcel without a trigger.
+
+## Minimum data a parcel needs before it hits the map
+
+1. `lat/lng` — pin
+2. `address, city, state` — label
+3. `living_sqft, year_built` — non-default underwrite
+4. **At least one trigger in the last 180d** — the reason it's a deal:
+   - distress event (foreclosure / probate / code violation / tax lien), OR
+   - active listing priced below county median $/sqft, OR
+   - recent absentee-owner + long tenure (>15y), OR
+   - operator manual lookup
+
+`listRankedParcels` already filters 1–3. It should also require 4. Anything else is noise on the map.
+
+## The pipeline to build
+
+```text
+   ┌───────── Scrapy Cloud (nightly, per county) ─────────┐
+   │  spider:foreclosure  → recipe:foreclosure            │
+   │  spider:probate      → recipe:probate                │
+   │  spider:codeviol     → recipe:code_violation         │
+   │  spider:mls_new      → recipe:listing  (new)         │
+   │  spider:parcel_drop  → recipe:parcel   (thin)        │
+   └───────────────────────┬──────────────────────────────┘
+                           │  HMAC webhook → /api/public/scrapy-ingest
+                           ▼
+              distress_events / listings / sales / parcels
+                           │
+                           ▼
+              DB trigger: enqueue_enrichment()
+                fires when a parcel gains a trigger
+                AND is missing sqft/year/beds
+                           │
+                           ▼
+                enrichment_queue (new table)
+                  priority = signal_recency * county_weight
+                  status: pending → inflight → done | failed
+                           │
+                           ▼
+        cron: /api/public/run-realie-enrichment
+          pulls top N (daily budget cap, e.g. 300)
+          calls realieLookupAddress()
+          upserts parcel, marks queue done
+                           │
+                           ▼
+        cron: /api/public/rerun-underwrite (exists)
+          re-scores touched parcels
+                           │
+                           ▼
+                    parcel_scores
+                           │
+                           ▼
+              Map + Deals (already filter to real inputs;
+              add "has trigger" filter in same server fn)
+```
+
+## What to build, in order
+
+**1. Kill the ghost rows in one migration**
+   - Add `has_trigger` boolean column on `parcel_scores` (or compute in server fn via join).
+   - Update `listRankedParcels` + `getCoverage` to require a trigger. Result: map goes from 490 → whatever has real signals (likely a small number until spiders run — this is correct).
+
+**2. `enrichment_queue` table + trigger**
+   ```
+   enrichment_queue(
+     parcel_id uuid PK,
+     priority int,
+     reason text,          -- 'foreclosure' | 'probate' | 'listing' | 'manual'
+     status text,          -- pending|inflight|done|failed
+     attempts int, last_error text,
+     requested_at, completed_at
+   )
+   ```
+   Trigger on `distress_events` insert + on `listings` insert: enqueue parent parcel if `parcels.living_sqft IS NULL OR year_built IS NULL`.
+
+**3. `/api/public/run-realie-enrichment` (server route)**
+   - HMAC-guarded like the other cron endpoints.
+   - Pulls `LIMIT :budget` from queue ordered by priority.
+   - Calls existing `realieLookupAddress`, upserts parcel row.
+   - Marks queue done; failures increment attempts, back off at 3.
+   - Emits `ingestion_runs` row `source = REALIE:enrichment`.
+   - Wire pg_cron to hit it every 15 min with a daily cap column.
+
+**4. Auto-rerun-underwrite**
+   - After enrichment finishes a batch, POST to existing `/api/public/rerun-underwrite` for the touched parcel_ids.
+
+**5. Spider inventory (parallel work in the scrapy repo)**
+   - Current: only `smoke` exists. Nothing is discovering signals.
+   - Highest-leverage first (matches the counties already in DB):
+     - Miami-Dade (12086): Clerk foreclosure filings, probate court
+     - Los Angeles (06037): LA County Recorder NOD/NOS, code enforcement
+     - NYC boroughs (36061/36005/36081): ACRIS distress deeds, HPD violations, PLUTO parcels
+     - SF (06075): Assessor sales, DBI complaints
+   - One recipe per source; all push to the same webhook. This is what turns `distress_events` from 0 → real numbers.
+
+**6. Small operator surface (admin only)**
+   - Queue depth, daily Realie spend, last cron run, per-recipe row counts in last 24h.
+   - Already have `admin.health.tsx` — add three cards.
+
+## Cost math (why the gating matters)
+
+If Realie is ~$0.05/call and we blindly enrich all 524 unenriched parcels: ~$26 once, then again every time Scrapy discovers a new address. With a trigger gate + a 300/day cap, cost stays predictable and every call is spent on a parcel that already has a reason to be a deal.
+
+## What NOT to do
+
+- Do not backfill Realie for the 524 unenriched parcels right now. They have no triggers — you'd pay to enrich random houses. Enrich them **after** a spider produces a signal for them.
+- Do not add more `data_source` variants. Keep `LIVE` for real, `SCRAPY` for smoke-only until it's producing real recipes, then merge.
+- Do not expand Zyte usage on its own — it's a transport, not a source.
+
+## Deliverables for this turn
+
+If you approve, I'll ship in this order:
+1. Migration: `enrichment_queue` + triggers + `has_trigger` view/column.
+2. `/api/public/run-realie-enrichment` route + wire to existing cron.
+3. Update `listRankedParcels`/`getCoverage` to require a trigger.
+4. Admin health cards for queue + Realie spend.
+5. A `docs/pipeline.md` describing the spider recipes we still need in the Scrapy repo (that work happens there, not here).
+
+Steps 1–4 are all in this repo. Step 5 is the checklist you take to the Scrapy project.

@@ -19,16 +19,28 @@ export const listRankedParcels = createServerFn({ method: "POST" })
   .validator((data: unknown) => ListInput.parse(data ?? {}))
   .handler(async ({ data, context }) => {
     const supabase = context.supabase;
-    // Always LIVE — fixture rows were purged 2026-07-13.
-    // Only surface deals backed by real underwriting inputs — parcels missing
-    // living_sqft or year_built get scored off defaults and collapse into
-    // identical "mock" rows. Filter them out at the source.
+
+    // Gate 1: only parcels with a real deal trigger in the last 180 days
+    // (distress event or active listing). No trigger = no reason to be on
+    // the map, regardless of score.
+    const { data: triggerRows, error: trigErr } = await (supabase as any)
+      .rpc("parcels_with_active_trigger", { _days: 180 });
+    if (trigErr) throw new Error(trigErr.message);
+    const triggeredIds = ((triggerRows ?? []) as Array<{ parcel_id: string }>)
+      .map((r) => r.parcel_id)
+      .filter(Boolean);
+    if (triggeredIds.length === 0) return [];
+
+    // Gate 2: require real underwriting inputs (living_sqft + year_built).
+    // Without them the underwrite falls back to defaults and every row
+    // collapses to the same "mock" numbers.
     let q = supabase
       .from("parcel_scores")
       .select(
         "parcel_id, perfect_score, gross_profit, risk_adjusted_profit, modeled_offer, acquisition_probability, exit_days, ring, confidence_grade, skeptic_flags, recommended_scope, reno_cost, data_source, computed_at, mc_profit_p5, mc_profit_p50, mc_p_loss, cosmetic_arv, full_reno_arv, expanded_arv, as_is_value, carry_cost, selling_cost, ead, pd_credit, lgd, risk_adjusted_profit_credit, parcels!inner(id, address, city, state, zip, lat, lng, living_sqft, year_built, bedrooms, bathrooms, condition_grade, owner_is_absentee, is_listed, is_vacant, county_fips, data_source)",
       )
       .eq("data_source", "LIVE")
+      .in("parcel_id", triggeredIds)
       .not("parcels.living_sqft", "is", null)
       .not("parcels.year_built", "is", null)
       .order("perfect_score", { ascending: false })
@@ -93,19 +105,29 @@ export const getCoverage = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
   const supabase = context.supabase;
-  const [counties, runs, scores, outcomes, liveByCounty] = await Promise.all([
+
+  const { data: triggerRows } = await (supabase as any)
+    .rpc("parcels_with_active_trigger", { _days: 180 });
+  const triggeredIds = ((triggerRows ?? []) as Array<{ parcel_id: string }>)
+    .map((r) => r.parcel_id)
+    .filter(Boolean);
+
+  const [counties, runs, scores, outcomes, liveByCounty, queueRows] = await Promise.all([
     supabase.from("counties").select("*").order("state").order("name"),
     supabase.from("ingestion_runs").select("*").order("started_at", { ascending: false }).limit(30),
-    // Match the same real-inputs filter as listRankedParcels so counts don't
-    // include parcels underwritten off defaults.
-    supabase
-      .from("parcel_scores")
-      .select("perfect_score, ring, confidence_grade, data_source, parcels!inner(living_sqft, year_built)")
-      .eq("data_source", "LIVE")
-      .not("parcels.living_sqft", "is", null)
-      .not("parcels.year_built", "is", null),
+    // Match listRankedParcels: LIVE + real inputs + has an active trigger.
+    triggeredIds.length === 0
+      ? Promise.resolve({ data: [] as any[] })
+      : supabase
+          .from("parcel_scores")
+          .select("parcel_id, perfect_score, ring, confidence_grade, data_source, parcels!inner(county_fips, living_sqft, year_built)")
+          .eq("data_source", "LIVE")
+          .in("parcel_id", triggeredIds)
+          .not("parcels.living_sqft", "is", null)
+          .not("parcels.year_built", "is", null),
     supabase.from("prediction_outcomes").select("outcome, error_pct, predicted_profit, actual_profit"),
     supabase.from("parcels").select("county_fips").eq("data_source", "LIVE").not("living_sqft", "is", null).not("year_built", "is", null),
+    supabase.from("enrichment_queue").select("status"),
   ]);
   const sLive = (scores.data ?? []) as any[];
   const tiers = {
@@ -133,6 +155,15 @@ export const getCoverage = createServerFn({ method: "GET" })
   const avgError = o.length
     ? o.reduce((a: number, b: any) => a + Math.abs(Number(b.error_pct ?? 0)), 0) / o.length
     : 0;
+  const qRows = ((queueRows as any)?.data ?? []) as Array<{ status: string }>;
+  const queue = {
+    pending: qRows.filter((x) => x.status === "pending").length,
+    inflight: qRows.filter((x) => x.status === "inflight").length,
+    done: qRows.filter((x) => x.status === "done").length,
+    failed: qRows.filter((x) => x.status === "failed").length,
+    total: qRows.length,
+  };
+
   return {
     counties: countiesEnriched,
     runs: runs.data ?? [],
@@ -140,6 +171,8 @@ export const getCoverage = createServerFn({ method: "GET" })
     rings,
     total_parcels: sLive.length,
     live_totals: { parcels: (liveByCounty.data ?? []).length, scored: sLive.length },
+    triggered_parcels: triggeredIds.length,
+    enrichment_queue: queue,
     accuracy: {
       total: o.length,
       wins,
