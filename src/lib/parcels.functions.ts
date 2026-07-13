@@ -62,7 +62,7 @@ export const listRankedParcels = createServerFn({ method: "POST" })
 // so we skip the active-trigger gate and score on leading signals instead.
 const ProphecyInput = z.object({
   county_fips: z.string().optional(),
-  min_score: z.number().default(70),
+  min_score: z.number().default(15),
   limit: z.number().int().max(500).default(200),
 });
 
