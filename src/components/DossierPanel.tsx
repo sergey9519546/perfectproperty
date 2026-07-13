@@ -4,6 +4,7 @@ import { getDossier } from "@/lib/parcels.functions";
 import { fmt$, pct, tierLabel } from "@/lib/format";
 import { X, TrendingUp, AlertTriangle, Building2, ScrollText, Zap, Activity, ShieldCheck, Lock } from "lucide-react";
 import { DataFreshness } from "@/components/DataFreshness";
+import { WhyThisScorePanel } from "@/components/WhyThisScorePanel";
 
 
 interface Props {
