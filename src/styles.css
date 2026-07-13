@@ -1,3 +1,5 @@
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
@@ -11,8 +13,8 @@
  */
 
 @theme inline {
-  --font-sans: "InterVariable", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", "SFMono-Regular", ui-monospace, monospace;
+  --font-sans: "Geist Variable", "InterVariable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", "JetBrains Mono", "SFMono-Regular", ui-monospace, monospace;
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -132,6 +134,277 @@
 /* Map custom marker glow */
 .opp-pulse {
   animation: opp-pulse 2.6s ease-in-out infinite;
+}
+
+/* Perfect Property public and market-workspace surfaces. */
+.perfect-property-ui {
+  --page: #01070c;
+  --header: #02080d;
+  --pp-surface: #061018;
+  --surface-raised: #091721;
+  --surface-soft: #07131b;
+  --pp-border: rgba(129, 157, 177, 0.17);
+  --pp-border-strong: rgba(143, 174, 195, 0.28);
+  --pp-text: #f3f6f8;
+  --pp-muted: #9ba9b4;
+  --faint: #657581;
+  --gold: #efaa2d;
+  --gold-bright: #f5b83c;
+  --live: #05d680;
+  min-width: 320px;
+  font-family: "Geist Variable", "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+.perfect-property-ui *,
+.perfect-property-ui *::before,
+.perfect-property-ui *::after {
+  box-sizing: border-box;
+}
+
+.perfect-property-ui button,
+.perfect-property-ui input {
+  font: inherit;
+}
+
+.perfect-property-ui button {
+  cursor: pointer;
+}
+
+.perfect-property-ui button:focus-visible,
+.perfect-property-ui input:focus-visible {
+  outline: 2px solid rgba(239, 170, 45, 0.85);
+  outline-offset: 2px;
+}
+
+.perfect-property-ui .app-body {
+  height: calc(100dvh - 72px);
+}
+
+.perfect-property-ui .control-button {
+  display: flex;
+  height: 38px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--pp-border);
+  border-radius: 5px;
+  background: linear-gradient(180deg, rgba(10, 24, 34, 0.96), rgba(5, 15, 22, 0.96));
+  padding: 0 12px;
+  color: #cad3d9;
+  font-size: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 8px 24px rgba(0, 5, 9, 0.16);
+  transition: background 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.22s cubic-bezier(0.16, 1, 0.3, 1), color 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.perfect-property-ui .control-button:hover {
+  border-color: var(--pp-border-strong);
+  background: linear-gradient(180deg, rgba(13, 31, 43, 0.98), rgba(7, 20, 29, 0.98));
+  color: var(--pp-text);
+}
+
+.perfect-property-ui .control-button:active,
+.perfect-property-ui .primary-button:active,
+.perfect-property-ui .icon-button:active,
+.perfect-property-ui .filter-button:active {
+  transform: translateY(1px);
+}
+
+.perfect-property-ui .primary-button {
+  display: flex;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 202, 85, 0.78);
+  border-radius: 5px;
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+  padding: 0 16px;
+  color: #101313;
+  font-size: 12px;
+  font-weight: 650;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 8px 22px rgba(239, 170, 45, 0.12);
+  transition: filter 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.perfect-property-ui .primary-button:hover {
+  filter: brightness(1.06);
+}
+
+.perfect-property-ui .landing-cta {
+  height: 49px;
+}
+
+.perfect-property-ui .icon-button {
+  display: grid;
+  height: 36px;
+  width: 36px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #82919b;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.18s ease;
+}
+
+.perfect-property-ui .icon-button:hover {
+  border-color: var(--pp-border);
+  background: rgba(115, 154, 180, 0.055);
+  color: #e7edf1;
+}
+
+.perfect-property-ui .filter-button {
+  height: 34px;
+  white-space: nowrap;
+  border: 1px solid var(--pp-border);
+  border-radius: 4px;
+  background: rgba(5, 15, 22, 0.88);
+  padding: 0 12px;
+  color: #99a8b2;
+  font-size: 11px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.018);
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.18s ease;
+}
+
+.perfect-property-ui .filter-button:hover {
+  border-color: var(--pp-border-strong);
+  background: rgba(10, 27, 38, 0.94);
+  color: var(--pp-text);
+}
+
+.perfect-property-ui .filter-button.active-filter {
+  border-color: rgba(239, 170, 45, 0.72);
+  background: rgba(239, 170, 45, 0.105);
+  color: #ffc24c;
+  box-shadow: inset 0 1px 0 rgba(255, 215, 128, 0.065);
+}
+
+.perfect-property-ui .label {
+  color: #718391;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.perfect-property-ui .skeleton {
+  border-radius: 3px;
+  background: linear-gradient(90deg, #151d1f 20%, #202a2c 48%, #151d1f 76%);
+  background-size: 220% 100%;
+  animation: shimmer 1.3s infinite;
+}
+
+@keyframes shimmer {
+  to { background-position: -220% 0; }
+}
+
+.perfect-property-ui .maplibregl-map {
+  font-family: "Geist Variable", sans-serif;
+}
+
+.perfect-property-ui .maplibre-map-container {
+  position: absolute !important;
+  inset: 0 !important;
+}
+
+.perfect-property-ui .maplibregl-ctrl-bottom-left {
+  left: 184px !important;
+  bottom: 8px !important;
+}
+
+.perfect-property-ui .map-color-wash {
+  background: radial-gradient(ellipse 65% 72% at 32% 28%, rgba(0, 91, 145, 0.16), transparent 72%), linear-gradient(120deg, rgba(0, 37, 60, 0.14), transparent 48%, rgba(0, 22, 36, 0.14));
+  mix-blend-mode: screen;
+}
+
+.perfect-property-ui .maplibregl-ctrl-attrib {
+  background: rgba(2, 9, 14, 0.82) !important;
+  color: #70808b !important;
+  font-size: 9px !important;
+}
+
+.perfect-property-ui .maplibregl-ctrl-attrib a { color: #a6b5bf !important; }
+
+.perfect-property-ui .maplibregl-popup-content {
+  border: 1px solid var(--pp-border-strong) !important;
+  border-radius: 5px !important;
+  background: #08131b !important;
+  padding: 11px 13px !important;
+  color: var(--pp-text) !important;
+  box-shadow: 0 18px 48px rgba(0, 7, 12, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+.perfect-property-ui .market-popup strong,
+.perfect-property-ui .market-popup span { display: block; }
+.perfect-property-ui .market-popup strong { font-size: 12px; }
+.perfect-property-ui .market-popup span {
+  margin-top: 4px;
+  color: var(--gold);
+  font-family: "Geist Mono Variable", monospace;
+  font-size: 10px;
+}
+.perfect-property-ui .maplibregl-popup-tip { border-top-color: #08131b !important; }
+
+.perfect-property-ui .landing-nav-link {
+  position: relative;
+  padding-block: 8px;
+  transition: color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.perfect-property-ui .landing-nav-link:hover { color: #f3f6f8; }
+.perfect-property-ui .landing-nav-link::after {
+  content: "";
+  position: absolute;
+  right: 100%;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  background: #efaa2d;
+  transition: right 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.perfect-property-ui .landing-nav-link:hover::after,
+.perfect-property-ui .landing-nav-link.active::after { right: 0; }
+.perfect-property-ui .landing-nav-link.active { color: #f3f6f8; }
+.perfect-property-ui .landing-menu-button { display: none; }
+
+.perfect-property-ui .landing-hero-exposure {
+  background: linear-gradient(90deg, rgba(1, 7, 12, 0.98) 0%, rgba(1, 7, 12, 0.91) 8%, rgba(1, 7, 12, 0.68) 27%, rgba(1, 7, 12, 0.14) 53%, rgba(1, 7, 12, 0.17) 70%, rgba(1, 7, 12, 0.73) 100%), linear-gradient(180deg, rgba(0, 0, 0, 0.06), transparent 46%, rgba(1, 7, 12, 0.24) 72%, rgba(1, 7, 12, 0.9) 100%);
+}
+
+@media (max-width: 1023px) {
+  .perfect-property-ui .landing-menu-button { display: grid; }
+  .perfect-property-ui .app-body { height: auto; }
+  .perfect-property-ui .product-grid { display: flex; flex-direction: column; }
+  .perfect-property-ui .evidence-panel {
+    order: 2;
+    max-height: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-left: 0;
+  }
+  .perfect-property-ui .center-workspace { order: 1; }
+  .perfect-property-ui .maplibregl-ctrl-bottom-left { left: 8px !important; }
+  .perfect-property-ui .deal-table { max-height: 320px; }
+}
+
+@media (max-width: 767px) {
+  .perfect-property-ui .landing-hero-exposure {
+    background: linear-gradient(90deg, rgba(1, 7, 12, 0.96), rgba(1, 7, 12, 0.68) 66%, rgba(1, 7, 12, 0.45)), linear-gradient(180deg, rgba(1, 7, 12, 0.08), rgba(1, 7, 12, 0.12) 48%, rgba(1, 7, 12, 0.98) 88%);
+  }
+  .perfect-property-ui .topbar { position: sticky; top: 0; z-index: 10; }
+  .perfect-property-ui .nav-rail { position: sticky; top: 72px; z-index: 9; }
+  .perfect-property-ui .deal-table { max-height: 360px; }
+  .perfect-property-ui .evidence-panel { max-height: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .perfect-property-ui *,
+  .perfect-property-ui *::before,
+  .perfect-property-ui *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 @keyframes opp-pulse {
   0%, 100% { filter: drop-shadow(0 0 4px currentColor); opacity: 0.95; }

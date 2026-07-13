@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WorkspaceRouteImport } from './routes/workspace'
 import { Route as ShadowRouteImport } from './routes/shadow'
 import { Route as ProphecyRouteImport } from './routes/prophecy'
 import { Route as MonitoringRouteImport } from './routes/monitoring'
@@ -36,6 +37,11 @@ import { Route as ApiPublicBackfillOutcomesRouteImport } from './routes/api/publ
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 
+const WorkspaceRoute = WorkspaceRouteImport.update({
+  id: '/workspace',
+  path: '/workspace',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShadowRoute = ShadowRouteImport.update({
   id: '/shadow',
   path: '/shadow',
@@ -185,6 +191,7 @@ export interface FileRoutesByFullPath {
   '/monitoring': typeof MonitoringRoute
   '/prophecy': typeof ProphecyRoute
   '/shadow': typeof ShadowRoute
+  '/workspace': typeof WorkspaceRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin/health': typeof AdminHealthRoute
@@ -212,6 +219,7 @@ export interface FileRoutesByTo {
   '/monitoring': typeof MonitoringRoute
   '/prophecy': typeof ProphecyRoute
   '/shadow': typeof ShadowRoute
+  '/workspace': typeof WorkspaceRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin/health': typeof AdminHealthRoute
@@ -241,6 +249,7 @@ export interface FileRoutesById {
   '/monitoring': typeof MonitoringRoute
   '/prophecy': typeof ProphecyRoute
   '/shadow': typeof ShadowRoute
+  '/workspace': typeof WorkspaceRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin/health': typeof AdminHealthRoute
@@ -271,6 +280,7 @@ export interface FileRouteTypes {
     | '/monitoring'
     | '/prophecy'
     | '/shadow'
+    | '/workspace'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/admin/health'
@@ -298,6 +308,7 @@ export interface FileRouteTypes {
     | '/monitoring'
     | '/prophecy'
     | '/shadow'
+    | '/workspace'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/admin/health'
@@ -326,6 +337,7 @@ export interface FileRouteTypes {
     | '/monitoring'
     | '/prophecy'
     | '/shadow'
+    | '/workspace'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/admin/health'
@@ -355,6 +367,7 @@ export interface RootRouteChildren {
   MonitoringRoute: typeof MonitoringRoute
   ProphecyRoute: typeof ProphecyRoute
   ShadowRoute: typeof ShadowRoute
+  WorkspaceRoute: typeof WorkspaceRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
@@ -374,6 +387,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/workspace': {
+      id: '/workspace'
+      path: '/workspace'
+      fullPath: '/workspace'
+      preLoaderRoute: typeof WorkspaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/shadow': {
       id: '/shadow'
       path: '/shadow'
@@ -581,6 +601,7 @@ const rootRouteChildren: RootRouteChildren = {
   MonitoringRoute: MonitoringRoute,
   ProphecyRoute: ProphecyRoute,
   ShadowRoute: ShadowRoute,
+  WorkspaceRoute: WorkspaceRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,

@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Brand } from "@/features/perfect-property/components/Brand";
 
 function NotFoundComponent() {
   return (
@@ -120,12 +121,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
-      { rel: "preconnect", href: "https://rsms.me/" },
-      { rel: "stylesheet", href: "https://rsms.me/inter/inter.css" },
-      {
-        rel: "stylesheet",
-        href: "https://cdn.jsdelivr.net/gh/JetBrains/JetBrainsMono/web/webfonts/jetbrains-mono.css",
-      },
       { rel: "stylesheet", href: "https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" },
     ],
   }),
@@ -157,7 +152,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <div className="dark min-h-screen bg-background text-foreground">
-        {pathname === "/auth" ? null : <TopNav />}
+        {pathname === "/auth" || pathname === "/" || pathname === "/workspace" ? null : <TopNav />}
         <Outlet />
         <Toaster theme="dark" position="bottom-right" />
       </div>
@@ -171,7 +166,7 @@ function TopNav() {
     window.location.assign("/auth");
   }
   const primary: { to: string; label: string; hint: string }[] = [
-    { to: "/", label: "Map", hint: "Every scored property on a live map" },
+    { to: "/workspace", label: "Map", hint: "Every scored property on a live map" },
     { to: "/deals", label: "Deals", hint: "Ranked list of the best properties to buy" },
   ];
   const more: {
@@ -220,9 +215,9 @@ function TopNav() {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-2 px-3 sm:gap-6 sm:px-6">
-        <Link to="/" className="flex items-center gap-2.5">
-          <div className="h-2.5 w-2.5 rounded-full bg-opportunity opp-pulse text-opportunity" />
-          <span className="text-[14px] font-semibold tracking-wide">Perfect Property</span>
+        <Link to="/" className="perfect-property-ui flex items-center gap-2.5 text-foreground">
+          <Brand compact />
+          <span className="hidden text-[12px] font-semibold tracking-[0.13em] xl:inline">PERFECT PROPERTY</span>
         </Link>
         <nav className="flex items-center gap-1 text-[14px]">
           {primary.map((l) => (
