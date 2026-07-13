@@ -69,7 +69,12 @@ class LovableIngestPipeline:
             self.url,
             data=body,
             method="POST",
-            headers={"content-type": "application/json", "x-signature": sig},
+            headers={
+                "content-type": "application/json",
+                "x-signature": sig,
+                "user-agent": "PerfectPropertyScrapyIngest/1.0",
+                "accept": "application/json",
+            },
         )
         try:
             with urlopen(req, timeout=30) as r:
