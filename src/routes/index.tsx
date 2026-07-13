@@ -86,14 +86,19 @@ function HomePage() {
 
 function CoverageStrip({ cov }: { cov: Awaited<ReturnType<typeof getCoverage>> | undefined }) {
   if (!cov) return <div className="border-b border-border px-5 py-4 text-[12px] text-muted-foreground">Loading coverage…</div>;
+  const triggered = (cov as any).triggered_parcels ?? 0;
+  const queue = (cov as any).enrichment_queue?.pending ?? 0;
   return (
     <div className="border-b border-border px-5 py-4">
-      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Live coverage</div>
+      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">On the map right now</div>
       <div className="num mt-1 text-2xl font-semibold">
         {cov.total_parcels.toLocaleString()}
-        <span className="ml-1 text-sm font-normal text-muted-foreground">properties scored</span>
+        <span className="ml-1 text-sm font-normal text-muted-foreground">deals with a real trigger</span>
       </div>
-      <div className="mt-1 text-[12px] text-muted-foreground">Every property in-range gets a fresh score every night.</div>
+      <div className="mt-1 text-[12px] text-muted-foreground">
+        Filtered to parcels with a distress event or active listing in the last 180 days.
+        {triggered > 0 && ` ${triggered.toLocaleString()} triggered · ${queue.toLocaleString()} awaiting enrichment.`}
+      </div>
 
       <div className="mt-3 text-[10px] uppercase tracking-wider text-muted-foreground">Buy rating</div>
       <div className="mt-1 grid grid-cols-4 gap-1.5 text-center text-[11px]">
