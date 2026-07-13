@@ -32,6 +32,7 @@ import { Route as ApiPublicRerunUnderwriteRouteImport } from './routes/api/publi
 import { Route as ApiPublicNextScrapeTargetsRouteImport } from './routes/api/public/next-scrape-targets'
 import { Route as ApiPublicIngestOutcomesRouteImport } from './routes/api/public/ingest-outcomes'
 import { Route as ApiPublicIngestAllRouteImport } from './routes/api/public/ingest-all'
+import { Route as ApiPublicBackfillOutcomesRouteImport } from './routes/api/public/backfill-outcomes'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 
@@ -156,6 +157,12 @@ const ApiPublicIngestAllRoute = ApiPublicIngestAllRouteImport.update({
   path: '/api/public/ingest-all',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicBackfillOutcomesRoute =
+  ApiPublicBackfillOutcomesRouteImport.update({
+    id: '/api/public/backfill-outcomes',
+    path: '/api/public/backfill-outcomes',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
   Char91DotmcpChar93InvokeToolToolRouteImport.update({
     id: '/.mcp/invoke-tool/$tool',
@@ -184,6 +191,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/public/backfill-outcomes': typeof ApiPublicBackfillOutcomesRoute
   '/api/public/ingest-all': typeof ApiPublicIngestAllRoute
   '/api/public/ingest-outcomes': typeof ApiPublicIngestOutcomesRoute
   '/api/public/next-scrape-targets': typeof ApiPublicNextScrapeTargetsRoute
@@ -210,6 +218,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/public/backfill-outcomes': typeof ApiPublicBackfillOutcomesRoute
   '/api/public/ingest-all': typeof ApiPublicIngestAllRoute
   '/api/public/ingest-outcomes': typeof ApiPublicIngestOutcomesRoute
   '/api/public/next-scrape-targets': typeof ApiPublicNextScrapeTargetsRoute
@@ -238,6 +247,7 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/public/backfill-outcomes': typeof ApiPublicBackfillOutcomesRoute
   '/api/public/ingest-all': typeof ApiPublicIngestAllRoute
   '/api/public/ingest-outcomes': typeof ApiPublicIngestOutcomesRoute
   '/api/public/next-scrape-targets': typeof ApiPublicNextScrapeTargetsRoute
@@ -267,6 +277,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/public/backfill-outcomes'
     | '/api/public/ingest-all'
     | '/api/public/ingest-outcomes'
     | '/api/public/next-scrape-targets'
@@ -293,6 +304,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/public/backfill-outcomes'
     | '/api/public/ingest-all'
     | '/api/public/ingest-outcomes'
     | '/api/public/next-scrape-targets'
@@ -320,6 +332,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/public/backfill-outcomes'
     | '/api/public/ingest-all'
     | '/api/public/ingest-outcomes'
     | '/api/public/next-scrape-targets'
@@ -346,6 +359,7 @@ export interface RootRouteChildren {
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  ApiPublicBackfillOutcomesRoute: typeof ApiPublicBackfillOutcomesRoute
   ApiPublicIngestAllRoute: typeof ApiPublicIngestAllRoute
   ApiPublicIngestOutcomesRoute: typeof ApiPublicIngestOutcomesRoute
   ApiPublicNextScrapeTargetsRoute: typeof ApiPublicNextScrapeTargetsRoute
@@ -521,6 +535,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicIngestAllRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/backfill-outcomes': {
+      id: '/api/public/backfill-outcomes'
+      path: '/api/public/backfill-outcomes'
+      fullPath: '/api/public/backfill-outcomes'
+      preLoaderRoute: typeof ApiPublicBackfillOutcomesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/.mcp/invoke-tool/$tool': {
       id: '/.mcp/invoke-tool/$tool'
       path: '/.mcp/invoke-tool/$tool'
@@ -565,6 +586,7 @@ const rootRouteChildren: RootRouteChildren = {
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  ApiPublicBackfillOutcomesRoute: ApiPublicBackfillOutcomesRoute,
   ApiPublicIngestAllRoute: ApiPublicIngestAllRoute,
   ApiPublicIngestOutcomesRoute: ApiPublicIngestOutcomesRoute,
   ApiPublicNextScrapeTargetsRoute: ApiPublicNextScrapeTargetsRoute,
