@@ -150,14 +150,16 @@ function AdminPage() {
 
 
   const adapters = [
-    { name: "Parcels + Assessor", source: "PARCELS", status: "LIVE — county ArcGIS/Socrata", real: "LA · SD · SF · Miami-Dade · Broward" },
+    { name: "Parcels + Assessor", source: "PARCELS", status: "LIVE — county ArcGIS/Socrata", real: "LA · SD · SF · Miami-Dade · Broward · NYC" },
     { name: "FEMA Flood Zones", source: "FEMA", status: "LIVE — hazards.fema.gov NFHL", real: "Sampled during parcel enrichment" },
-    { name: "Recorder / Deeds", source: "DEEDS", status: "Fixture", real: "County recorder scrape (per-county HTML)" },
-    { name: "Distress Signals", source: "DISTRESS", status: "Fixture", real: "LA Treasurer tax-defaulted list, foreclosure dockets, probate court, code violations" },
+    { name: "NYC Sales", source: "NYC-SALES", status: "LIVE — Socrata (5 boroughs)", real: "4,900+ real closed sales ingested" },
+    { name: "Recorder / Deeds", source: "DEEDS", status: "Awaiting Scrapy spider", real: "County recorder scrape (per-county HTML) → /api/public/scrapy-ingest" },
+    { name: "Distress Signals", source: "DISTRESS", status: "Awaiting Scrapy spider", real: "LA Treasurer tax-defaulted, foreclosure dockets, probate, code violations" },
     { name: "HUD Homes", source: "HUD", status: "URL wired", real: "hudhomestore.gov storefront" },
-    { name: "MLS Feed", source: "MLS", status: "Fixture", real: "RESO / Trestle — requires licensed broker" },
-    { name: "Aggregator", source: "AGGREGATOR", status: "—", real: "ATTOM / PropStream / Estated" },
+    { name: "MLS Feed", source: "MLS", status: "Requires broker license", real: "RESO / Trestle" },
+    { name: "Aggregator", source: "AGGREGATOR", status: "Optional", real: "ATTOM / PropStream / Estated" },
   ];
+
 
   return (
     <div className="mx-auto max-w-[1400px] px-6 py-8">
@@ -176,14 +178,11 @@ function AdminPage() {
           <Zap className="h-4 w-4" />
           {score.isPending ? "Scoring…" : "Underwrite real parcels (uses comps)"}
         </button>
-        <button onClick={() => seed.mutate()} disabled={seed.isPending} className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:opacity-50">
-          <Database className="h-4 w-4" />
-          {seed.isPending ? "Ingesting…" : "Load fixtures (demo)"}
-        </button>
         <button onClick={() => uw.mutate()} disabled={uw.isPending} className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:opacity-50">
           <Zap className="h-4 w-4" />
-          {uw.isPending ? "Scoring…" : "Fixture underwrite"}
+          {uw.isPending ? "Scoring…" : "Rescore every parcel"}
         </button>
+
       </div>
 
       <section className="mt-8">
