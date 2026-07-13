@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { getCoverage } from "@/lib/parcels.functions";
-import { seedFixtures, runUnderwrite } from "@/lib/seed.functions";
+import { runUnderwrite } from "@/lib/seed.functions";
 import { ingestCounty, scoreAll, listSources } from "@/lib/ingest.functions";
 import { ingestAllNycSales, salesSummary } from "@/lib/sales.functions";
 import { probeUrl, listProbes } from "@/lib/probe.functions";
@@ -11,7 +11,7 @@ import { discoverSchema, saveRecipe, listRecipes, runRecipe, deleteRecipe } from
 import { supabase } from "@/integrations/supabase/client";
 import { PageHead } from "./deals";
 import { toast } from "sonner";
-import { Database, Zap, Globe, ScrollText, Search, Wand2, Play, Trash2, Copy } from "lucide-react";
+import { Zap, Globe, ScrollText, Search, Wand2, Play, Trash2, Copy } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   ssr: false,
@@ -39,7 +39,7 @@ export const Route = createFileRoute("/admin")({
 
 function AdminPage() {
   const covFn = useServerFn(getCoverage);
-  const seedFn = useServerFn(seedFixtures);
+  
   const uwFn = useServerFn(runUnderwrite);
   const ingestFn = useServerFn(ingestCounty);
   const scoreFn = useServerFn(scoreAll);
@@ -102,16 +102,12 @@ function AdminPage() {
 
 
 
-  const seed = useMutation({
-    mutationFn: () => seedFn(),
-    onSuccess: (r) => { toast.success(`Ingested ${r.parcels} parcels · ${r.deeds} deeds · ${r.distress} distress · ${r.listings} listings`); qc.invalidateQueries(); },
-    onError: (e: any) => toast.error(e.message ?? "Seed failed"),
-  });
   const uw = useMutation({
     mutationFn: () => uwFn(),
-    onSuccess: (r) => { toast.success(`Underwrote ${r.scored} parcels · ${r.outcomes} historical outcomes graded`); qc.invalidateQueries(); },
+    onSuccess: (r) => { toast.success(`Underwrote ${r.scored} live parcels${r.skipped ? ` · skipped ${r.skipped}` : ""}`); qc.invalidateQueries(); },
     onError: (e: any) => toast.error(e.message ?? "Underwrite failed"),
   });
+
   const ingest = useMutation({
     mutationFn: (fips: string) => ingestFn({ data: { county_fips: fips, max_parcels: 300, enrich_flood: true } }),
     onSuccess: (r) => {
@@ -154,14 +150,16 @@ function AdminPage() {
 
 
   const adapters = [
-    { name: "Parcels + Assessor", source: "PARCELS", status: "LIVE — county ArcGIS/Socrata", real: "LA · SD · SF · Miami-Dade · Broward" },
+    { name: "Parcels + Assessor", source: "PARCELS", status: "LIVE — county ArcGIS/Socrata", real: "LA · SD · SF · Miami-Dade · Broward · NYC" },
     { name: "FEMA Flood Zones", source: "FEMA", status: "LIVE — hazards.fema.gov NFHL", real: "Sampled during parcel enrichment" },
-    { name: "Recorder / Deeds", source: "DEEDS", status: "Fixture", real: "County recorder scrape (per-county HTML)" },
-    { name: "Distress Signals", source: "DISTRESS", status: "Fixture", real: "LA Treasurer tax-defaulted list, foreclosure dockets, probate court, code violations" },
+    { name: "NYC Sales", source: "NYC-SALES", status: "LIVE — Socrata (5 boroughs)", real: "4,900+ real closed sales ingested" },
+    { name: "Recorder / Deeds", source: "DEEDS", status: "Awaiting Scrapy spider", real: "County recorder scrape (per-county HTML) → /api/public/scrapy-ingest" },
+    { name: "Distress Signals", source: "DISTRESS", status: "Awaiting Scrapy spider", real: "LA Treasurer tax-defaulted, foreclosure dockets, probate, code violations" },
     { name: "HUD Homes", source: "HUD", status: "URL wired", real: "hudhomestore.gov storefront" },
-    { name: "MLS Feed", source: "MLS", status: "Fixture", real: "RESO / Trestle — requires licensed broker" },
-    { name: "Aggregator", source: "AGGREGATOR", status: "—", real: "ATTOM / PropStream / Estated" },
+    { name: "MLS Feed", source: "MLS", status: "Requires broker license", real: "RESO / Trestle" },
+    { name: "Aggregator", source: "AGGREGATOR", status: "Optional", real: "ATTOM / PropStream / Estated" },
   ];
+
 
   return (
     <div className="mx-auto max-w-[1400px] px-6 py-8">
@@ -180,14 +178,11 @@ function AdminPage() {
           <Zap className="h-4 w-4" />
           {score.isPending ? "Scoring…" : "Underwrite real parcels (uses comps)"}
         </button>
-        <button onClick={() => seed.mutate()} disabled={seed.isPending} className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:opacity-50">
-          <Database className="h-4 w-4" />
-          {seed.isPending ? "Ingesting…" : "Load fixtures (demo)"}
-        </button>
         <button onClick={() => uw.mutate()} disabled={uw.isPending} className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium hover:bg-surface-2 disabled:opacity-50">
           <Zap className="h-4 w-4" />
-          {uw.isPending ? "Scoring…" : "Fixture underwrite"}
+          {uw.isPending ? "Scoring…" : "Rescore every parcel"}
         </button>
+
       </div>
 
       <section className="mt-8">
@@ -605,12 +600,13 @@ function AdminPage() {
               <div className="text-[11px] text-muted-foreground">Linked to parcels: {(sales.data?.linked_to_parcels ?? 0).toLocaleString()}</div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Demo (FIXTURE) parcels</div>
-              <div className="mt-1 text-2xl font-semibold text-muted-foreground">
-                {(cov.data?.total_fixture_parcels ?? 0).toLocaleString()}
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Scored parcels</div>
+              <div className="mt-1 text-2xl font-semibold text-primary">
+                {(cov.data?.live_totals?.scored ?? 0).toLocaleString()}
               </div>
-              <div className="text-[11px] text-muted-foreground">Hidden from /deals by default</div>
+              <div className="text-[11px] text-muted-foreground">Underwritten by the engine.</div>
             </div>
+
             <div>
               <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Graded predictions</div>
               <div className="mt-1 text-2xl font-semibold">{(cov.data?.accuracy?.total ?? 0).toLocaleString()}</div>
@@ -628,8 +624,7 @@ function AdminPage() {
               <thead className="bg-surface-2 text-[10px] uppercase tracking-widest text-muted-foreground">
                 <tr>
                   <th className="px-4 py-2 text-left">County</th>
-                  <th className="px-4 py-2 text-right">Live</th>
-                  <th className="px-4 py-2 text-right">Fixture</th>
+                  <th className="px-4 py-2 text-right">Parcels</th>
                   <th className="px-4 py-2 text-left">Last ingest</th>
                 </tr>
               </thead>
@@ -638,14 +633,14 @@ function AdminPage() {
                   <tr key={c.fips} className="border-t border-border">
                     <td className="px-4 py-2">{c.state} · {c.name}</td>
                     <td className="num px-4 py-2 text-right text-profit-strong">{(c.live_parcels ?? 0).toLocaleString()}</td>
-                    <td className="num px-4 py-2 text-right text-muted-foreground">{(c.fixture_parcels ?? 0).toLocaleString()}</td>
                     <td className="num px-4 py-2 text-muted-foreground text-[11px]">{c.last_ingested_at ? new Date(c.last_ingested_at).toLocaleString() : "—"}</td>
                   </tr>
                 ))}
                 {(cov.data?.counties.length ?? 0) === 0 && (
-                  <tr><td colSpan={4} className="px-4 py-6 text-center text-muted-foreground text-sm">No counties yet — click Scan live sources.</td></tr>
+                  <tr><td colSpan={3} className="px-4 py-6 text-center text-muted-foreground text-sm">No counties yet — click Scan live sources.</td></tr>
                 )}
               </tbody>
+
             </table>
           </div>
         </section>
