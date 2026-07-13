@@ -155,6 +155,15 @@ export const getCoverage = createServerFn({ method: "GET" })
   const avgError = o.length
     ? o.reduce((a: number, b: any) => a + Math.abs(Number(b.error_pct ?? 0)), 0) / o.length
     : 0;
+  const qRows = (queueRows as any)?.data ?? queueRows ?? [];
+  const queue = {
+    pending: (qRows as any[]).filter((x) => x.status === "pending").length,
+    inflight: (qRows as any[]).filter((x) => x.status === "inflight").length,
+    done: (qRows as any[]).filter((x) => x.status === "done").length,
+    failed: (qRows as any[]).filter((x) => x.status === "failed").length,
+    total: (qRows as any[]).length,
+  };
+
   return {
     counties: countiesEnriched,
     runs: runs.data ?? [],
@@ -162,6 +171,8 @@ export const getCoverage = createServerFn({ method: "GET" })
     rings,
     total_parcels: sLive.length,
     live_totals: { parcels: (liveByCounty.data ?? []).length, scored: sLive.length },
+    triggered_parcels: triggeredIds.length,
+    enrichment_queue: queue,
     accuracy: {
       total: o.length,
       wins,
