@@ -15,16 +15,27 @@
  */
 
 export type ProvField =
-  | "living_sqft" | "year_built" | "beds" | "baths" | "lot_sqft"
-  | "assessed_value" | "last_sale_price" | "last_sale_date"
-  | "owner_name" | "owner_mailing_address" | "property_type"
-  | "lat" | "lng" | "condition_grade" | "flood_zone";
+  | "living_sqft"
+  | "year_built"
+  | "beds"
+  | "baths"
+  | "lot_sqft"
+  | "assessed_value"
+  | "last_sale_price"
+  | "last_sale_date"
+  | "owner_name"
+  | "owner_mailing_address"
+  | "property_type"
+  | "lat"
+  | "lng"
+  | "condition_grade"
+  | "flood_zone";
 
 export type ProvEntry = {
   field: ProvField | string;
   value: unknown;
-  confidence: number;   // 0..1
-  source: string;       // "REALIE", "SCRAPY:<recipe>", "COUNTY_ASSESSOR", "DEED"
+  confidence: number; // 0..1
+  source: string; // "REALIE", "SCRAPY:<recipe>", "COUNTY_ASSESSOR", "DEED"
   observed_at?: string; // ISO; defaults to now()
   provider_request_id?: string;
 };
@@ -73,7 +84,7 @@ export function shouldOverwrite(
   if (incoming.confidence > existing.confidence) return true;
   const inTs = incoming.observed_at ? Date.parse(incoming.observed_at) : Date.now();
   const exTs = existing.observed_at ? Date.parse(existing.observed_at) : 0;
-  return (inTs - exTs) > 90 * 24 * 3600 * 1000; // fresher by >90 days
+  return inTs - exTs > 90 * 24 * 3600 * 1000; // fresher by >90 days
 }
 
 export async function writeProvenance(
@@ -84,7 +95,7 @@ export async function writeProvenance(
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const nowIso = new Date().toISOString();
 
-  const rows = entries
+  const candidates = entries
     .filter((e) => e.value !== null && e.value !== undefined && e.value !== "")
     .map((e) => ({
       parcel_id: parcelId,
@@ -96,6 +107,24 @@ export async function writeProvenance(
       observed_at: e.observed_at ?? nowIso,
       written_at: nowIso,
     }));
+  if (candidates.length === 0) return { written: 0 };
+
+  const fields = Array.from(new Set(candidates.map((row) => row.field_name)));
+  const sources = Array.from(new Set(candidates.map((row) => row.source)));
+  const { data: existing, error: readError } = await (supabaseAdmin as any)
+    .from("field_provenance")
+    .select("field_name, source, confidence, observed_at")
+    .eq("parcel_id", parcelId)
+    .in("field_name", fields)
+    .in("source", sources);
+  if (readError) throw new Error(`provenance read failed: ${readError.message}`);
+
+  const existingByKey = new Map(
+    ((existing ?? []) as any[]).map((row) => [`${row.field_name}\u0000${row.source}`, row]),
+  );
+  const rows = candidates.filter((row) =>
+    shouldOverwrite(row, existingByKey.get(`${row.field_name}\u0000${row.source}`) ?? null),
+  );
   if (rows.length === 0) return { written: 0 };
 
   const { error } = await (supabaseAdmin as any)
@@ -126,14 +155,18 @@ export async function readLatestProvenance(parcelId: string) {
 }
 
 /** Weighted confidence over the fields that actually drive the underwrite. */
-export function computeScoreConfidence(latest: Map<string, { confidence: number; observed_at: string | null }>): number {
-  let num = 0, den = 0;
+export function computeScoreConfidence(
+  latest: Map<string, { confidence: number; observed_at: string | null }>,
+): number {
+  let num = 0,
+    den = 0;
   for (const [field, w] of Object.entries(FIELD_WEIGHT)) {
     const row = latest.get(field);
-    if (!row) { den += w; continue; }
-    const ageDays = row.observed_at
-      ? (Date.now() - Date.parse(row.observed_at)) / 86400000
-      : 999;
+    if (!row) {
+      den += w;
+      continue;
+    }
+    const ageDays = row.observed_at ? (Date.now() - Date.parse(row.observed_at)) / 86400000 : 999;
     // linear decay past 18 months
     const freshness = ageDays > 540 ? Math.max(0.5, 1 - (ageDays - 540) / 720) : 1;
     num += w * row.confidence * freshness;
@@ -143,10 +176,16 @@ export function computeScoreConfidence(latest: Map<string, { confidence: number;
 }
 
 /** Snapshot the current provenance into a compact object for parcel_scores.inputs_provenance. */
-export function buildProvenanceSnapshot(latest: Map<string, any>): Record<string, { source: string; confidence: number; observed_at: string | null }> {
+export function buildProvenanceSnapshot(
+  latest: Map<string, any>,
+): Record<string, { source: string; confidence: number; observed_at: string | null }> {
   const out: Record<string, any> = {};
   for (const [field, row] of latest.entries()) {
-    out[field] = { source: row.source, confidence: Number(row.confidence), observed_at: row.observed_at ?? null };
+    out[field] = {
+      source: row.source,
+      confidence: Number(row.confidence),
+      observed_at: row.observed_at ?? null,
+    };
   }
   return out;
 }

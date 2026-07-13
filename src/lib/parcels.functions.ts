@@ -4,6 +4,7 @@ import { realieLookupAddress, realieToParcelRow } from "@/lib/adapters/realie";
 import { underwrite, MARKET_CONTEXT, type ParcelInput, type DistressInput } from "@/lib/engine";
 import { appendDecision, type DecisionRecord } from "@/lib/engine/warehouse";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAdmin } from "@/integrations/supabase/require-admin";
 
 const ListInput = z.object({
   county_fips: z.string().optional(),
@@ -26,8 +27,10 @@ export const listRankedParcels = createServerFn({ method: "POST" })
     // fresh install, spiders not wired yet — we fall back to top-scored
     // LIVE parcels with real underwriting inputs so the app still shows the
     // engine's real output instead of a blank page.
-    const { data: triggerRows, error: trigErr } = await (supabase as any)
-      .rpc("parcels_with_active_trigger", { _days: 180 });
+    const { data: triggerRows, error: trigErr } = await (supabase as any).rpc(
+      "parcels_with_active_trigger",
+      { _days: 180 },
+    );
     if (trigErr) throw new Error(trigErr.message);
     const triggeredIds = ((triggerRows ?? []) as Array<{ parcel_id: string }>)
       .map((r) => r.parcel_id)
@@ -45,7 +48,6 @@ export const listRankedParcels = createServerFn({ method: "POST" })
       .limit(data.limit);
 
     if (triggeredIds.length > 0) q = q.in("parcel_id", triggeredIds);
-
 
     if (data.ring) q = q.eq("ring", data.ring);
     if (data.min_score !== undefined) q = q.gte("perfect_score", data.min_score);
@@ -75,9 +77,6 @@ export const listProphecyParcels = createServerFn({ method: "POST" })
     return runProphecyQuery(context.supabase, data);
   });
 
-
-
-
 export const getDossier = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => z.object({ parcel_id: z.string().uuid() }).parse(data))
@@ -86,9 +85,21 @@ export const getDossier = createServerFn({ method: "POST" })
     const [parcel, score, deeds, distress, listings] = await Promise.all([
       supabase.from("parcels").select("*").eq("id", data.parcel_id).maybeSingle(),
       supabase.from("parcel_scores").select("*").eq("parcel_id", data.parcel_id).maybeSingle(),
-      supabase.from("deeds").select("*").eq("parcel_id", data.parcel_id).order("recorded_at", { ascending: false }),
-      supabase.from("distress_events").select("*").eq("parcel_id", data.parcel_id).order("event_date", { ascending: false }),
-      supabase.from("listings").select("*").eq("parcel_id", data.parcel_id).order("listed_at", { ascending: false }),
+      supabase
+        .from("deeds")
+        .select("*")
+        .eq("parcel_id", data.parcel_id)
+        .order("recorded_at", { ascending: false }),
+      supabase
+        .from("distress_events")
+        .select("*")
+        .eq("parcel_id", data.parcel_id)
+        .order("event_date", { ascending: false }),
+      supabase
+        .from("listings")
+        .select("*")
+        .eq("parcel_id", data.parcel_id)
+        .order("listed_at", { ascending: false }),
     ]);
     if (parcel.error) throw new Error(parcel.error.message);
     if (!parcel.data) throw new Error("Parcel not found");
@@ -113,105 +124,120 @@ const LookupInput = z.object({
 });
 
 export const lookupParcelByAddress = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAdmin])
   .validator((data: unknown) => LookupInput.parse(data))
   .handler(async ({ data }) => {
     const { lookupParcelByAddressCore } = await import("@/lib/parcels-core");
     return lookupParcelByAddressCore(data);
   });
 
-
 export const getCoverage = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-  const supabase = context.supabase;
+    const supabase = context.supabase;
 
-  const { data: triggerRows } = await (supabase as any)
-    .rpc("parcels_with_active_trigger", { _days: 180 });
-  const triggeredIds = ((triggerRows ?? []) as Array<{ parcel_id: string }>)
-    .map((r) => r.parcel_id)
-    .filter(Boolean);
+    const { data: triggerRows } = await (supabase as any).rpc("parcels_with_active_trigger", {
+      _days: 180,
+    });
+    const triggeredIds = ((triggerRows ?? []) as Array<{ parcel_id: string }>)
+      .map((r) => r.parcel_id)
+      .filter(Boolean);
 
-  const [counties, runs, scores, outcomes, liveByCounty, queueRows] = await Promise.all([
-    supabase.from("counties").select("*").order("state").order("name"),
-    supabase.from("ingestion_runs").select("*").order("started_at", { ascending: false }).limit(30),
-    // Match listRankedParcels: LIVE + real inputs. Apply the active-trigger
-    // filter only when at least one trigger exists (fresh installs shouldn't
-    // show zero tiers/rings just because spiders haven't emitted yet).
-    (triggeredIds.length === 0
-      ? supabase
-          .from("parcel_scores")
-          .select("parcel_id, perfect_score, ring, confidence_grade, data_source, parcels!inner(county_fips, living_sqft, year_built)")
-          .eq("data_source", "LIVE")
-          .not("parcels.living_sqft", "is", null)
-          .not("parcels.year_built", "is", null)
-      : supabase
-          .from("parcel_scores")
-          .select("parcel_id, perfect_score, ring, confidence_grade, data_source, parcels!inner(county_fips, living_sqft, year_built)")
-          .eq("data_source", "LIVE")
-          .in("parcel_id", triggeredIds)
-          .not("parcels.living_sqft", "is", null)
-          .not("parcels.year_built", "is", null)),
-    supabase.from("prediction_outcomes").select("outcome, error_pct, predicted_profit, actual_profit"),
-    supabase.from("parcels").select("county_fips").eq("data_source", "LIVE").not("living_sqft", "is", null).not("year_built", "is", null),
-    supabase.from("enrichment_queue").select("status"),
-  ]);
-  const sLive = (scores.data ?? []) as any[];
-  const tiers = {
-    exceptional: sLive.filter((x: any) => x.perfect_score >= 80).length,
-    strong: sLive.filter((x: any) => x.perfect_score >= 65 && x.perfect_score < 80).length,
-    viable: sLive.filter((x: any) => x.perfect_score >= 50 && x.perfect_score < 65).length,
-    watch: sLive.filter((x: any) => x.perfect_score < 50).length,
-  };
-  const rings = {
-    r1: sLive.filter((x: any) => x.ring === 1).length,
-    r2: sLive.filter((x: any) => x.ring === 2).length,
-    r3: sLive.filter((x: any) => x.ring === 3).length,
-  };
-  const liveCounts: Record<string, number> = {};
-  for (const r of (liveByCounty.data ?? []) as any[]) liveCounts[r.county_fips] = (liveCounts[r.county_fips] ?? 0) + 1;
-  const countiesEnriched = (counties.data ?? []).map((c: any) => ({
-    ...c,
-    live_parcels: liveCounts[c.fips] ?? 0,
-  }));
+    const [counties, runs, scores, outcomes, liveByCounty, queueRows] = await Promise.all([
+      supabase.from("counties").select("*").order("state").order("name"),
+      supabase
+        .from("ingestion_runs")
+        .select("*")
+        .order("started_at", { ascending: false })
+        .limit(30),
+      // Match listRankedParcels: LIVE + real inputs. Apply the active-trigger
+      // filter only when at least one trigger exists (fresh installs shouldn't
+      // show zero tiers/rings just because spiders haven't emitted yet).
+      triggeredIds.length === 0
+        ? supabase
+            .from("parcel_scores")
+            .select(
+              "parcel_id, perfect_score, ring, confidence_grade, data_source, parcels!inner(county_fips, living_sqft, year_built)",
+            )
+            .eq("data_source", "LIVE")
+            .not("parcels.living_sqft", "is", null)
+            .not("parcels.year_built", "is", null)
+        : supabase
+            .from("parcel_scores")
+            .select(
+              "parcel_id, perfect_score, ring, confidence_grade, data_source, parcels!inner(county_fips, living_sqft, year_built)",
+            )
+            .eq("data_source", "LIVE")
+            .in("parcel_id", triggeredIds)
+            .not("parcels.living_sqft", "is", null)
+            .not("parcels.year_built", "is", null),
+      supabase
+        .from("prediction_outcomes")
+        .select("outcome, error_pct, predicted_profit, actual_profit"),
+      supabase
+        .from("parcels")
+        .select("county_fips")
+        .eq("data_source", "LIVE")
+        .not("living_sqft", "is", null)
+        .not("year_built", "is", null),
+      supabase.from("enrichment_queue").select("status"),
+    ]);
+    const sLive = (scores.data ?? []) as any[];
+    const tiers = {
+      exceptional: sLive.filter((x: any) => x.perfect_score >= 80).length,
+      strong: sLive.filter((x: any) => x.perfect_score >= 65 && x.perfect_score < 80).length,
+      viable: sLive.filter((x: any) => x.perfect_score >= 50 && x.perfect_score < 65).length,
+      watch: sLive.filter((x: any) => x.perfect_score < 50).length,
+    };
+    const rings = {
+      r1: sLive.filter((x: any) => x.ring === 1).length,
+      r2: sLive.filter((x: any) => x.ring === 2).length,
+      r3: sLive.filter((x: any) => x.ring === 3).length,
+    };
+    const liveCounts: Record<string, number> = {};
+    for (const r of (liveByCounty.data ?? []) as any[])
+      liveCounts[r.county_fips] = (liveCounts[r.county_fips] ?? 0) + 1;
+    const countiesEnriched = (counties.data ?? []).map((c: any) => ({
+      ...c,
+      live_parcels: liveCounts[c.fips] ?? 0,
+    }));
 
-  const o = (outcomes.data ?? []) as any[];
-  const wins = o.filter((x: any) => x.outcome === "WIN").length;
-  const losses = o.filter((x: any) => x.outcome === "LOSS").length;
-  const stuck = o.filter((x: any) => x.outcome === "STUCK").length;
-  const avgError = o.length
-    ? o.reduce((a: number, b: any) => a + Math.abs(Number(b.error_pct ?? 0)), 0) / o.length
-    : 0;
-  const qRows = ((queueRows as any)?.data ?? []) as Array<{ status: string }>;
-  const queue = {
-    pending: qRows.filter((x) => x.status === "pending").length,
-    inflight: qRows.filter((x) => x.status === "inflight").length,
-    done: qRows.filter((x) => x.status === "done").length,
-    failed: qRows.filter((x) => x.status === "failed").length,
-    total: qRows.length,
-  };
+    const o = (outcomes.data ?? []) as any[];
+    const wins = o.filter((x: any) => x.outcome === "WIN").length;
+    const losses = o.filter((x: any) => x.outcome === "LOSS").length;
+    const stuck = o.filter((x: any) => x.outcome === "STUCK").length;
+    const avgError = o.length
+      ? o.reduce((a: number, b: any) => a + Math.abs(Number(b.error_pct ?? 0)), 0) / o.length
+      : 0;
+    const qRows = ((queueRows as any)?.data ?? []) as Array<{ status: string }>;
+    const queue = {
+      pending: qRows.filter((x) => x.status === "pending").length,
+      inflight: qRows.filter((x) => x.status === "inflight").length,
+      done: qRows.filter((x) => x.status === "done").length,
+      failed: qRows.filter((x) => x.status === "failed").length,
+      total: qRows.length,
+    };
 
-  return {
-    counties: countiesEnriched,
-    runs: runs.data ?? [],
-    tiers,
-    rings,
-    total_parcels: sLive.length,
-    live_totals: { parcels: (liveByCounty.data ?? []).length, scored: sLive.length },
-    triggered_parcels: triggeredIds.length,
-    enrichment_queue: queue,
-    accuracy: {
-      total: o.length,
-      wins,
-      losses,
-      stuck,
-      win_rate: o.length ? wins / o.length : 0,
-      mean_abs_error_pct: avgError,
-    },
-    outcomes: o,
-  };
-});
-
+    return {
+      counties: countiesEnriched,
+      runs: runs.data ?? [],
+      tiers,
+      rings,
+      total_parcels: sLive.length,
+      live_totals: { parcels: (liveByCounty.data ?? []).length, scored: sLive.length },
+      triggered_parcels: triggeredIds.length,
+      enrichment_queue: queue,
+      accuracy: {
+        total: o.length,
+        wins,
+        losses,
+        stuck,
+        win_rate: o.length ? wins / o.length : 0,
+        mean_abs_error_pct: avgError,
+      },
+      outcomes: o,
+    };
+  });
 
 // ---------------------------------------------------------------------------
 // Per-field provenance for a single parcel — powers the "Why this score" tab.
@@ -224,7 +250,9 @@ export const getFieldProvenance = createServerFn({ method: "POST" })
     const [{ data: rows, error }, { data: score }] = await Promise.all([
       (supabase as any)
         .from("field_provenance")
-        .select("field_name, value, confidence, source, observed_at, written_at, provider_request_id")
+        .select(
+          "field_name, value, confidence, source, observed_at, written_at, provider_request_id",
+        )
         .eq("parcel_id", data.parcel_id)
         .order("written_at", { ascending: false }),
       supabase
@@ -255,23 +283,33 @@ export const getFieldProvenance = createServerFn({ method: "POST" })
 // Orchestrator status — coverage matrix + Zyte/Realie budget for /admin/health.
 // ---------------------------------------------------------------------------
 export const getOrchestratorStats = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAdmin])
   .handler(async ({ context }) => {
     const supabase = context.supabase;
-    const dayStart = new Date(); dayStart.setUTCHours(0, 0, 0, 0);
+    const dayStart = new Date();
+    dayStart.setUTCHours(0, 0, 0, 0);
 
     const [cfg, targets, runs] = await Promise.all([
       supabase.from("orchestrator_config").select("*").eq("id", 1).maybeSingle(),
-      supabase.from("scrape_targets")
-        .select("county_fips, source_kind, priority, needs_zyte, paused, penalty, last_success_at, trigger_yield_30d, cost_per_trigger_usd")
-        .order("priority", { ascending: false }).limit(200),
-      supabase.from("scrape_runs")
-        .select("cost_usd, used_zyte, triggers_produced, requests_made, status, started_at, county_fips, source_kind")
+      supabase
+        .from("scrape_targets")
+        .select(
+          "county_fips, source_kind, priority, needs_zyte, paused, penalty, last_success_at, trigger_yield_30d, cost_per_trigger_usd",
+        )
+        .order("priority", { ascending: false })
+        .limit(200),
+      supabase
+        .from("scrape_runs")
+        .select(
+          "cost_usd, used_zyte, triggers_produced, requests_made, status, started_at, county_fips, source_kind",
+        )
         .gte("started_at", dayStart.toISOString()),
     ]);
 
     const runRows = (runs.data ?? []) as any[];
-    const zyteSpent = runRows.filter((r) => r.used_zyte).reduce((a, r) => a + Number(r.cost_usd || 0), 0);
+    const zyteSpent = runRows
+      .filter((r) => r.used_zyte)
+      .reduce((a, r) => a + Number(r.cost_usd || 0), 0);
     const triggersToday = runRows.reduce((a, r) => a + Number(r.triggers_produced || 0), 0);
     const requestsToday = runRows.reduce((a, r) => a + Number(r.requests_made || 0), 0);
     const blocksToday = runRows.filter((r) => r.status === "blocked").length;
@@ -295,9 +333,7 @@ export const getOrchestratorStats = createServerFn({ method: "GET" })
         blocks: blocksToday,
         runs: runRows.length,
       },
-      targets: (targets.data ?? []),
+      targets: targets.data ?? [],
       coverage_matrix: matrix,
     };
   });
-
-

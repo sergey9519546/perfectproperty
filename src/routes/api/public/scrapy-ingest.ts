@@ -33,7 +33,11 @@ function verifySignature(secret: string, rawBody: string, header: string | null)
   const a = Buffer.from(expected, "utf8");
   const b = Buffer.from(header.trim(), "utf8");
   if (a.length !== b.length) return false;
-  try { return timingSafeEqual(a, b); } catch { return false; }
+  try {
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
 }
 
 async function dispatch(recipe: string, items: any[], sourceUrl?: string) {
@@ -46,15 +50,23 @@ async function dispatch(recipe: string, items: any[], sourceUrl?: string) {
   let note = "";
 
   if (recipe === "foreclosure" || recipe === "probate" || recipe === "code_violation") {
-    const eventType = recipe === "foreclosure" ? "FORECLOSURE"
-      : recipe === "probate" ? "PROBATE" : "CODE_VIOLATION";
+    const eventType =
+      recipe === "foreclosure"
+        ? "FORECLOSURE"
+        : recipe === "probate"
+          ? "PROBATE"
+          : "CODE_VIOLATION";
     // Resolve parcel_id when APN is provided.
     const rows: any[] = [];
     for (const it of items) {
       let parcelId = it.parcel_id ?? null;
       if (!parcelId && it.county_fips && it.apn) {
-        const { data: p } = await supabaseAdmin.from("parcels")
-          .select("id").eq("county_fips", it.county_fips).eq("apn", String(it.apn)).maybeSingle();
+        const { data: p } = await supabaseAdmin
+          .from("parcels")
+          .select("id")
+          .eq("county_fips", it.county_fips)
+          .eq("apn", String(it.apn))
+          .maybeSingle();
         parcelId = p?.id ?? null;
       }
       if (!parcelId) continue;
@@ -76,19 +88,21 @@ async function dispatch(recipe: string, items: any[], sourceUrl?: string) {
     }
     note = `matched ${inserted}/${items.length} to parcels`;
   } else if (recipe === "sale" || recipe === "auction") {
-    const rows = items.map((it) => ({
-      county_fips: String(it.county_fips ?? ""),
-      apn: it.apn ? String(it.apn) : null,
-      address: it.address ?? null,
-      sold_at: it.sold_at ?? started.slice(0, 10),
-      sale_price: it.sale_price != null ? Number(it.sale_price) : null,
-      living_sqft: it.living_sqft != null ? Number(it.living_sqft) : null,
-      lat: it.lat != null ? Number(it.lat) : null,
-      lng: it.lng != null ? Number(it.lng) : null,
-      buyer: it.buyer ?? null,
-      seller: it.seller ?? null,
-      data_source: "SCRAPY",
-    })).filter((r) => r.county_fips && r.sale_price);
+    const rows = items
+      .map((it) => ({
+        county_fips: String(it.county_fips ?? ""),
+        apn: it.apn ? String(it.apn) : null,
+        address: it.address ?? null,
+        sold_at: it.sold_at ?? started.slice(0, 10),
+        sale_price: it.sale_price != null ? Number(it.sale_price) : null,
+        living_sqft: it.living_sqft != null ? Number(it.living_sqft) : null,
+        lat: it.lat != null ? Number(it.lat) : null,
+        lng: it.lng != null ? Number(it.lng) : null,
+        buyer: it.buyer ?? null,
+        seller: it.seller ?? null,
+        data_source: "SCRAPY",
+      }))
+      .filter((r) => r.county_fips && r.sale_price);
     if (rows.length) {
       const { error } = await supabaseAdmin.from("sales").insert(rows as any);
       if (error) throw new Error(error.message);
@@ -97,28 +111,33 @@ async function dispatch(recipe: string, items: any[], sourceUrl?: string) {
     note = `inserted ${inserted}/${items.length} sales`;
   } else if (recipe === "parcel") {
     // Parcels need county + apn to upsert cleanly.
-    const rows = items.map((it) => ({
-      apn: String(it.apn),
-      county_fips: String(it.county_fips),
-      address: it.address ?? "Address unknown",
-      city: it.city ?? null, state: it.state ?? null, zip: it.zip ?? null,
-      lat: it.lat != null ? Number(it.lat) : null,
-      lng: it.lng != null ? Number(it.lng) : null,
-      property_type: it.property_type ?? "SFR",
-      year_built: it.year_built != null ? Number(it.year_built) : null,
-      living_sqft: it.living_sqft != null ? Number(it.living_sqft) : null,
-      lot_sqft: it.lot_sqft != null ? Number(it.lot_sqft) : null,
-      owner_name: it.owner_name ?? null,
-      assessed_value: it.assessed_value != null ? Number(it.assessed_value) : null,
-      condition_grade: it.condition_grade ?? "B",
-      flood_zone: it.flood_zone ?? "X",
-      school_score: it.school_score ?? 6,
-      data_source: "SCRAPY",
-      source_url: sourceUrl ?? null,
-      last_seen_at: started,
-    })).filter((r) => r.apn && r.county_fips);
+    const rows = items
+      .map((it) => ({
+        apn: String(it.apn),
+        county_fips: String(it.county_fips),
+        address: it.address ?? "Address unknown",
+        city: it.city ?? null,
+        state: it.state ?? null,
+        zip: it.zip ?? null,
+        lat: it.lat != null ? Number(it.lat) : null,
+        lng: it.lng != null ? Number(it.lng) : null,
+        property_type: it.property_type ?? "SFR",
+        year_built: it.year_built != null ? Number(it.year_built) : null,
+        living_sqft: it.living_sqft != null ? Number(it.living_sqft) : null,
+        lot_sqft: it.lot_sqft != null ? Number(it.lot_sqft) : null,
+        owner_name: it.owner_name ?? null,
+        assessed_value: it.assessed_value != null ? Number(it.assessed_value) : null,
+        condition_grade: it.condition_grade ?? "B",
+        flood_zone: it.flood_zone ?? "X",
+        school_score: it.school_score ?? 6,
+        data_source: "SCRAPY",
+        source_url: sourceUrl ?? null,
+        last_seen_at: started,
+      }))
+      .filter((r) => r.apn && r.county_fips);
     if (rows.length) {
-      const { data: upserted, error } = await supabaseAdmin.from("parcels")
+      const { data: upserted, error } = await supabaseAdmin
+        .from("parcels")
         .upsert(rows as any, { onConflict: "county_fips,apn" })
         .select("id, county_fips, apn");
       if (error) throw new Error(error.message);
@@ -132,9 +151,16 @@ async function dispatch(recipe: string, items: any[], sourceUrl?: string) {
         );
         const conf = DEFAULT_CONFIDENCE["SCRAPY:parcel"] ?? 0.7;
         const provFields = [
-          "living_sqft", "year_built", "lot_sqft", "assessed_value",
-          "owner_name", "property_type", "lat", "lng",
-          "condition_grade", "flood_zone",
+          "living_sqft",
+          "year_built",
+          "lot_sqft",
+          "assessed_value",
+          "owner_name",
+          "property_type",
+          "lat",
+          "lng",
+          "condition_grade",
+          "flood_zone",
         ];
         for (const r of rows) {
           const pid = idByKey.get(`${r.county_fips}:${r.apn}`);
@@ -157,11 +183,23 @@ async function dispatch(recipe: string, items: any[], sourceUrl?: string) {
     note = `upserted ${inserted}/${items.length} parcels`;
   }
 
-  await supabaseAdmin.from("ingestion_runs").insert({
-    county_fips: "SCRAPY", source: `SCRAPY:${recipe}`, status: inserted > 0 ? "OK" : "PARTIAL",
-    rows_ingested: inserted, notes: note,
-    started_at: started, finished_at: new Date().toISOString(),
-  });
+  const counties = Array.from(
+    new Set(
+      items
+        .map((item) => (typeof item?.county_fips === "string" ? item.county_fips : null))
+        .filter(Boolean),
+    ),
+  );
+  const { error: runError } = await supabaseAdmin.from("ingestion_runs").insert({
+    county_fips: counties.length === 1 ? counties[0] : null,
+    source: `SCRAPY:${recipe}`,
+    status: inserted > 0 ? "OK" : "PARTIAL",
+    rows_ingested: inserted,
+    notes: note,
+    started_at: started,
+    finished_at: new Date().toISOString(),
+  } as any);
+  if (runError) throw new Error(`Failed to record Scrapy ingestion run: ${runError.message}`);
 
   return { inserted, note };
 }
@@ -177,8 +215,11 @@ export const Route = createFileRoute("/api/public/scrapy-ingest")({
           return new Response("Invalid signature", { status: 401 });
         }
         let parsed;
-        try { parsed = BodySchema.parse(JSON.parse(raw)); }
-        catch (e: any) { return new Response(`Bad payload: ${e.message}`, { status: 400 }); }
+        try {
+          parsed = BodySchema.parse(JSON.parse(raw));
+        } catch (e: any) {
+          return new Response(`Bad payload: ${e.message}`, { status: 400 });
+        }
         try {
           const res = await dispatch(parsed.recipe, parsed.items, parsed.source_url);
           return Response.json({ ok: true, ...res });

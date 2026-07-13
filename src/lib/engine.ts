@@ -61,7 +61,10 @@ export interface Comp {
 
 // Trimmed mean of comp $/sqft (drop hi/lo when >= 5 comps).
 function trimmedMeanPpsf(comps: Comp[]): number | null {
-  const vals = comps.map((c) => Number(c.ppsf)).filter((v) => Number.isFinite(v) && v > 20 && v < 4000).sort((a, b) => a - b);
+  const vals = comps
+    .map((c) => Number(c.ppsf))
+    .filter((v) => Number.isFinite(v) && v > 20 && v < 4000)
+    .sort((a, b) => a - b);
   if (vals.length < 3) return null;
   const cut = vals.length >= 5 ? 1 : 0;
   const kept = vals.slice(cut, vals.length - cut);
@@ -96,11 +99,16 @@ export function computeValueLadder(p: ParcelInput, m: MarketContext, comps: Comp
 
 function conditionMultiplier(c: string | null) {
   switch (c) {
-    case "A": return 1.08;
-    case "B": return 1.0;
-    case "C": return 0.88;
-    case "D": return 0.72;
-    default: return 0.94;
+    case "A":
+      return 1.08;
+    case "B":
+      return 1.0;
+    case "C":
+      return 0.88;
+    case "D":
+      return 0.72;
+    default:
+      return 0.94;
   }
 }
 function locationMultiplier(p: ParcelInput) {
@@ -132,7 +140,11 @@ export function recommendedScope(p: ParcelInput): Scope {
 }
 
 export function arvForScope(ladder: ReturnType<typeof computeValueLadder>, scope: Scope) {
-  return scope === "COSMETIC" ? ladder.cosmetic_arv : scope === "FULL" ? ladder.full_reno_arv : ladder.expanded_arv;
+  return scope === "COSMETIC"
+    ? ladder.cosmetic_arv
+    : scope === "FULL"
+      ? ladder.full_reno_arv
+      : ladder.expanded_arv;
 }
 
 // ---------------------------------------------------------------------------
@@ -146,24 +158,30 @@ export function computeAcquisition(p: ParcelInput, distress: DistressInput[], as
   for (const d of distress) {
     switch (d.event_type) {
       case "FORECLOSURE_NOD":
-        base += 0.32; discountFromAsIs.push(0.18);
+        base += 0.32;
+        discountFromAsIs.push(0.18);
         flags.push("Foreclosure NOD filed");
         break;
       case "AUCTION_SCHEDULED":
-        base += 0.45; discountFromAsIs.push(0.28);
+        base += 0.45;
+        discountFromAsIs.push(0.28);
         flags.push("Auction scheduled");
         break;
       case "TAX_LIEN":
-        base += 0.14; discountFromAsIs.push(0.09);
+        base += 0.14;
+        discountFromAsIs.push(0.09);
         break;
       case "PROBATE":
-        base += 0.22; discountFromAsIs.push(0.14);
+        base += 0.22;
+        discountFromAsIs.push(0.14);
         break;
       case "CODE_VIOLATION":
-        base += 0.09; discountFromAsIs.push(0.06);
+        base += 0.09;
+        discountFromAsIs.push(0.06);
         break;
       case "VACANCY":
-        base += 0.11; discountFromAsIs.push(0.07);
+        base += 0.11;
+        discountFromAsIs.push(0.07);
         break;
     }
   }
@@ -190,15 +208,22 @@ export function computeExit(m: MarketContext) {
 // ---------------------------------------------------------------------------
 // The Skeptic — hunts for what the market already knows
 // ---------------------------------------------------------------------------
-export function skepticVerdict(p: ParcelInput, distress: DistressInput[], grossProfit: number, arv: number) {
+export function skepticVerdict(
+  p: ParcelInput,
+  distress: DistressInput[],
+  grossProfit: number,
+  arv: number,
+) {
   const flags: string[] = [];
-  if (p.flood_zone && ["AE", "VE", "A"].includes(p.flood_zone)) flags.push("FEMA high-risk flood zone");
+  if (p.flood_zone && ["AE", "VE", "A"].includes(p.flood_zone))
+    flags.push("FEMA high-risk flood zone");
   if (p.condition_grade === "D") flags.push("Condition grade D — deep unknowns");
   if ((p.year_built ?? 2000) < 1955) flags.push("Pre-1955 build — hidden systems risk");
   const taxAmt = distress.find((d) => d.event_type === "TAX_LIEN")?.amount ?? 0;
   if (taxAmt > 25000) flags.push(`Tax lien of $${Math.round(taxAmt / 1000)}k must be cleared`);
   const marginPct = arv > 0 ? grossProfit / arv : 0;
-  if (marginPct > 0.45) flags.push("Extreme apparent margin — market signal suggests hidden defect");
+  if (marginPct > 0.45)
+    flags.push("Extreme apparent margin — market signal suggests hidden defect");
   return flags;
 }
 
@@ -254,9 +279,9 @@ export interface UnderwriteResult {
   arv_exit_p50?: number;
   arv_exit_p95?: number;
   lightgbm_divergence?: number;
-  primary_rank?: number;         // P(true_margin >= floor)
-  retail_score?: number;         // 0..100, geometric-mean of 4 factors
-  survival_factor?: number;      // clustered noisy-OR survival
+  primary_rank?: number; // P(true_margin >= floor)
+  retail_score?: number; // 0..100, geometric-mean of 4 factors
+  survival_factor?: number; // clustered noisy-OR survival
   pd_credit?: number;
   pd_project?: number;
   pd_exit?: number;
@@ -278,7 +303,6 @@ export interface UnderwriteResult {
 import * as v11 from "./engine/v11";
 import * as v12 from "./engine/v12";
 import * as credit from "./engine/credit";
-
 
 /**
  * v11 upgrade — the underwrite orchestrator now runs the canon:
@@ -317,9 +341,13 @@ export function underwrite(
   const compPpsfs = comps.map((c) => Number(c.ppsf)).filter((v) => Number.isFinite(v) && v > 0);
   const logPpsfs = compPpsfs.map((x) => Math.log(x));
   const meanLog = logPpsfs.length ? logPpsfs.reduce((a, b) => a + b, 0) / logPpsfs.length : 0;
-  const sigmaLogDisp = logPpsfs.length > 1
-    ? Math.sqrt(logPpsfs.map((x) => (x - meanLog) ** 2).reduce((a, b) => a + b, 0) / (logPpsfs.length - 1))
-    : 0.18;
+  const sigmaLogDisp =
+    logPpsfs.length > 1
+      ? Math.sqrt(
+          logPpsfs.map((x) => (x - meanLog) ** 2).reduce((a, b) => a + b, 0) /
+            (logPpsfs.length - 1),
+        )
+      : 0.18;
   const nEff = Math.max(compPpsfs.length, 3);
   const sigma_arv_log = v11.sigmaArvLog({ sigmaLogDisp, nEff, sigmaSysLogBacktest: 0 });
   const monthlyDrift = Math.log(1 + m.momentum * 0.02); // ≈2%/yr scaled by momentum
@@ -328,7 +356,9 @@ export function underwrite(
     m.pending_ratio * 2 - 1, // pending ratio as leading signal proxy in [-1,1]
   );
   // Rehab PERT band around the deterministic cost.
-  const rehabL = reno * 0.85, rehabM = reno, rehabH = reno * 1.35;
+  const rehabL = reno * 0.85,
+    rehabM = reno,
+    rehabH = reno * 1.35;
   const mc = v11.runMonteCarlo({
     arv_today: arv,
     drift_used_monthly: drift_used,
@@ -352,17 +382,17 @@ export function underwrite(
     return_draws: true,
   });
 
-
   // --- (3) Skeptic (clustered noisy-OR) -----------------------------------
   const defects: v11.DefectProb[] = [];
-  if (p.flood_zone && ["AE", "VE", "A"].includes(p.flood_zone)) defects.push({ cluster: "WATER", p: 0.4 });
+  if (p.flood_zone && ["AE", "VE", "A"].includes(p.flood_zone))
+    defects.push({ cluster: "WATER", p: 0.4 });
   if (p.condition_grade === "D") defects.push({ cluster: "STRUCTURE", p: 0.45 });
   if ((p.year_built ?? 2000) < 1955) defects.push({ cluster: "STRUCTURE", p: 0.25 });
   const taxAmt = distress.find((d) => d.event_type === "TAX_LIEN")?.amount ?? 0;
   if (taxAmt > 25000) defects.push({ cluster: "LEGAL", p: Math.min(0.6, taxAmt / 100000) });
   if ((ladder.comp_count ?? 0) < 3) defects.push({ cluster: "DATA_QUALITY", p: 0.5 });
   const sigmaMarginPct = sigma_arv_log; // in log-price / margin space, close enough
-  const suspZ = marginPct > 0.45 ? (marginPct - 0.30) / Math.max(sigmaMarginPct, 0.05) : 0;
+  const suspZ = marginPct > 0.45 ? (marginPct - 0.3) / Math.max(sigmaMarginPct, 0.05) : 0;
   const F_surv = v11.skepticFactor(defects, suspZ);
   const skeptic_flags = buildSkepticFlags(p, distress, marginPct);
 
@@ -373,21 +403,24 @@ export function underwrite(
     m.momentum * 0.05, // crude "market-typical margin" prior
     0.12,
   );
-  const F_profit = v11.exceedanceRank(marginGov.mu, marginGov.sigma, 0.03, 0.10);
+  const F_profit = v11.exceedanceRank(marginGov.mu, marginGov.sigma, 0.03, 0.1);
 
   // --- (5) Safe score ------------------------------------------------------
   const confidence = v11.clip01(1 - sigma_arv_log / Math.log(2));
   const F_acq = v11.clip01(acq.acquisition_probability);
   const F_exit = v11.clip01(v11.exitFactor(exit.exit_days, 45));
   const F_conf = v11.clip01(confidence);
-  const F_gov = v11.clip01(1 - Math.abs(marginPct - marginGov.mu) / 0.20);
+  const F_gov = v11.clip01(1 - Math.abs(marginPct - marginGov.mu) / 0.2);
   const scored = v11.safeScore(
     { F_profit, F_acq, F_exit, F_surv, F_conf, F_gov },
-    { profit: 0.34, acq: 0.20, exit: 0.14, surv: 0.14, conf: 0.10, gov: 0.08 },
+    { profit: 0.34, acq: 0.2, exit: 0.14, surv: 0.14, conf: 0.1, gov: 0.08 },
     {
-      profit_p5: mc.profit_p5, loss_floor: -25_000,
-      p_loss: mc.P_loss, loss_prob_ceiling: 0.60,
-      confidence, confidence_floor: 0.15,
+      profit_p5: mc.profit_p5,
+      loss_floor: -25_000,
+      p_loss: mc.P_loss,
+      loss_prob_ceiling: 0.6,
+      confidence,
+      confidence_floor: 0.15,
     },
   );
 
@@ -397,7 +430,11 @@ export function underwrite(
   const grade = confidenceGrade(uncertainty, distress.length, p.is_listed);
 
   // ring=1 listed on market · ring=2 off-market · ring=3 predicted (NOD w/o auction)
-  const prophecySignal = distress.some((d) => d.event_type === "FORECLOSURE_NOD" && !distress.some((x) => x.event_type === "AUCTION_SCHEDULED"));
+  const prophecySignal = distress.some(
+    (d) =>
+      d.event_type === "FORECLOSURE_NOD" &&
+      !distress.some((x) => x.event_type === "AUCTION_SCHEDULED"),
+  );
   let ring: Ring = p.is_listed ? 1 : 2;
   if (!p.is_listed && prophecySignal) ring = 3;
 
@@ -412,9 +449,7 @@ export function underwrite(
   const draws = mc.draws?.profits ?? [];
   const arvExits = mc.draws?.arvExits ?? [];
   const cost_basis = acq.modeled_offer + reno;
-  const primary_rank = draws.length
-    ? v12.primaryRankFromMC(draws, cost_basis, 0.10)
-    : 0;
+  const primary_rank = draws.length ? v12.primaryRankFromMC(draws, cost_basis, 0.1) : 0;
   const v12Defects: v12.V12Defect[] = defects
     .filter((d) => d.cluster !== "DATA_QUALITY")
     .map((d) => ({ cluster: d.cluster as v12.V12RiskCluster, p: d.p }));
@@ -427,10 +462,12 @@ export function underwrite(
   });
   const sortedExits = [...arvExits].sort((a, b) => a - b);
   const qExit = (pct: number) =>
-    sortedExits.length ? sortedExits[Math.min(sortedExits.length - 1, Math.floor(pct * sortedExits.length))] : arv;
+    sortedExits.length
+      ? sortedExits[Math.min(sortedExits.length - 1, Math.floor(pct * sortedExits.length))]
+      : arv;
   const arv_today = arv;
   const arv_exit_p5 = qExit(0.05);
-  const arv_exit_p50 = qExit(0.50);
+  const arv_exit_p50 = qExit(0.5);
   const arv_exit_p95 = qExit(0.95);
   const lightgbm_divergence = 0; // placeholder — no anchor model trained yet
 
@@ -458,11 +495,19 @@ export function underwrite(
     protective_advances: 0,
     expected_carry_to_resolution: carry_cost,
   });
-  const lgd = credit.lgd({
-    ARV: arv, ARV_shock: -0.15, liquidation_haircut: 0.85,
-    foreclosure_cost: 15_000, liquidation_carry_cost: carry_cost * 0.5,
-    senior_claims: taxAmt, selling_cost: selling_cost, legal_workout_cost: 8_000,
-  }, ead);
+  const lgd = credit.lgd(
+    {
+      ARV: arv,
+      ARV_shock: -0.15,
+      liquidation_haircut: 0.85,
+      foreclosure_cost: 15_000,
+      liquidation_carry_cost: carry_cost * 0.5,
+      senior_claims: taxAmt,
+      selling_cost: selling_cost,
+      legal_workout_cost: 8_000,
+    },
+    ead,
+  );
   const expected_loss = credit.expectedLoss(pd_credit, lgd, ead);
   const risk_adjusted_profit_credit = credit.riskAdjustedProfit({
     E_profit_no_default: mc.expected_profit,
@@ -471,18 +516,17 @@ export function underwrite(
     liquidity_charge: ead * 0.005,
     servicing_and_workout_cost: 2500,
   });
-  const raroc = risk_adjusted_profit_credit / Math.max(ead * 0.10, 1); // EC ≈ 10% of EAD stub
+  const raroc = risk_adjusted_profit_credit / Math.max(ead * 0.1, 1); // EC ≈ 10% of EAD stub
 
   // --- (8) Gates 0-8 --------------------------------------------------------
   const passed = new Set<number>();
-  passed.add(0); passed.add(1); // seeded infra + entity resolution assumed live
+  passed.add(0);
+  passed.add(1); // seeded infra + entity resolution assumed live
   if (ladder.comp_count >= 3) passed.add(2);
   // Gate 3 (falsifier) not yet passed — locks Prophecy / institutional surfaces
   // Gates 4-8 remain locked pending business milestones
   const trust = v12.gate3TrustLock(passed);
   const gate_status = { passed: [...passed].sort((a, b) => a - b), ...trust };
-
-
 
   return {
     ...ladder,
@@ -498,9 +542,11 @@ export function underwrite(
     risk_adjusted_profit,
     perfect_score,
     confidence_grade: grade,
-    skeptic_flags: scored.rejected ? [`Rejected: ${scored.reason}`, ...skeptic_flags] : skeptic_flags,
+    skeptic_flags: scored.rejected
+      ? [`Rejected: ${scored.reason}`, ...skeptic_flags]
+      : skeptic_flags,
     motivation_flags: acq.motivationFlags,
-    ring: trust.prophecy_ranking ? ring : Math.min(ring, 2) as Ring,
+    ring: trust.prophecy_ranking ? ring : (Math.min(ring, 2) as Ring),
     offer_curve,
     // v12 outputs
     arv_today: round(arv_today),
@@ -536,30 +582,72 @@ export function underwrite(
   };
 }
 
-
 function buildSkepticFlags(p: ParcelInput, distress: DistressInput[], marginPct: number): string[] {
   const flags: string[] = [];
-  if (p.flood_zone && ["AE", "VE", "A"].includes(p.flood_zone)) flags.push("FEMA high-risk flood zone");
+  if (p.flood_zone && ["AE", "VE", "A"].includes(p.flood_zone))
+    flags.push("FEMA high-risk flood zone");
   if (p.condition_grade === "D") flags.push("Condition grade D — deep unknowns");
   if ((p.year_built ?? 2000) < 1955) flags.push("Pre-1955 build — hidden systems risk");
   const taxAmt = distress.find((d) => d.event_type === "TAX_LIEN")?.amount ?? 0;
   if (taxAmt > 25000) flags.push(`Tax lien of $${Math.round(taxAmt / 1000)}k must be cleared`);
-  if (marginPct > 0.45) flags.push("Extreme apparent margin — market signal suggests hidden defect");
+  if (marginPct > 0.45)
+    flags.push("Extreme apparent margin — market signal suggests hidden defect");
   return flags;
 }
-
 
 // ---------------------------------------------------------------------------
 // Market context by county — normally learned from deed history.
 // Seeded with realistic bands per FIPS.
 // ---------------------------------------------------------------------------
 export const MARKET_CONTEXT: Record<string, MarketContext> = {
-  "06037": { median_ppsf: 620, ppsf_stddev: 140, avg_dom_renovated: 34, pending_ratio: 0.42, momentum: 0.08 }, // LA County
-  "06073": { median_ppsf: 720, ppsf_stddev: 160, avg_dom_renovated: 31, pending_ratio: 0.48, momentum: 0.12 }, // San Diego
-  "12086": { median_ppsf: 445, ppsf_stddev: 120, avg_dom_renovated: 52, pending_ratio: 0.38, momentum: -0.04 }, // Miami-Dade
-  "12011": { median_ppsf: 385, ppsf_stddev: 95, avg_dom_renovated: 61, pending_ratio: 0.34, momentum: -0.09 }, // Broward
+  "06037": {
+    median_ppsf: 620,
+    ppsf_stddev: 140,
+    avg_dom_renovated: 34,
+    pending_ratio: 0.42,
+    momentum: 0.08,
+  }, // LA County
+  "06073": {
+    median_ppsf: 720,
+    ppsf_stddev: 160,
+    avg_dom_renovated: 31,
+    pending_ratio: 0.48,
+    momentum: 0.12,
+  }, // San Diego
+  "12086": {
+    median_ppsf: 445,
+    ppsf_stddev: 120,
+    avg_dom_renovated: 52,
+    pending_ratio: 0.38,
+    momentum: -0.04,
+  }, // Miami-Dade
+  "12011": {
+    median_ppsf: 385,
+    ppsf_stddev: 95,
+    avg_dom_renovated: 61,
+    pending_ratio: 0.34,
+    momentum: -0.09,
+  }, // Broward
 };
 
-function clamp(x: number, lo: number, hi: number) { return Math.min(hi, Math.max(lo, x)); }
-function round(x: number) { return Math.round(x); }
-function round2(x: number) { return Math.round(x * 100) / 100; }
+export const DEFAULT_MARKET_CONTEXT: MarketContext = {
+  median_ppsf: 350,
+  ppsf_stddev: 100,
+  avg_dom_renovated: 55,
+  pending_ratio: 0.35,
+  momentum: 0,
+};
+
+export function marketContextForCounty(countyFips: string): MarketContext {
+  return MARKET_CONTEXT[countyFips] ?? DEFAULT_MARKET_CONTEXT;
+}
+
+function clamp(x: number, lo: number, hi: number) {
+  return Math.min(hi, Math.max(lo, x));
+}
+function round(x: number) {
+  return Math.round(x);
+}
+function round2(x: number) {
+  return Math.round(x * 100) / 100;
+}

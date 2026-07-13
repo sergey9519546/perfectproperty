@@ -7,7 +7,7 @@ import { COUNTY_SOURCES, type CountySource } from "./adapters/sources";
 import { arcgisQuery, featureCentroid, type ArcGISFeature } from "./adapters/arcgis";
 import { socrataQueryAll } from "./adapters/socrata";
 import { femaFloodZoneAt } from "./adapters/fema";
-import { MARKET_CONTEXT, underwrite, type ParcelInput, type DistressInput } from "./engine";
+import { marketContextForCounty, underwrite, type ParcelInput, type DistressInput } from "./engine";
 
 export type IngestArgs = {
   county_fips: string;
@@ -67,7 +67,9 @@ function normalizeArcGISFeature(f: ArcGISFeature, src: CountySource) {
   return {
     apn: String(a[c.field_apn ?? "OBJECTID"] ?? crypto.randomUUID()),
     county_fips: src.fips,
-    address: c.field_address ? String(a[c.field_address] ?? "").trim() || "Address unknown" : "Address unknown",
+    address: c.field_address
+      ? String(a[c.field_address] ?? "").trim() || "Address unknown"
+      : "Address unknown",
     city: c.field_city ? String(a[c.field_city] ?? "").trim() || null : null,
     state: src.state,
     zip: c.field_zip ? String(a[c.field_zip] ?? "").trim() || null : null,
@@ -103,7 +105,10 @@ function normalizeSocrataRow(r: Record<string, any>, src: CountySource) {
     city = "San Francisco";
   } else if (c.address_builder === "nyc") {
     address = String(r.address ?? "").trim() || "Address unknown";
-    city = { BX: "Bronx", BK: "Brooklyn", MN: "Manhattan", QN: "Queens", SI: "Staten Island" }[r.borough as string] ?? null;
+    city =
+      { BX: "Bronx", BK: "Brooklyn", MN: "Manhattan", QN: "Queens", SI: "Staten Island" }[
+        r.borough as string
+      ] ?? null;
   } else if (c.address_builder === "chicago") {
     address = String(r.prop_address_full ?? "").trim() || "Address unknown";
     city = String(r.prop_address_city_name ?? "").trim() || null;
@@ -113,22 +118,40 @@ function normalizeSocrataRow(r: Record<string, any>, src: CountySource) {
   }
   const yb = c.field_year_built ? Number(r[c.field_year_built]) || null : null;
   const sqft = c.field_living_sqft ? Number(r[c.field_living_sqft]) || null : null;
-  let lat = src.center[0], lng = src.center[1];
-  if (r.latitude && r.longitude) { lat = Number(r.latitude); lng = Number(r.longitude); }
-  else if (r.lat && r.lon) { lat = Number(r.lat); lng = Number(r.lon); }
-  else if (r.location?.latitude && r.location?.longitude) { lat = Number(r.location.latitude); lng = Number(r.location.longitude); }
+  let lat = src.center[0],
+    lng = src.center[1];
+  if (r.latitude && r.longitude) {
+    lat = Number(r.latitude);
+    lng = Number(r.longitude);
+  } else if (r.lat && r.lon) {
+    lat = Number(r.lat);
+    lng = Number(r.lon);
+  } else if (r.location?.latitude && r.location?.longitude) {
+    lat = Number(r.location.latitude);
+    lng = Number(r.location.longitude);
+  }
   let apn = String(r[c.field_apn ?? "id"] ?? crypto.randomUUID());
   if (c.address_builder === "nyc") apn = apn.replace(/\..*$/, "").replace(/^0+/, "") || apn;
-  const NYC_FIPS: Record<string, string> = { MN: "36061", BX: "36005", BK: "36047", QN: "36081", SI: "36085" };
-  const county_fips = c.address_builder === "nyc" && NYC_FIPS[r.borough as string]
-    ? NYC_FIPS[r.borough as string]!
-    : src.fips;
+  const NYC_FIPS: Record<string, string> = {
+    MN: "36061",
+    BX: "36005",
+    BK: "36047",
+    QN: "36081",
+    SI: "36085",
+  };
+  const county_fips =
+    c.address_builder === "nyc" && NYC_FIPS[r.borough as string]
+      ? NYC_FIPS[r.borough as string]!
+      : src.fips;
   return {
     apn,
     county_fips,
-    address, city, state: src.state,
+    address,
+    city,
+    state: src.state,
     zip: c.field_zip ? String(r[c.field_zip] ?? "").trim() || null : null,
-    lat, lng,
+    lat,
+    lng,
     property_type: "SFR",
     year_built: yb,
     living_sqft: sqft,
@@ -157,9 +180,18 @@ export async function ingestCountyCore(args: IngestArgs): Promise<IngestResult> 
   const supabase = supabaseAdmin;
   const started = new Date().toISOString();
 
-  const countyRows = [{ fips: src.fips, state: src.state, name: src.name,
-    center_lat: src.center[0], center_lng: src.center[1],
-    last_ingested_at: started, coverage_pct: 100, parcel_count: 0 }];
+  const countyRows = [
+    {
+      fips: src.fips,
+      state: src.state,
+      name: src.name,
+      center_lat: src.center[0],
+      center_lng: src.center[1],
+      last_ingested_at: started,
+      coverage_pct: 100,
+      parcel_count: 0,
+    },
+  ];
   if (src.parcels?.address_builder === "nyc") {
     const NYC = [
       { fips: "36061", name: "NYC · Manhattan" },
@@ -168,11 +200,17 @@ export async function ingestCountyCore(args: IngestArgs): Promise<IngestResult> 
       { fips: "36081", name: "NYC · Queens" },
       { fips: "36085", name: "NYC · Staten Island" },
     ];
-    for (const c of NYC) countyRows.push({
-      fips: c.fips, state: "NY", name: c.name,
-      center_lat: 40.7128, center_lng: -74.006,
-      last_ingested_at: started, coverage_pct: 100, parcel_count: 0,
-    });
+    for (const c of NYC)
+      countyRows.push({
+        fips: c.fips,
+        state: "NY",
+        name: c.name,
+        center_lat: 40.7128,
+        center_lng: -74.006,
+        last_ingested_at: started,
+        coverage_pct: 100,
+        parcel_count: 0,
+      });
   }
   for (const row of countyRows) await supabase.from("counties").upsert(row, { onConflict: "fips" });
 
@@ -185,7 +223,12 @@ export async function ingestCountyCore(args: IngestArgs): Promise<IngestResult> 
   if (!preflight.ok) {
     status = "FAIL";
     note = `Preflight ${preflight.status}: ${preflight.note}`;
-    await recordFailure({ source: "PARCELS_PREFLIGHT", stage: "preflight", countyFips: src.fips, error: new Error(note) });
+    await recordFailure({
+      source: "PARCELS_PREFLIGHT",
+      stage: "preflight",
+      countyFips: src.fips,
+      error: new Error(note),
+    });
   } else {
     try {
       if (src.parcels?.kind === "ARCGIS") parcels = await fetchParcelsFromArcGIS(src, max);
@@ -195,7 +238,12 @@ export async function ingestCountyCore(args: IngestArgs): Promise<IngestResult> 
     } catch (e: any) {
       status = "FAIL";
       note = `Upstream error: ${e.message}`;
-      await recordFailure({ source: "PARCELS_FETCH", stage: "fetch", countyFips: src.fips, error: e });
+      await recordFailure({
+        source: "PARCELS_FETCH",
+        stage: "fetch",
+        countyFips: src.fips,
+        error: e,
+      });
     }
   }
 
@@ -212,34 +260,59 @@ export async function ingestCountyCore(args: IngestArgs): Promise<IngestResult> 
     const url = src.parcels?.url ?? null;
     const seen = new Set<string>();
     const stamped = parcels
-      .map((p) => ({ ...p, data_source: "LIVE", source_url: url, last_seen_at: new Date().toISOString() }))
+      .map((p) => ({
+        ...p,
+        data_source: "LIVE",
+        source_url: url,
+        last_seen_at: new Date().toISOString(),
+      }))
       .filter((p) => {
         const k = `${p.county_fips}|${p.apn}`;
         if (seen.has(k)) return false;
-        seen.add(k); return true;
+        seen.add(k);
+        return true;
       });
     const CHUNK = 200;
     for (let i = 0; i < stamped.length; i += CHUNK) {
       const chunk = stamped.slice(i, i + CHUNK);
-      const { error } = await supabase.from("parcels").upsert(chunk, { onConflict: "county_fips,apn" });
+      const { error } = await supabase
+        .from("parcels")
+        .upsert(chunk, { onConflict: "county_fips,apn" });
       if (error) {
-        status = "PARTIAL"; note = `Upsert error: ${error.message}`;
-        await recordFailure({ source: "PARCELS_UPSERT", stage: "upsert", countyFips: src.fips, error, payload: { chunk_start: i, chunk_len: chunk.length } });
+        status = "PARTIAL";
+        note = `Upsert error: ${error.message}`;
+        await recordFailure({
+          source: "PARCELS_UPSERT",
+          stage: "upsert",
+          countyFips: src.fips,
+          error,
+          payload: { chunk_start: i, chunk_len: chunk.length },
+        });
         break;
       }
       inserted += chunk.length;
     }
     const touched = Array.from(new Set(stamped.map((p) => p.county_fips)));
     for (const fips of touched) {
-      const { count } = await supabase.from("parcels").select("id", { count: "exact", head: true }).eq("county_fips", fips);
-      await supabase.from("counties").update({ parcel_count: count ?? 0 }).eq("fips", fips);
+      const { count } = await supabase
+        .from("parcels")
+        .select("id", { count: "exact", head: true })
+        .eq("county_fips", fips);
+      await supabase
+        .from("counties")
+        .update({ parcel_count: count ?? 0 })
+        .eq("fips", fips);
     }
   }
 
   await supabase.from("ingestion_runs").insert({
-    county_fips: src.fips, source: "PARCELS", status,
-    rows_ingested: inserted, notes: note,
-    started_at: started, finished_at: new Date().toISOString(),
+    county_fips: src.fips,
+    source: "PARCELS",
+    status,
+    rows_ingested: inserted,
+    notes: note,
+    started_at: started,
+    finished_at: new Date().toISOString(),
   });
 
   return { fips: src.fips, name: src.name, fetched: parcels.length, inserted, status, note };
@@ -248,19 +321,38 @@ export async function ingestCountyCore(args: IngestArgs): Promise<IngestResult> 
 export async function scoreAllCore(): Promise<{ scored: number; comps_backed: number }> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const supabase = supabaseAdmin;
-  const { data: parcels, error } = await supabase.from("parcels").select("*").eq("data_source", "LIVE");
-  if (error) throw new Error(error.message);
+  const parcels: any[] = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("parcels")
+      .select("*")
+      .eq("data_source", "LIVE")
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    parcels.push(...(data ?? []));
+    if ((data?.length ?? 0) < PAGE) break;
+  }
   const parcelIds = (parcels ?? []).map((p) => p.id);
   const byParcel = new Map<string, DistressInput[]>();
   if (parcelIds.length) {
-    const { data: distress } = await supabase.from("distress_events").select("*").in("parcel_id", parcelIds);
-    for (const d of distress ?? []) {
-      const arr = byParcel.get(d.parcel_id) ?? [];
-      arr.push({
-        event_type: d.event_type, severity: d.severity, amount: d.amount,
-        event_date: d.event_date, auction_date: d.auction_date,
-      });
-      byParcel.set(d.parcel_id, arr);
+    for (let i = 0; i < parcelIds.length; i += 500) {
+      const { data: distress, error: distressError } = await supabase
+        .from("distress_events")
+        .select("*")
+        .in("parcel_id", parcelIds.slice(i, i + 500));
+      if (distressError) throw new Error(distressError.message);
+      for (const d of distress ?? []) {
+        const arr = byParcel.get(d.parcel_id) ?? [];
+        arr.push({
+          event_type: d.event_type,
+          severity: d.severity,
+          amount: d.amount,
+          event_date: d.event_date,
+          auction_date: d.auction_date,
+        });
+        byParcel.set(d.parcel_id, arr);
+      }
     }
   }
 
@@ -268,80 +360,113 @@ export async function scoreAllCore(): Promise<{ scored: number; comps_backed: nu
   const scores: any[] = [];
   for (const p of parcels ?? []) {
     try {
-    const m = MARKET_CONTEXT[p.county_fips] ?? {
-      median_ppsf: 400, ppsf_stddev: 110, avg_dom_renovated: 55, pending_ratio: 0.35, momentum: 0,
-    };
-    const input: ParcelInput = {
-      living_sqft: p.living_sqft, lot_sqft: p.lot_sqft, year_built: p.year_built,
-      bedrooms: p.bedrooms, bathrooms: p.bathrooms ? Number(p.bathrooms) : null,
-      condition_grade: p.condition_grade, flood_zone: p.flood_zone, school_score: p.school_score,
-      assessed_value: p.assessed_value ? Number(p.assessed_value) : null,
-      estimated_equity: p.estimated_equity ? Number(p.estimated_equity) : null,
-      owner_is_absentee: p.owner_is_absentee, owner_since: p.owner_since,
-      is_listed: p.is_listed, is_vacant: p.is_vacant, state: p.state,
-    };
-    let comps: any[] = [];
-    if (p.lat != null && p.lng != null && (p.living_sqft ?? 0) > 100) {
-      const { data: cRows } = await (supabase as any).rpc("pick_comps", {
-        subject_lat: p.lat, subject_lng: p.lng, subject_sqft: p.living_sqft, subject_county: p.county_fips,
+      const m = marketContextForCounty(p.county_fips);
+      const input: ParcelInput = {
+        living_sqft: p.living_sqft,
+        lot_sqft: p.lot_sqft,
+        year_built: p.year_built,
+        bedrooms: p.bedrooms,
+        bathrooms: p.bathrooms ? Number(p.bathrooms) : null,
+        condition_grade: p.condition_grade,
+        flood_zone: p.flood_zone,
+        school_score: p.school_score,
+        assessed_value: p.assessed_value ? Number(p.assessed_value) : null,
+        estimated_equity: p.estimated_equity ? Number(p.estimated_equity) : null,
+        owner_is_absentee: p.owner_is_absentee,
+        owner_since: p.owner_since,
+        is_listed: p.is_listed,
+        is_vacant: p.is_vacant,
+        state: p.state,
+      };
+      let comps: any[] = [];
+      if (p.lat != null && p.lng != null && (p.living_sqft ?? 0) > 100) {
+        const { data: cRows } = await (supabase as any).rpc("pick_comps", {
+          subject_lat: p.lat,
+          subject_lng: p.lng,
+          subject_sqft: p.living_sqft,
+          subject_county: p.county_fips,
+        });
+        comps = (cRows ?? []).map((c: any) => ({
+          ppsf: Number(c.ppsf),
+          distance_km: Number(c.distance_km),
+          sale_id: c.sale_id,
+          address: c.address,
+          sold_at: c.sold_at,
+          sale_price: Number(c.sale_price),
+          living_sqft: c.living_sqft,
+        }));
+      }
+      const u = underwrite(input, byParcel.get(p.id) ?? [], m, comps);
+      scores.push({
+        parcel_id: p.id,
+        as_is_value: u.as_is_value,
+        cosmetic_arv: u.cosmetic_arv,
+        full_reno_arv: u.full_reno_arv,
+        expanded_arv: u.expanded_arv,
+        recommended_scope: u.recommended_scope,
+        reno_cost: u.reno_cost,
+        carry_cost: u.carry_cost,
+        selling_cost: u.selling_cost,
+        modeled_offer: u.modeled_offer,
+        acquisition_probability: u.acquisition_probability,
+        exit_days: u.exit_days,
+        exit_confidence: u.exit_confidence,
+        gross_profit: u.gross_profit,
+        risk_adjusted_profit: u.risk_adjusted_profit,
+        perfect_score: u.perfect_score,
+        confidence_grade: u.confidence_grade,
+        skeptic_flags: u.skeptic_flags,
+        ring: u.ring,
+        computed_at: new Date().toISOString(),
+        data_source: "LIVE",
+        comps_used: comps,
+        comp_count: u.comp_count,
+        arv_source: u.arv_source,
+        mc_profit_p5: (u as any).mc_profit_p5 ?? null,
+        mc_profit_p50: (u as any).mc_profit_p50 ?? null,
+        mc_profit_p95: (u as any).mc_profit_p95 ?? null,
+        mc_p_loss: (u as any).mc_p_loss ?? null,
+        mc_cvar_loss: (u as any).mc_cvar_loss ?? null,
+        mc_dqr: (u as any).mc_dqr ?? null,
+        governor_kappa: (u as any).governor_kappa ?? null,
+        exceedance_rank: (u as any).exceedance_rank ?? null,
+        sigma_arv_log: (u as any).sigma_arv_log ?? null,
+        drift_used_monthly: (u as any).drift_used_monthly ?? null,
+        arv_today: u.arv_today ?? null,
+        arv_exit_p5: u.arv_exit_p5 ?? null,
+        arv_exit_p50: u.arv_exit_p50 ?? null,
+        arv_exit_p95: u.arv_exit_p95 ?? null,
+        lightgbm_divergence: u.lightgbm_divergence ?? null,
+        primary_rank: u.primary_rank ?? null,
+        retail_score: u.retail_score ?? null,
+        survival_factor: u.survival_factor ?? null,
+        pd_credit: u.pd_credit ?? null,
+        pd_project: u.pd_project ?? null,
+        pd_exit: u.pd_exit ?? null,
+        ead: u.ead ?? null,
+        lgd: u.lgd ?? null,
+        expected_loss: u.expected_loss ?? null,
+        risk_adjusted_profit_credit: u.risk_adjusted_profit_credit ?? null,
+        raroc: u.raroc ?? null,
+        gate_status: u.gate_status ?? null,
       });
-      comps = (cRows ?? []).map((c: any) => ({
-        ppsf: Number(c.ppsf), distance_km: Number(c.distance_km), sale_id: c.sale_id,
-        address: c.address, sold_at: c.sold_at, sale_price: Number(c.sale_price), living_sqft: c.living_sqft,
-      }));
-    }
-    const u = underwrite(input, byParcel.get(p.id) ?? [], m, comps);
-    scores.push({
-      parcel_id: p.id,
-      as_is_value: u.as_is_value, cosmetic_arv: u.cosmetic_arv,
-      full_reno_arv: u.full_reno_arv, expanded_arv: u.expanded_arv,
-      recommended_scope: u.recommended_scope, reno_cost: u.reno_cost,
-      carry_cost: u.carry_cost, selling_cost: u.selling_cost,
-      modeled_offer: u.modeled_offer, acquisition_probability: u.acquisition_probability,
-      exit_days: u.exit_days, exit_confidence: u.exit_confidence,
-      gross_profit: u.gross_profit, risk_adjusted_profit: u.risk_adjusted_profit,
-      perfect_score: u.perfect_score, confidence_grade: u.confidence_grade,
-      skeptic_flags: u.skeptic_flags, ring: u.ring,
-      computed_at: new Date().toISOString(),
-      data_source: "LIVE",
-      comps_used: comps, comp_count: u.comp_count, arv_source: u.arv_source,
-      mc_profit_p5: (u as any).mc_profit_p5 ?? null,
-      mc_profit_p50: (u as any).mc_profit_p50 ?? null,
-      mc_profit_p95: (u as any).mc_profit_p95 ?? null,
-      mc_p_loss: (u as any).mc_p_loss ?? null,
-      mc_cvar_loss: (u as any).mc_cvar_loss ?? null,
-      mc_dqr: (u as any).mc_dqr ?? null,
-      governor_kappa: (u as any).governor_kappa ?? null,
-      exceedance_rank: (u as any).exceedance_rank ?? null,
-      sigma_arv_log: (u as any).sigma_arv_log ?? null,
-      drift_used_monthly: (u as any).drift_used_monthly ?? null,
-      arv_today: u.arv_today ?? null,
-      arv_exit_p5: u.arv_exit_p5 ?? null,
-      arv_exit_p50: u.arv_exit_p50 ?? null,
-      arv_exit_p95: u.arv_exit_p95 ?? null,
-      lightgbm_divergence: u.lightgbm_divergence ?? null,
-      primary_rank: u.primary_rank ?? null,
-      retail_score: u.retail_score ?? null,
-      survival_factor: u.survival_factor ?? null,
-      pd_credit: u.pd_credit ?? null,
-      pd_project: u.pd_project ?? null,
-      pd_exit: u.pd_exit ?? null,
-      ead: u.ead ?? null,
-      lgd: u.lgd ?? null,
-      expected_loss: u.expected_loss ?? null,
-      risk_adjusted_profit_credit: u.risk_adjusted_profit_credit ?? null,
-      raroc: u.raroc ?? null,
-      gate_status: u.gate_status ?? null,
-    });
-
     } catch (e) {
-      await recordScoreFailure({ source: "SCORE", stage: "underwrite", parcelRef: p.id, countyFips: p.county_fips, error: e });
+      await recordScoreFailure({
+        source: "SCORE",
+        stage: "underwrite",
+        parcelRef: p.id,
+        countyFips: p.county_fips,
+        error: e,
+      });
     }
   }
-  await supabase.from("parcel_scores").delete().eq("data_source", "LIVE");
-  const CHUNK = 200;
-  for (let i = 0; i < scores.length; i += CHUNK) {
-    await supabase.from("parcel_scores").insert(scores.slice(i, i + CHUNK));
+  const { data: replaced, error: replaceError } = await (supabase as any).rpc(
+    "replace_live_parcel_scores",
+    { p_scores: scores },
+  );
+  if (replaceError) throw new Error(`Atomic score replacement failed: ${replaceError.message}`);
+  if (Number(replaced) !== scores.length) {
+    throw new Error(`Atomic score replacement wrote ${replaced} of ${scores.length} rows`);
   }
   const compBacked = scores.filter((s) => s.arv_source === "COMPS").length;
   return { scored: scores.length, comps_backed: compBacked };

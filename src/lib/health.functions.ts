@@ -13,22 +13,26 @@ export const getPipelineHealth = createServerFn({ method: "GET" })
     const since1h = new Date(Date.now() - 3600 * 1000).toISOString();
 
     const [runs, fails, sources, probes, recentFails, queueRows, realie24h] = await Promise.all([
-      supabaseAdmin.from("ingestion_runs")
+      supabaseAdmin
+        .from("ingestion_runs")
         .select("status, rows_ingested, county_fips, started_at")
         .gte("started_at", since24),
-      supabaseAdmin.from("ingestion_failures")
+      supabaseAdmin
+        .from("ingestion_failures")
         .select("id, source, stage, county_fips, error_message, created_at")
         .gte("created_at", since24),
       supabaseAdmin.from("source_health").select("*"),
-      supabaseAdmin.from("probe_runs")
-        .select("id, created_at")
-        .gte("created_at", since1h),
-      supabaseAdmin.from("ingestion_failures")
+      supabaseAdmin.from("probe_runs").select("id, created_at").gte("created_at", since1h),
+      supabaseAdmin
+        .from("ingestion_failures")
         .select("id, source, stage, county_fips, error_message, created_at")
         .order("created_at", { ascending: false })
         .limit(25),
-      supabaseAdmin.from("enrichment_queue").select("status, reason, priority, attempts, last_error, requested_at"),
-      supabaseAdmin.from("ingestion_runs")
+      supabaseAdmin
+        .from("enrichment_queue")
+        .select("status, reason, priority, attempts, last_error, requested_at"),
+      supabaseAdmin
+        .from("ingestion_runs")
         .select("rows_ingested, started_at, status")
         .eq("source", "REALIE:enrichment")
         .gte("started_at", since24),
@@ -40,7 +44,8 @@ export const getPipelineHealth = createServerFn({ method: "GET" })
     const byCounty = new Map<string, { ok: number; fail: number; ingested: number }>();
     for (const r of runsRows) {
       const b = byCounty.get(r.county_fips) ?? { ok: 0, fail: 0, ingested: 0 };
-      if (r.status === "OK") b.ok++; else b.fail++;
+      if (String(r.status).toUpperCase() === "OK") b.ok++;
+      else b.fail++;
       b.ingested += r.rows_ingested ?? 0;
       byCounty.set(r.county_fips, b);
     }
@@ -54,13 +59,16 @@ export const getPipelineHealth = createServerFn({ method: "GET" })
       total: q.length,
       by_reason: Object.fromEntries(
         ["foreclosure", "probate", "code_violation", "tax_lien", "listing", "manual"].map((r) => [
-          r, q.filter((x) => x.reason === r && x.status !== "done").length,
+          r,
+          q.filter((x) => x.reason === r && x.status !== "done").length,
         ]),
       ),
     };
     const realieRuns = (realie24h.data ?? []) as any[];
     const realieEnriched24h = realieRuns.reduce((a, r) => a + (r.rows_ingested ?? 0), 0);
-    const lastRealieRun = realieRuns.length ? realieRuns.reduce((a, b) => a.started_at > b.started_at ? a : b).started_at : null;
+    const lastRealieRun = realieRuns.length
+      ? realieRuns.reduce((a, b) => (a.started_at > b.started_at ? a : b)).started_at
+      : null;
 
     return {
       total_ingested_24h: totalIngested,

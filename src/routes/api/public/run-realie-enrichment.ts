@@ -2,11 +2,8 @@
  * Cron endpoint: dequeue N parcels from enrichment_queue and fill in
  * living_sqft / year_built / beds / baths via Realie.
  *
- * Auth: /api/public/* bypasses the edge auth wall. We additionally check
- * that the caller sent the Supabase anon key in the `apikey` header
- * (matches how the other cron endpoints — run-recipes, rerun-underwrite,
- * run-bulk-lookups, run-monitoring — are called from pg_cron). The batch
- * cap keeps abusive callers cheap.
+ * Auth: shared CRON_SECRET in the `x-cron-secret` header, timing-safe
+ * compared. A Supabase publishable key is intentionally not accepted.
  *
  * Body: { batch?: number }  // default 25, hard cap 100 per invocation
  *
@@ -16,17 +13,29 @@
  */
 
 import { createFileRoute } from "@tanstack/react-router";
+import { timingSafeEqual } from "crypto";
+
+function authorized(request: Request): boolean {
+  const secret = process.env.CRON_SECRET;
+  const header = request.headers.get("x-cron-secret");
+  if (!secret || !header) return false;
+  const expected = Buffer.from(secret, "utf8");
+  const received = Buffer.from(header.trim(), "utf8");
+  if (expected.length !== received.length) return false;
+  try {
+    return timingSafeEqual(expected, received);
+  } catch {
+    return false;
+  }
+}
 
 export const Route = createFileRoute("/api/public/run-realie-enrichment")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const expectedKey = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY;
-        const gotKey = request.headers.get("apikey") ?? "";
-        if (!expectedKey || gotKey !== expectedKey) {
+        if (!authorized(request)) {
           return new Response("Unauthorized", { status: 401 });
         }
-
 
         let batch = 25;
         try {
@@ -34,38 +43,37 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
           if (typeof body.batch === "number" && body.batch > 0) {
             batch = Math.min(Math.floor(body.batch), 100);
           }
-        } catch { /* keep default */ }
+        } catch {
+          /* keep default */
+        }
 
         const startedAt = new Date().toISOString();
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { lookupParcelByAddressCore } = await import("@/lib/parcels-core");
 
-        // 1. Pull the next batch of pending items, oldest attempts first.
-        const { data: queueItems, error: qErr } = await supabaseAdmin
-          .from("enrichment_queue")
-          .select("parcel_id, reason, priority, attempts")
-          .eq("status", "pending")
-          .lt("attempts", 3)
-          .order("priority", { ascending: false })
-          .order("requested_at", { ascending: true })
-          .limit(batch);
+        // Atomically claim work with SKIP LOCKED; the RPC also recovers stale
+        // inflight rows left behind by crashed workers.
+        const { data: queueItems, error: qErr } = await (supabaseAdmin as any).rpc(
+          "claim_enrichment_queue",
+          { p_limit: batch },
+        );
         if (qErr) {
           return new Response(`Queue read failed: ${qErr.message}`, { status: 500 });
         }
 
         const items = queueItems ?? [];
         if (items.length === 0) {
-          return Response.json({ ok: true, processed: 0, enriched: 0, failed: 0, note: "queue empty" });
+          return Response.json({
+            ok: true,
+            processed: 0,
+            enriched: 0,
+            failed: 0,
+            note: "queue empty",
+          });
         }
 
-        // 2. Mark them inflight so a concurrent invocation doesn't double up.
-        const ids = items.map((r) => r.parcel_id);
-        await supabaseAdmin
-          .from("enrichment_queue")
-          .update({ status: "inflight", started_at: startedAt })
-          .in("parcel_id", ids);
-
-        // 3. Load the parcel rows we need addresses from.
+        const ids = items.map((r: any) => r.parcel_id);
+        // Load the parcel rows we need addresses from.
         const { data: parcels, error: pErr } = await supabaseAdmin
           .from("parcels")
           .select("id, address, city, state, county_fips")
@@ -128,6 +136,7 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
             state: p.state.toUpperCase(),
             city: county ? (p.city ?? undefined) : undefined,
             county,
+            existingParcelId: item.parcel_id,
           };
 
           // Capture every HTTP call the adapter makes during this lookup.
@@ -135,22 +144,30 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
           setRealieAuditSink((e) => captured.push(e));
 
           try {
-            await lookupParcelByAddressCore(reqParams);
+            const lookup = await lookupParcelByAddressCore(reqParams);
 
             const { data: fresh } = await supabaseAdmin
               .from("parcels")
               .select("living_sqft, year_built, property_type")
-              .eq("id", item.parcel_id).maybeSingle();
+              .eq("id", lookup.parcel_id)
+              .maybeSingle();
             const missing: string[] = [];
             if (!fresh?.living_sqft) missing.push("living_sqft");
             if (!fresh?.year_built) missing.push("year_built");
             if (!fresh?.property_type) missing.push("property_type");
-            const returned = ["living_sqft", "year_built", "property_type"].filter((f) => !missing.includes(f));
+            const returned = ["living_sqft", "year_built", "property_type"].filter(
+              (f) => !missing.includes(f),
+            );
 
             const primary = captured[0] ?? {
               endpoint: "/public/property/address/",
-              params: reqParams, http_status: null, ok: true, duration_ms: 0,
-              error_code: null, error_message: null, response_sample: null,
+              params: reqParams,
+              http_status: null,
+              ok: true,
+              duration_ms: 0,
+              error_code: null,
+              error_message: null,
+              response_sample: null,
             };
             await supabaseAdmin.from("realie_audit").insert({
               parcel_id: item.parcel_id,
@@ -165,6 +182,10 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
               error_message: missing.length ? `missing ${missing.join(",")}` : null,
               fields_returned: returned,
               fields_missing: missing.length ? missing : null,
+              response_sample:
+                lookup.parcel_id === item.parcel_id
+                  ? null
+                  : ({ matched_parcel_id: lookup.parcel_id } as any),
             } as any);
 
             if (missing.length) {
@@ -177,7 +198,11 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
                   completed_at: new Date().toISOString(),
                 })
                 .eq("parcel_id", item.parcel_id);
-              results.push({ parcel_id: item.parcel_id, ok: false, note: `insufficient (${missing.join(",")})` });
+              results.push({
+                parcel_id: item.parcel_id,
+                ok: false,
+                note: `insufficient (${missing.join(",")})`,
+              });
               continue;
             }
 
@@ -223,7 +248,6 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
           }
         }
 
-
         const enriched = results.filter((r) => r.ok).length;
         const failed = results.length - enriched;
 
@@ -233,19 +257,22 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
           const cf = byId.get(r.parcel_id)?.county_fips;
           if (!cf) continue;
           const b = byCounty.get(cf) ?? { ok: 0, fail: 0 };
-          if (r.ok) b.ok++; else b.fail++;
+          if (r.ok) b.ok++;
+          else b.fail++;
           byCounty.set(cf, b);
         }
         for (const [cf, b] of byCounty) {
-          await supabaseAdmin.from("ingestion_runs").insert({
+          const { error: runError } = await supabaseAdmin.from("ingestion_runs").insert({
             county_fips: cf,
             source: "REALIE:enrichment",
-            status: b.fail === 0 ? "ok" : b.ok > 0 ? "partial" : "failed",
+            status: b.fail === 0 ? "OK" : b.ok > 0 ? "PARTIAL" : "FAIL",
             rows_ingested: b.ok,
             started_at: startedAt,
             finished_at: new Date().toISOString(),
             notes: `enriched ${b.ok} / failed ${b.fail}`,
           } as any);
+          if (runError)
+            throw new Error(`Failed to record Realie ingestion run: ${runError.message}`);
         }
 
         // 6. When any parcel was successfully enriched, re-score all parcels
@@ -266,7 +293,10 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
             const origin = new URL(request.url).origin;
             const res = await fetch(`${origin}/api/public/run-monitoring`, {
               method: "POST",
-              headers: { "Content-Type": "application/json", apikey: expectedKey! },
+              headers: {
+                "Content-Type": "application/json",
+                "x-cron-secret": process.env.CRON_SECRET!,
+              },
               body: "{}",
             });
             monitoring_refreshed = res.ok;
@@ -284,7 +314,6 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
           monitoring_refreshed,
           results,
         });
-
       },
     },
   },

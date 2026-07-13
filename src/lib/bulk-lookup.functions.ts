@@ -3,17 +3,8 @@
  * queue overnight and underwrites each one via `lookupParcelByAddress`.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import type { Database } from "@/integrations/supabase/types";
-
-function serverClient() {
-  return createClient<Database>(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_PUBLISHABLE_KEY!,
-    { auth: { storage: undefined, persistSession: false, autoRefreshToken: false } },
-  );
-}
+import { requireAdmin } from "@/integrations/supabase/require-admin";
 
 const RowSchema = z.object({
   address: z.string().min(3),
@@ -34,6 +25,7 @@ const CreateInput = z.object({
  * insert privileges on the queue tables.
  */
 export const createBulkLookupJob = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
   .validator((data: unknown) => CreateInput.parse(data))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -48,8 +40,12 @@ export const createBulkLookupJob = createServerFn({ method: "POST" })
     // so we don't send known-duplicate rows into the unique index.
     const seen = new Set<string>();
     const items: Array<{
-      job_id: string; address: string; state: string;
-      city: string | null; county: string | null; unit: string | null;
+      job_id: string;
+      address: string;
+      state: string;
+      city: string | null;
+      county: string | null;
+      unit: string | null;
     }> = [];
     for (const r of data.rows) {
       const address = r.address.trim();
@@ -71,7 +67,9 @@ export const createBulkLookupJob = createServerFn({ method: "POST" })
     // reject any duplicates that slip past client-side de-dupe. Fall back to
     // per-row inserts on conflict so a single dupe doesn't fail the batch.
     const { data: inserted, error: iErr } = await supabaseAdmin
-      .from("bulk_lookup_items").insert(items).select("id");
+      .from("bulk_lookup_items")
+      .insert(items)
+      .select("id");
     let enqueued = inserted?.length ?? 0;
     if (iErr) {
       if (!/duplicate key|unique constraint/i.test(iErr.message)) {
@@ -89,8 +87,7 @@ export const createBulkLookupJob = createServerFn({ method: "POST" })
 
     // Keep the job's total in sync with what actually made it into the queue.
     if (enqueued !== data.rows.length) {
-      await supabaseAdmin.from("bulk_lookup_jobs")
-        .update({ total: enqueued }).eq("id", job.id);
+      await supabaseAdmin.from("bulk_lookup_jobs").update({ total: enqueued }).eq("id", job.id);
     }
     return { job_id: job.id, enqueued, skipped: data.rows.length - enqueued };
   });
@@ -98,28 +95,35 @@ export const createBulkLookupJob = createServerFn({ method: "POST" })
 /**
  * List recent jobs with progress.
  */
-export const listBulkLookupJobs = createServerFn({ method: "GET" }).handler(async () => {
-  const supabase = serverClient();
-  const { data, error } = await supabase
-    .from("bulk_lookup_jobs")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(50);
-  if (error) throw new Error(error.message);
-  return data ?? [];
-});
+export const listBulkLookupJobs = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .handler(async () => {
+    const { supabaseAdmin: supabase } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabase
+      .from("bulk_lookup_jobs")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
 
 /**
  * Read a job + its items (paged).
  */
 export const getBulkLookupJob = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
   .validator((data: unknown) => z.object({ job_id: z.string().uuid() }).parse(data))
   .handler(async ({ data }) => {
-    const supabase = serverClient();
+    const { supabaseAdmin: supabase } = await import("@/integrations/supabase/client.server");
     const [job, items] = await Promise.all([
       supabase.from("bulk_lookup_jobs").select("*").eq("id", data.job_id).maybeSingle(),
-      supabase.from("bulk_lookup_items").select("*").eq("job_id", data.job_id)
-        .order("created_at", { ascending: true }).limit(2000),
+      supabase
+        .from("bulk_lookup_items")
+        .select("*")
+        .eq("job_id", data.job_id)
+        .order("created_at", { ascending: true })
+        .limit(2000),
     ]);
     if (job.error) throw new Error(job.error.message);
     return { job: job.data, items: items.data ?? [] };
@@ -161,21 +165,27 @@ export async function processBulkLookupBatch(limit = 20): Promise<{
         unit: item.unit ?? undefined,
       });
 
-      await supabaseAdmin.from("bulk_lookup_items").update({
-        status: "succeeded",
-        parcel_id: r.parcel_id,
-        attempts: (item.attempts ?? 0) + 1,
-        processed_at: new Date().toISOString(),
-        error: null,
-      }).eq("id", item.id);
+      await supabaseAdmin
+        .from("bulk_lookup_items")
+        .update({
+          status: "succeeded",
+          parcel_id: r.parcel_id,
+          attempts: (item.attempts ?? 0) + 1,
+          processed_at: new Date().toISOString(),
+          error: null,
+        })
+        .eq("id", item.id);
       succeeded++;
     } catch (e: any) {
-      await supabaseAdmin.from("bulk_lookup_items").update({
-        status: "failed",
-        attempts: (item.attempts ?? 0) + 1,
-        processed_at: new Date().toISOString(),
-        error: String(e?.message ?? e).slice(0, 500),
-      }).eq("id", item.id);
+      await supabaseAdmin
+        .from("bulk_lookup_items")
+        .update({
+          status: "failed",
+          attempts: (item.attempts ?? 0) + 1,
+          processed_at: new Date().toISOString(),
+          error: String(e?.message ?? e).slice(0, 500),
+        })
+        .eq("id", item.id);
       failed++;
     }
   }
@@ -191,14 +201,17 @@ export async function processBulkLookupBatch(limit = 20): Promise<{
     const okN = (counts ?? []).filter((c) => c.status === "succeeded").length;
     const failN = (counts ?? []).filter((c) => c.status === "failed").length;
     const finished = done === total;
-    await supabaseAdmin.from("bulk_lookup_jobs").update({
-      processed: done,
-      succeeded: okN,
-      failed: failN,
-      status: finished ? "done" : "running",
-      updated_at: new Date().toISOString(),
-      finished_at: finished ? new Date().toISOString() : null,
-    }).eq("id", jobId);
+    await supabaseAdmin
+      .from("bulk_lookup_jobs")
+      .update({
+        processed: done,
+        succeeded: okN,
+        failed: failN,
+        status: finished ? "done" : "running",
+        updated_at: new Date().toISOString(),
+        finished_at: finished ? new Date().toISOString() : null,
+      })
+      .eq("id", jobId);
   }
 
   return { processed: (pending ?? []).length, succeeded, failed };
@@ -214,6 +227,7 @@ export async function processBulkLookupBatch(limit = 20): Promise<{
 const ResumeInput = z.object({ job_id: z.string().uuid().optional() });
 
 export const resumeFailedInJob = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
   .validator((data: unknown) => ResumeInput.parse(data ?? {}))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -238,29 +252,39 @@ export const resumeFailedInJob = createServerFn({ method: "POST" })
       .select("id");
     if (error) throw new Error(error.message);
 
-
     const resetN = reset?.length ?? 0;
 
     // Reflect the reset on the parent job so the UI updates immediately.
     if (resetN > 0) {
       const { data: counts } = await supabaseAdmin
-        .from("bulk_lookup_items").select("status").eq("job_id", jobId);
+        .from("bulk_lookup_items")
+        .select("status")
+        .eq("job_id", jobId);
       const done = (counts ?? []).filter((c) => c.status !== "pending").length;
       const okN = (counts ?? []).filter((c) => c.status === "succeeded").length;
       const failN = (counts ?? []).filter((c) => c.status === "failed").length;
-      await supabaseAdmin.from("bulk_lookup_jobs").update({
-        status: done === (counts?.length ?? 0) ? "done" : "running",
-        processed: done, succeeded: okN, failed: failN,
-        finished_at: null,
-        updated_at: new Date().toISOString(),
-      }).eq("id", jobId);
+      await supabaseAdmin
+        .from("bulk_lookup_jobs")
+        .update({
+          status: done === (counts?.length ?? 0) ? "done" : "running",
+          processed: done,
+          succeeded: okN,
+          failed: failN,
+          finished_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", jobId);
     }
 
     // Kick off one batch now so the user sees progress without waiting for cron.
-    let processed = 0, succeeded = 0, failed = 0;
+    let processed = 0,
+      succeeded = 0,
+      failed = 0;
     if (resetN > 0) {
       const r = await processBulkLookupBatch(Math.min(resetN, 20));
-      processed = r.processed; succeeded = r.succeeded; failed = r.failed;
+      processed = r.processed;
+      succeeded = r.succeeded;
+      failed = r.failed;
     }
     return { job_id: jobId, reset: resetN, processed, succeeded, failed };
   });

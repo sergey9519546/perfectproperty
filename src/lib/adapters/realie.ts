@@ -16,6 +16,7 @@ export interface RealieProperty {
   state?: string;
   zipCode?: string;
   county?: string;
+  propertyType?: string;
   fipsState?: string;
   fipsCounty?: string;
   latitude?: number;
@@ -82,7 +83,10 @@ export function setRealieAuditSink(fn: ((e: RealieAuditEntry) => void) | null) {
   auditSink = fn;
 }
 
-async function call<T>(path: string, params: Record<string, string | number | undefined>): Promise<T> {
+async function call<T>(
+  path: string,
+  params: Record<string, string | number | undefined>,
+): Promise<T> {
   const key = process.env.REALIE_API_KEY;
   if (!key) throw new Error("REALIE_API_KEY is not configured");
   const q = new URLSearchParams();
@@ -92,59 +96,69 @@ async function call<T>(path: string, params: Record<string, string | number | un
   }
   const url = `${BASE}${path}${q.toString() ? `?${q}` : ""}`;
   const { retryWithBackoff } = await import("@/lib/retry");
-  return retryWithBackoff(async () => {
-    const started = Date.now();
-    let status: number | null = null;
-    let body: any = null;
-    try {
-      const res = await fetch(url, {
-        method: "GET",
-        headers: { Authorization: key, Accept: "application/json" },
-      });
-      status = res.status;
-      const text = await res.text();
-      try { body = text ? JSON.parse(text) : null; } catch { body = { raw: text }; }
-      if (!res.ok) {
-        const msg = body?.error ?? res.statusText ?? `HTTP ${res.status}`;
-        const err = new Error(`Realie ${res.status}: ${msg}`);
-        (err as any).status = res.status;
-        throw err;
-      }
-      if (auditSink) {
+  return retryWithBackoff(
+    async () => {
+      const started = Date.now();
+      let status: number | null = null;
+      let body: any = null;
+      try {
+        const res = await fetch(url, {
+          method: "GET",
+          headers: { Authorization: key, Accept: "application/json" },
+        });
+        status = res.status;
+        const text = await res.text();
         try {
-          auditSink({
-            endpoint: path,
-            params,
-            http_status: status,
-            ok: true,
-            duration_ms: Date.now() - started,
-            error_code: null,
-            error_message: null,
-            response_sample: null,
-          });
-        } catch { /* never let audit break the call */ }
+          body = text ? JSON.parse(text) : null;
+        } catch {
+          body = { raw: text };
+        }
+        if (!res.ok) {
+          const msg = body?.error ?? res.statusText ?? `HTTP ${res.status}`;
+          const err = new Error(`Realie ${res.status}: ${msg}`);
+          (err as any).status = res.status;
+          throw err;
+        }
+        if (auditSink) {
+          try {
+            auditSink({
+              endpoint: path,
+              params,
+              http_status: status,
+              ok: true,
+              duration_ms: Date.now() - started,
+              error_code: null,
+              error_message: null,
+              response_sample: null,
+            });
+          } catch {
+            /* never let audit break the call */
+          }
+        }
+        return body as T;
+      } catch (e: any) {
+        if (auditSink) {
+          try {
+            auditSink({
+              endpoint: path,
+              params,
+              http_status: status,
+              ok: false,
+              duration_ms: Date.now() - started,
+              error_code: status ? `HTTP_${status}` : "NETWORK",
+              error_message: String(e?.message ?? e).slice(0, 500),
+              response_sample: body && typeof body === "object" ? body : null,
+            });
+          } catch {
+            /* swallow */
+          }
+        }
+        throw e;
       }
-      return body as T;
-    } catch (e: any) {
-      if (auditSink) {
-        try {
-          auditSink({
-            endpoint: path,
-            params,
-            http_status: status,
-            ok: false,
-            duration_ms: Date.now() - started,
-            error_code: status ? `HTTP_${status}` : "NETWORK",
-            error_message: String(e?.message ?? e).slice(0, 500),
-            response_sample: body && typeof body === "object" ? body : null,
-          });
-        } catch { /* swallow */ }
-      }
-      throw e;
-    }
-  }, { retries: 3, baseMs: 500 });
+    },
+    { retries: 3, baseMs: 500 },
+  );
 }
-
 
 export async function realieLookupAddress(args: {
   address: string;
@@ -256,7 +270,14 @@ export function realieCompsToEngineComps(
   comps: RealieComp[],
   subjectLat: number,
   subjectLng: number,
-): Array<{ ppsf: number; distance_km: number; address: string | null; sold_at: string | undefined; sale_price: number; living_sqft: number | null }> {
+): Array<{
+  ppsf: number;
+  distance_km: number;
+  address: string | null;
+  sold_at: string | undefined;
+  sale_price: number;
+  living_sqft: number | null;
+}> {
   const out = [];
   for (const c of comps) {
     const price = Number(c.transferPrice ?? c.lastSalePrice ?? 0);
@@ -264,9 +285,10 @@ export function realieCompsToEngineComps(
     if (!(price > 20000) || !(sqft > 200)) continue;
     const lat = Number(c.latitude ?? NaN);
     const lng = Number(c.longitude ?? NaN);
-    const dKm = Number.isFinite(lat) && Number.isFinite(lng)
-      ? distanceKm(subjectLat, subjectLng, lat, lng)
-      : 3.0;
+    const dKm =
+      Number.isFinite(lat) && Number.isFinite(lng)
+        ? distanceKm(subjectLat, subjectLng, lat, lng)
+        : 3.0;
     out.push({
       ppsf: price / sqft,
       distance_km: dKm,
@@ -287,14 +309,16 @@ export function realieToParcelRow(p: RealieProperty, fallbackState?: string): an
   const address = (p.address ?? p.addressFull ?? "").trim();
   const state = (p.state ?? fallbackState ?? "").trim().toUpperCase();
   if (!address || !state) return null;
-  const fipsState = String(p.fipsState ?? "").padStart(2, "0");
-  const fipsCounty = String(p.fipsCounty ?? "").padStart(3, "0");
-  const county_fips = fipsState && fipsCounty ? `${fipsState}${fipsCounty}` : "00000";
+  const rawFipsState = String(p.fipsState ?? "").trim();
+  const rawFipsCounty = String(p.fipsCounty ?? "").trim();
+  const county_fips =
+    rawFipsState && rawFipsCounty
+      ? `${rawFipsState.padStart(2, "0")}${rawFipsCounty.padStart(3, "0")}`
+      : null;
   const yb = Number(p.yearBuilt) || null;
-  const age = yb ? new Date().getFullYear() - yb : null;
-  const condition_grade = age == null ? "B" : age < 15 ? "A" : age < 40 ? "B" : age < 70 ? "C" : "D";
   const ownerState = (p.ownerState ?? "").trim().toUpperCase();
-  const owner_is_absentee = Boolean(ownerState && state && ownerState !== state);
+  const owner_is_absentee = ownerState ? ownerState !== state : null;
+  const propertyType = String(p.propertyType ?? "").trim() || null;
   return {
     apn: String(p.parcelId ?? crypto.randomUUID()),
     county_fips,
@@ -304,22 +328,22 @@ export function realieToParcelRow(p: RealieProperty, fallbackState?: string): an
     zip: p.zipCode ?? null,
     lat: Number.isFinite(Number(p.latitude)) ? Number(p.latitude) : null,
     lng: Number.isFinite(Number(p.longitude)) ? Number(p.longitude) : null,
-    property_type: "SFR",
+    property_type: propertyType,
     year_built: yb,
     living_sqft: Number(p.buildingArea) || null,
     lot_sqft: Number(p.landArea) || null,
     bedrooms: Number(p.totalBedrooms) || null,
     bathrooms: Number(p.totalBathrooms) || null,
-    condition_grade,
-    flood_zone: "X",
-    school_score: 6,
+    condition_grade: null,
+    flood_zone: null,
+    school_score: null,
     owner_name: p.ownerName ?? null,
     owner_is_absentee,
-    owner_is_corporate: /LLC|INC|TRUST|CORP|LP\b/i.test(String(p.ownerName ?? "")),
+    owner_is_corporate: p.ownerName ? /LLC|INC|TRUST|CORP|LP\b/i.test(String(p.ownerName)) : null,
     assessed_value: Number(p.totalAssessedValue) || null,
     estimated_equity: Number(p.equityCurrentEstBal) || null,
-    is_listed: false,
-    is_vacant: false,
+    is_listed: null,
+    is_vacant: null,
     data_source: "LIVE",
     source_url: "https://app.realie.ai",
     last_seen_at: new Date().toISOString(),

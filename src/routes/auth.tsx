@@ -2,11 +2,7 @@ import { createFileRoute, redirect, useSearch, useNavigate, Link } from "@tansta
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
-
-function safeNext(n: string | undefined) {
-  if (!n || !n.startsWith("/")) return "/";
-  return n;
-}
+import { safeNext } from "@/lib/safe-next";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -23,12 +19,10 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   const { next } = useSearch({ from: "/auth" });
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
@@ -56,32 +50,17 @@ function AuthPage() {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    setNotice(null);
-    if (mode === "signup") {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: `${window.location.origin}/auth?next=${encodeURIComponent(safeNext(next))}` },
-      });
-      if (error) setError(error.message);
-      else setNotice("Check your email to confirm your account, then sign in.");
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) setError(error.message);
-      else navigate({ to: safeNext(next) as "/" });
-    }
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) setError(error.message);
+    else navigate({ to: safeNext(next) as "/" });
     setBusy(false);
   }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 dark">
       <div className="w-full max-w-sm rounded-lg border border-border bg-surface p-6">
-        <h1 className="text-xl font-semibold text-foreground">
-          {mode === "signin" ? "Sign in" : "Create an account"}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Perfect Property Engine
-        </p>
+        <h1 className="text-xl font-semibold text-foreground">Sign in</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Perfect Property Engine</p>
 
         <button
           onClick={handleGoogle}
@@ -120,27 +99,23 @@ function AuthPage() {
             disabled={busy}
             className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
           >
-            {mode === "signin" ? "Sign in" : "Create account"}
+            Sign in
           </button>
         </form>
 
-        {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
-        {notice && <p className="mt-3 text-sm text-muted-foreground">{notice}</p>}
-
-        <button
-          type="button"
-          onClick={() => {
-            setMode(mode === "signin" ? "signup" : "signin");
-            setError(null);
-            setNotice(null);
-          }}
-          className="mt-4 text-xs text-muted-foreground hover:text-foreground"
-        >
-          {mode === "signin" ? "Need an account? Sign up" : "Already have an account? Sign in"}
-        </button>
+        {error && (
+          <p role="alert" className="mt-3 text-sm text-destructive">
+            {error}
+          </p>
+        )}
+        <p className="mt-4 text-xs text-muted-foreground">
+          Access is provisioned by an administrator.
+        </p>
 
         <div className="mt-6 text-xs text-muted-foreground">
-          <Link to="/" className="hover:text-foreground">← Back to app</Link>
+          <Link to="/" className="hover:text-foreground">
+            ← Back to app
+          </Link>
         </div>
       </div>
     </main>

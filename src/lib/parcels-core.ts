@@ -13,6 +13,7 @@ export type LookupArgs = {
   city?: string;
   county?: string;
   unit?: string;
+  existingParcelId?: string;
 };
 
 export async function lookupParcelByAddressCore(args: LookupArgs) {
@@ -37,10 +38,37 @@ export async function lookupParcelByAddressCore(args: LookupArgs) {
     _city: row.city,
   });
 
-  let parcelId: string | null = (matchId as string | null) ?? null;
+  let parcelId: string | null = args.existingParcelId ?? (matchId as string | null) ?? null;
   if (parcelId) {
-    await supabaseAdmin.from("parcels").update(row).eq("id", parcelId);
+    // A sparse provider response must not erase better values already stored.
+    const patch = Object.fromEntries(
+      Object.entries(row).filter(
+        ([, value]) => value !== null && value !== undefined && value !== "",
+      ),
+    );
+    const { error } = await supabaseAdmin
+      .from("parcels")
+      .update(patch as any)
+      .eq("id", parcelId);
+    if (error) throw new Error(`Failed to update parcel: ${error.message}`);
   } else {
+    const missing = ["county_fips", "city", "zip", "lat", "lng"].filter(
+      (field) => row[field] === null || row[field] === undefined || row[field] === "",
+    );
+    if (missing.length) {
+      throw new Error(`Realie returned insufficient location data: ${missing.join(", ")}`);
+    }
+    const { error: countyError } = await supabaseAdmin.from("counties").upsert(
+      {
+        fips: row.county_fips,
+        state: row.state,
+        name: args.county?.trim() || property.county?.trim() || `County ${row.county_fips}`,
+        center_lat: row.lat,
+        center_lng: row.lng,
+      },
+      { onConflict: "fips", ignoreDuplicates: true },
+    );
+    if (countyError) throw new Error(`Failed to ensure county: ${countyError.message}`);
     const { data: inserted, error } = await supabaseAdmin
       .from("parcels")
       .upsert(row, { onConflict: "county_fips,apn" })
@@ -57,9 +85,18 @@ export async function lookupParcelByAddressCore(args: LookupArgs) {
     const conf = DEFAULT_CONFIDENCE.REALIE;
     const observedAt = new Date().toISOString();
     const provFields: Array<keyof typeof row> = [
-      "living_sqft", "year_built", "bedrooms", "bathrooms", "lot_sqft",
-      "assessed_value", "owner_name", "property_type", "lat", "lng",
-      "condition_grade", "flood_zone",
+      "living_sqft",
+      "year_built",
+      "bedrooms",
+      "bathrooms",
+      "lot_sqft",
+      "assessed_value",
+      "owner_name",
+      "property_type",
+      "lat",
+      "lng",
+      "condition_grade",
+      "flood_zone",
     ] as any;
     const entries = provFields
       .filter((f) => (row as any)[f] !== null && (row as any)[f] !== undefined)

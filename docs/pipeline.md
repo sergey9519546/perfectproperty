@@ -30,16 +30,17 @@ Enforced in `listRankedParcels` and `getCoverage` via the SQL function
 
 Table `public.enrichment_queue`:
 
-| column        | meaning                                                     |
-|---------------|-------------------------------------------------------------|
-| `parcel_id`   | PK → parcels.id (CASCADE)                                   |
-| `priority`    | int; higher runs first (foreclosure 300, probate 250, code_violation 200, listing 180, manual 100) |
-| `reason`      | `foreclosure` / `probate` / `code_violation` / `tax_lien` / `listing` / `manual` |
-| `status`      | `pending` → `inflight` → `done` \| `failed`                 |
-| `attempts`    | worker gives up at 3                                        |
-| `last_error`  | last exception message                                      |
+| column       | meaning                                                                                            |
+| ------------ | -------------------------------------------------------------------------------------------------- |
+| `parcel_id`  | PK → parcels.id (CASCADE)                                                                          |
+| `priority`   | int; higher runs first (foreclosure 300, probate 250, code_violation 200, listing 180, manual 100) |
+| `reason`     | `foreclosure` / `probate` / `code_violation` / `tax_lien` / `listing` / `manual`                   |
+| `status`     | `pending` → `inflight` → `done` \| `failed`                                                        |
+| `attempts`   | worker gives up at 3                                                                               |
+| `last_error` | last exception message                                                                             |
 
 Two AFTER-INSERT triggers auto-enqueue:
+
 - `distress_events_enqueue` (any distress event)
 - `listings_enqueue` (any new listing)
 
@@ -48,10 +49,10 @@ Both only enqueue if the parent parcel is missing `living_sqft` OR
 
 ## Cron worker
 
-`POST /api/public/run-realie-enrichment`  (scheduled every 15 min)
+`POST /api/public/run-realie-enrichment` (scheduled every 15 min)
 
-Body: `{ "batch": 25 }` (default 25, max 100). Auth: Supabase anon key in
-`apikey` header (matches the other cron endpoints).
+Body: `{ "batch": 25 }` (default 25, max 100). Auth: `CRON_SECRET` in the
+`x-cron-secret` header, matching the other cron endpoints.
 
 Per call: pulls top N pending items ordered by priority + requested_at,
 marks them `inflight`, calls `lookupParcelByAddressCore` (which upserts
@@ -65,6 +66,7 @@ Adjust batch size on the schedule if you want a tighter cap.
 ## Admin visibility
 
 `/admin/health` shows:
+
 - Enrichment pipeline card: pending / inflight / done / failed / total,
   plus a chip per reason showing how many are still in flight for that
   trigger type.
@@ -79,17 +81,17 @@ recipes `foreclosure | probate | code_violation | sale | parcel`. Only
 descending leverage order (matches the counties we already have parcels
 for):
 
-| County (FIPS)          | Source                                              | Recipe          |
-|------------------------|-----------------------------------------------------|-----------------|
-| Miami-Dade (12086)     | Clerk of Court — foreclosure filings                | foreclosure     |
-| Miami-Dade (12086)     | Probate court public records                        | probate         |
-| Los Angeles (06037)    | LA County Recorder — NOD / NOS                      | foreclosure     |
-| Los Angeles (06037)    | LA Building & Safety — code enforcement             | code_violation  |
-| NYC (36061/36005/36081)| ACRIS — distress deeds                              | foreclosure     |
-| NYC (36061/36005/36081)| HPD violations                                      | code_violation  |
-| NYC (36061/36005/36081)| PLUTO parcel drop (annual)                          | parcel          |
-| San Francisco (06075)  | Assessor sales                                      | sale            |
-| San Francisco (06075)  | DBI complaints                                      | code_violation  |
+| County (FIPS)           | Source                                  | Recipe         |
+| ----------------------- | --------------------------------------- | -------------- |
+| Miami-Dade (12086)      | Clerk of Court — foreclosure filings    | foreclosure    |
+| Miami-Dade (12086)      | Probate court public records            | probate        |
+| Los Angeles (06037)     | LA County Recorder — NOD / NOS          | foreclosure    |
+| Los Angeles (06037)     | LA Building & Safety — code enforcement | code_violation |
+| NYC (36061/36005/36081) | ACRIS — distress deeds                  | foreclosure    |
+| NYC (36061/36005/36081) | HPD violations                          | code_violation |
+| NYC (36061/36005/36081) | PLUTO parcel drop (annual)              | parcel         |
+| San Francisco (06075)   | Assessor sales                          | sale           |
+| San Francisco (06075)   | DBI complaints                          | code_violation |
 
 Each spider posts to `LOVABLE_INGEST_URL` with HMAC-SHA256 signature over
 the raw body using `LOVABLE_INGEST_SECRET`. See `docs/scrapy.md` for the

@@ -6,11 +6,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { rerunUnderwriteCore } from "@/lib/underwrite-core";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAdmin } from "@/integrations/supabase/require-admin";
 
 const Input = z.object({ parcel_id: z.string().uuid() });
 
 export const rerunUnderwrite = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAdmin])
   .validator((data: unknown) => Input.parse(data))
   .handler(async ({ data }) => rerunUnderwriteCore(data.parcel_id));
