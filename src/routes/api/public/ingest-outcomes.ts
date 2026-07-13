@@ -84,7 +84,17 @@ export const Route = createFileRoute("/api/public/ingest-outcomes")({
         }
 
         const scoreById = new Map((scores ?? []).map((s) => [s.parcel_id, s]));
-        const rows: Array<Record<string, unknown>> = [];
+        const rows: Array<{
+          parcel_id: string;
+          predicted_arv: number;
+          predicted_profit: number;
+          predicted_at: string;
+          actual_sale_price: number;
+          actual_profit: number;
+          actual_sold_at: string;
+          outcome: "WIN" | "LOSS" | "STUCK";
+          error_pct: number | null;
+        }> = [];
 
         for (const [parcel_id, sale] of latestByParcel) {
           const sc = scoreById.get(parcel_id);
