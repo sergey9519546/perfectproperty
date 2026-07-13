@@ -11,7 +11,7 @@ import { discoverSchema, saveRecipe, listRecipes, runRecipe, deleteRecipe } from
 import { supabase } from "@/integrations/supabase/client";
 import { PageHead } from "./deals";
 import { toast } from "sonner";
-import { Database, Zap, Globe, ScrollText, Search, Wand2, Play, Trash2, Copy } from "lucide-react";
+import { Zap, Globe, ScrollText, Search, Wand2, Play, Trash2, Copy } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   ssr: false,
