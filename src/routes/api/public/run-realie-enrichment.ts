@@ -132,15 +132,26 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
         const enriched = results.filter((r) => r.ok).length;
         const failed = results.length - enriched;
 
-        // 5. One summary row for admin visibility.
-        await supabaseAdmin.from("ingestion_runs").insert({
-          source: "REALIE:enrichment",
-          started_at: startedAt,
-          finished_at: new Date().toISOString(),
-          rows_inserted: enriched,
-          rows_failed: failed,
-          note: `processed ${results.length} / enriched ${enriched} / failed ${failed}`,
-        } as any);
+        // 5. One summary row per county in this batch (ingestion_runs requires county_fips).
+        const byCounty = new Map<string, { ok: number; fail: number }>();
+        for (const r of results) {
+          const cf = byId.get(r.parcel_id)?.county_fips;
+          if (!cf) continue;
+          const b = byCounty.get(cf) ?? { ok: 0, fail: 0 };
+          if (r.ok) b.ok++; else b.fail++;
+          byCounty.set(cf, b);
+        }
+        for (const [cf, b] of byCounty) {
+          await supabaseAdmin.from("ingestion_runs").insert({
+            county_fips: cf,
+            source: "REALIE:enrichment",
+            status: b.fail === 0 ? "ok" : b.ok > 0 ? "partial" : "failed",
+            rows_ingested: b.ok,
+            started_at: startedAt,
+            finished_at: new Date().toISOString(),
+            notes: `enriched ${b.ok} / failed ${b.fail}`,
+          } as any);
+        }
 
         return Response.json({
           ok: failed === 0,
