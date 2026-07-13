@@ -400,6 +400,50 @@ export type Database = {
           },
         ]
       }
+      field_provenance: {
+        Row: {
+          confidence: number
+          field_name: string
+          id: string
+          observed_at: string | null
+          parcel_id: string
+          provider_request_id: string | null
+          source: string
+          value: Json | null
+          written_at: string
+        }
+        Insert: {
+          confidence?: number
+          field_name: string
+          id?: string
+          observed_at?: string | null
+          parcel_id: string
+          provider_request_id?: string | null
+          source: string
+          value?: Json | null
+          written_at?: string
+        }
+        Update: {
+          confidence?: number
+          field_name?: string
+          id?: string
+          observed_at?: string | null
+          parcel_id?: string
+          provider_request_id?: string | null
+          source?: string
+          value?: Json | null
+          written_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_provenance_parcel_id_fkey"
+            columns: ["parcel_id"]
+            isOneToOne: false
+            referencedRelation: "parcels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ingestion_failures: {
         Row: {
           county_fips: string | null
@@ -524,6 +568,48 @@ export type Database = {
           },
         ]
       }
+      orchestrator_config: {
+        Row: {
+          cold_coverage_reserve_pct: number
+          id: number
+          max_targets_per_tick: number
+          realie_daily_budget_usd: number
+          updated_at: string
+          w_conversion: number
+          w_cost_penalty: number
+          w_score_lift: number
+          w_staleness: number
+          w_trigger_yield: number
+          zyte_daily_budget_usd: number
+        }
+        Insert: {
+          cold_coverage_reserve_pct?: number
+          id?: number
+          max_targets_per_tick?: number
+          realie_daily_budget_usd?: number
+          updated_at?: string
+          w_conversion?: number
+          w_cost_penalty?: number
+          w_score_lift?: number
+          w_staleness?: number
+          w_trigger_yield?: number
+          zyte_daily_budget_usd?: number
+        }
+        Update: {
+          cold_coverage_reserve_pct?: number
+          id?: number
+          max_targets_per_tick?: number
+          realie_daily_budget_usd?: number
+          updated_at?: string
+          w_conversion?: number
+          w_cost_penalty?: number
+          w_score_lift?: number
+          w_staleness?: number
+          w_trigger_yield?: number
+          zyte_daily_budget_usd?: number
+        }
+        Relationships: []
+      }
       parcel_scores: {
         Row: {
           acquisition_probability: number
@@ -551,6 +637,7 @@ export type Database = {
           gate_status: Json | null
           governor_kappa: number | null
           gross_profit: number
+          inputs_provenance: Json | null
           lgd: number | null
           lightgbm_divergence: number | null
           mc_cvar_loss: number | null
@@ -573,6 +660,7 @@ export type Database = {
           ring: number
           risk_adjusted_profit: number
           risk_adjusted_profit_credit: number | null
+          score_confidence: number | null
           selling_cost: number
           sigma_arv_log: number | null
           skeptic_flags: Json
@@ -604,6 +692,7 @@ export type Database = {
           gate_status?: Json | null
           governor_kappa?: number | null
           gross_profit: number
+          inputs_provenance?: Json | null
           lgd?: number | null
           lightgbm_divergence?: number | null
           mc_cvar_loss?: number | null
@@ -626,6 +715,7 @@ export type Database = {
           ring?: number
           risk_adjusted_profit: number
           risk_adjusted_profit_credit?: number | null
+          score_confidence?: number | null
           selling_cost: number
           sigma_arv_log?: number | null
           skeptic_flags?: Json
@@ -657,6 +747,7 @@ export type Database = {
           gate_status?: Json | null
           governor_kappa?: number | null
           gross_profit?: number
+          inputs_provenance?: Json | null
           lgd?: number | null
           lightgbm_divergence?: number | null
           mc_cvar_loss?: number | null
@@ -679,6 +770,7 @@ export type Database = {
           ring?: number
           risk_adjusted_profit?: number
           risk_adjusted_profit_credit?: number | null
+          score_confidence?: number | null
           selling_cost?: number
           sigma_arv_log?: number | null
           skeptic_flags?: Json
@@ -1073,6 +1165,146 @@ export type Database = {
           },
         ]
       }
+      scrape_runs: {
+        Row: {
+          blocks_encountered: number
+          cost_usd: number
+          county_fips: string | null
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          items_scraped: number
+          requests_made: number
+          source_kind: string | null
+          spider: string
+          started_at: string
+          status: string
+          target_id: string | null
+          triggers_produced: number
+          used_zyte: boolean
+        }
+        Insert: {
+          blocks_encountered?: number
+          cost_usd?: number
+          county_fips?: string | null
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          items_scraped?: number
+          requests_made?: number
+          source_kind?: string | null
+          spider: string
+          started_at?: string
+          status?: string
+          target_id?: string | null
+          triggers_produced?: number
+          used_zyte?: boolean
+        }
+        Update: {
+          blocks_encountered?: number
+          cost_usd?: number
+          county_fips?: string | null
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          items_scraped?: number
+          requests_made?: number
+          source_kind?: string | null
+          spider?: string
+          started_at?: string
+          status?: string
+          target_id?: string | null
+          triggers_produced?: number
+          used_zyte?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scrape_runs_target_id_fkey"
+            columns: ["target_id"]
+            isOneToOne: false
+            referencedRelation: "scrape_targets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scrape_targets: {
+        Row: {
+          cadence_hours: number
+          concurrent_requests: number
+          conversion_to_realie: number
+          cost_per_trigger_usd: number
+          county_fips: string
+          created_at: string
+          daily_request_cap: number
+          deal_score_lift: number
+          id: string
+          last_error: string | null
+          last_scheduled_at: string | null
+          last_success_at: string | null
+          needs_zyte: boolean
+          paused: boolean
+          penalty: number
+          priority: number
+          requests_per_min: number
+          source_kind: string
+          spider: string
+          trigger_yield_30d: number
+          updated_at: string
+          url_or_query: string
+        }
+        Insert: {
+          cadence_hours?: number
+          concurrent_requests?: number
+          conversion_to_realie?: number
+          cost_per_trigger_usd?: number
+          county_fips: string
+          created_at?: string
+          daily_request_cap?: number
+          deal_score_lift?: number
+          id?: string
+          last_error?: string | null
+          last_scheduled_at?: string | null
+          last_success_at?: string | null
+          needs_zyte?: boolean
+          paused?: boolean
+          penalty?: number
+          priority?: number
+          requests_per_min?: number
+          source_kind: string
+          spider: string
+          trigger_yield_30d?: number
+          updated_at?: string
+          url_or_query: string
+        }
+        Update: {
+          cadence_hours?: number
+          concurrent_requests?: number
+          conversion_to_realie?: number
+          cost_per_trigger_usd?: number
+          county_fips?: string
+          created_at?: string
+          daily_request_cap?: number
+          deal_score_lift?: number
+          id?: string
+          last_error?: string | null
+          last_scheduled_at?: string | null
+          last_success_at?: string | null
+          needs_zyte?: boolean
+          paused?: boolean
+          penalty?: number
+          priority?: number
+          requests_per_min?: number
+          source_kind?: string
+          spider?: string
+          trigger_yield_30d?: number
+          updated_at?: string
+          url_or_query?: string
+        }
+        Relationships: []
+      }
       source_health: {
         Row: {
           consecutive_failures: number
@@ -1196,6 +1428,7 @@ export type Database = {
           sold_at: string
         }[]
       }
+      recompute_scrape_priorities: { Args: never; Returns: number }
       record_underwrite_atomic: {
         Args: { p_audit: Json; p_score: Json }
         Returns: undefined
