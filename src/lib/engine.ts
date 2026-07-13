@@ -396,9 +396,9 @@ export function underwrite(
   const uncertainty = clamp(sigma_arv_log / Math.log(2), 0.1, 0.85);
   const grade = confidenceGrade(uncertainty, distress.length, p.is_listed);
 
-  let ring: Ring = 1;
-  if (!p.is_listed && distress.length > 0) ring = 2;
+  // ring=1 listed on market · ring=2 off-market · ring=3 predicted (NOD w/o auction)
   const prophecySignal = distress.some((d) => d.event_type === "FORECLOSURE_NOD" && !distress.some((x) => x.event_type === "AUCTION_SCHEDULED"));
+  let ring: Ring = p.is_listed ? 1 : 2;
   if (!p.is_listed && prophecySignal) ring = 3;
 
   const offer_curve = [-0.08, -0.04, 0, 0.05, 0.1].map((delta) => {
