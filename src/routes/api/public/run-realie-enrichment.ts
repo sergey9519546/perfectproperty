@@ -1,37 +1,32 @@
 /**
  * Cron endpoint: dequeue N parcels from enrichment_queue and fill in
- * living_sqft / year_built / beds / baths / etc. via Realie.
+ * living_sqft / year_built / beds / baths via Realie.
  *
- * Auth: shared bearer secret in `x-cron-secret` header (matches the
- * pattern of run-recipes.ts and rerun-underwrite.ts).
+ * Auth: /api/public/* bypasses the edge auth wall. We additionally check
+ * that the caller sent the Supabase anon key in the `apikey` header
+ * (matches how the other cron endpoints — run-recipes, rerun-underwrite,
+ * run-bulk-lookups, run-monitoring — are called from pg_cron). The batch
+ * cap keeps abusive callers cheap.
  *
  * Body: { batch?: number }  // default 25, hard cap 100 per invocation
  *
  * Each enriched parcel is re-underwritten as a side-effect of
- * lookupParcelByAddressCore(). Emits one ingestion_runs summary row
- * per invocation with source = "REALIE:enrichment".
+ * lookupParcelByAddressCore(). Emits one ingestion_runs row per county
+ * in the batch with source = "REALIE:enrichment".
  */
 
 import { createFileRoute } from "@tanstack/react-router";
-import { timingSafeEqual } from "crypto";
-
-function verify(secret: string, header: string | null): boolean {
-  if (!header) return false;
-  const a = Buffer.from(secret, "utf8");
-  const b = Buffer.from(header.trim(), "utf8");
-  if (a.length !== b.length) return false;
-  try { return timingSafeEqual(a, b); } catch { return false; }
-}
 
 export const Route = createFileRoute("/api/public/run-realie-enrichment")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = process.env.CRON_SECRET;
-        const header = request.headers.get("x-cron-secret");
-        if (!secret || !verify(secret, header)) {
+        const expectedKey = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY;
+        const gotKey = request.headers.get("apikey") ?? "";
+        if (!expectedKey || gotKey !== expectedKey) {
           return new Response("Unauthorized", { status: 401 });
         }
+
 
         let batch = 25;
         try {
