@@ -98,6 +98,33 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
               state: p.state.toUpperCase(),
               city: p.city ?? undefined,
             });
+
+            // Contract check: after Realie writes + underwrite runs, the
+            // parcel must have every REQUIRED field. If any is still null
+            // we treat the enrichment as insufficient — no partial win.
+            const { data: fresh } = await supabaseAdmin
+              .from("parcels")
+              .select("living_sqft, year_built, property_type")
+              .eq("id", item.parcel_id).maybeSingle();
+            const missing: string[] = [];
+            if (!fresh?.living_sqft) missing.push("living_sqft");
+            if (!fresh?.year_built) missing.push("year_built");
+            if (!fresh?.property_type) missing.push("property_type");
+
+            if (missing.length) {
+              await supabaseAdmin
+                .from("enrichment_queue")
+                .update({
+                  status: "failed",
+                  attempts: item.attempts + 1,
+                  last_error: `insufficient: missing ${missing.join(",")}`,
+                  completed_at: new Date().toISOString(),
+                })
+                .eq("parcel_id", item.parcel_id);
+              results.push({ parcel_id: item.parcel_id, ok: false, note: `insufficient (${missing.join(",")})` });
+              continue;
+            }
+
             await supabaseAdmin
               .from("enrichment_queue")
               .update({
