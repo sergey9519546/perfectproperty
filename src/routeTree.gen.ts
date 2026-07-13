@@ -22,11 +22,13 @@ import { Route as AdminHealthRouteImport } from './routes/admin.health'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as ApiPublicScrapyIngestRouteImport } from './routes/api/public/scrapy-ingest'
+import { Route as ApiPublicScrapeRunCompleteRouteImport } from './routes/api/public/scrape-run-complete'
 import { Route as ApiPublicRunRecipesRouteImport } from './routes/api/public/run-recipes'
 import { Route as ApiPublicRunRealieEnrichmentRouteImport } from './routes/api/public/run-realie-enrichment'
 import { Route as ApiPublicRunMonitoringRouteImport } from './routes/api/public/run-monitoring'
 import { Route as ApiPublicRunBulkLookupsRouteImport } from './routes/api/public/run-bulk-lookups'
 import { Route as ApiPublicRerunUnderwriteRouteImport } from './routes/api/public/rerun-underwrite'
+import { Route as ApiPublicNextScrapeTargetsRouteImport } from './routes/api/public/next-scrape-targets'
 import { Route as ApiPublicIngestAllRouteImport } from './routes/api/public/ingest-all'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
@@ -98,6 +100,12 @@ const ApiPublicScrapyIngestRoute = ApiPublicScrapyIngestRouteImport.update({
   path: '/api/public/scrapy-ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicScrapeRunCompleteRoute =
+  ApiPublicScrapeRunCompleteRouteImport.update({
+    id: '/api/public/scrape-run-complete',
+    path: '/api/public/scrape-run-complete',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicRunRecipesRoute = ApiPublicRunRecipesRouteImport.update({
   id: '/api/public/run-recipes',
   path: '/api/public/run-recipes',
@@ -123,6 +131,12 @@ const ApiPublicRerunUnderwriteRoute =
   ApiPublicRerunUnderwriteRouteImport.update({
     id: '/api/public/rerun-underwrite',
     path: '/api/public/rerun-underwrite',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicNextScrapeTargetsRoute =
+  ApiPublicNextScrapeTargetsRouteImport.update({
+    id: '/api/public/next-scrape-targets',
+    path: '/api/public/next-scrape-targets',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicIngestAllRoute = ApiPublicIngestAllRouteImport.update({
@@ -158,11 +172,13 @@ export interface FileRoutesByFullPath {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/ingest-all': typeof ApiPublicIngestAllRoute
+  '/api/public/next-scrape-targets': typeof ApiPublicNextScrapeTargetsRoute
   '/api/public/rerun-underwrite': typeof ApiPublicRerunUnderwriteRoute
   '/api/public/run-bulk-lookups': typeof ApiPublicRunBulkLookupsRoute
   '/api/public/run-monitoring': typeof ApiPublicRunMonitoringRoute
   '/api/public/run-realie-enrichment': typeof ApiPublicRunRealieEnrichmentRoute
   '/api/public/run-recipes': typeof ApiPublicRunRecipesRoute
+  '/api/public/scrape-run-complete': typeof ApiPublicScrapeRunCompleteRoute
   '/api/public/scrapy-ingest': typeof ApiPublicScrapyIngestRoute
 }
 export interface FileRoutesByTo {
@@ -181,11 +197,13 @@ export interface FileRoutesByTo {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/ingest-all': typeof ApiPublicIngestAllRoute
+  '/api/public/next-scrape-targets': typeof ApiPublicNextScrapeTargetsRoute
   '/api/public/rerun-underwrite': typeof ApiPublicRerunUnderwriteRoute
   '/api/public/run-bulk-lookups': typeof ApiPublicRunBulkLookupsRoute
   '/api/public/run-monitoring': typeof ApiPublicRunMonitoringRoute
   '/api/public/run-realie-enrichment': typeof ApiPublicRunRealieEnrichmentRoute
   '/api/public/run-recipes': typeof ApiPublicRunRecipesRoute
+  '/api/public/scrape-run-complete': typeof ApiPublicScrapeRunCompleteRoute
   '/api/public/scrapy-ingest': typeof ApiPublicScrapyIngestRoute
 }
 export interface FileRoutesById {
@@ -205,11 +223,13 @@ export interface FileRoutesById {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/ingest-all': typeof ApiPublicIngestAllRoute
+  '/api/public/next-scrape-targets': typeof ApiPublicNextScrapeTargetsRoute
   '/api/public/rerun-underwrite': typeof ApiPublicRerunUnderwriteRoute
   '/api/public/run-bulk-lookups': typeof ApiPublicRunBulkLookupsRoute
   '/api/public/run-monitoring': typeof ApiPublicRunMonitoringRoute
   '/api/public/run-realie-enrichment': typeof ApiPublicRunRealieEnrichmentRoute
   '/api/public/run-recipes': typeof ApiPublicRunRecipesRoute
+  '/api/public/scrape-run-complete': typeof ApiPublicScrapeRunCompleteRoute
   '/api/public/scrapy-ingest': typeof ApiPublicScrapyIngestRoute
 }
 export interface FileRouteTypes {
@@ -230,11 +250,13 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/ingest-all'
+    | '/api/public/next-scrape-targets'
     | '/api/public/rerun-underwrite'
     | '/api/public/run-bulk-lookups'
     | '/api/public/run-monitoring'
     | '/api/public/run-realie-enrichment'
     | '/api/public/run-recipes'
+    | '/api/public/scrape-run-complete'
     | '/api/public/scrapy-ingest'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -253,11 +275,13 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/ingest-all'
+    | '/api/public/next-scrape-targets'
     | '/api/public/rerun-underwrite'
     | '/api/public/run-bulk-lookups'
     | '/api/public/run-monitoring'
     | '/api/public/run-realie-enrichment'
     | '/api/public/run-recipes'
+    | '/api/public/scrape-run-complete'
     | '/api/public/scrapy-ingest'
   id:
     | '__root__'
@@ -276,11 +300,13 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/ingest-all'
+    | '/api/public/next-scrape-targets'
     | '/api/public/rerun-underwrite'
     | '/api/public/run-bulk-lookups'
     | '/api/public/run-monitoring'
     | '/api/public/run-realie-enrichment'
     | '/api/public/run-recipes'
+    | '/api/public/scrape-run-complete'
     | '/api/public/scrapy-ingest'
   fileRoutesById: FileRoutesById
 }
@@ -299,11 +325,13 @@ export interface RootRouteChildren {
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicIngestAllRoute: typeof ApiPublicIngestAllRoute
+  ApiPublicNextScrapeTargetsRoute: typeof ApiPublicNextScrapeTargetsRoute
   ApiPublicRerunUnderwriteRoute: typeof ApiPublicRerunUnderwriteRoute
   ApiPublicRunBulkLookupsRoute: typeof ApiPublicRunBulkLookupsRoute
   ApiPublicRunMonitoringRoute: typeof ApiPublicRunMonitoringRoute
   ApiPublicRunRealieEnrichmentRoute: typeof ApiPublicRunRealieEnrichmentRoute
   ApiPublicRunRecipesRoute: typeof ApiPublicRunRecipesRoute
+  ApiPublicScrapeRunCompleteRoute: typeof ApiPublicScrapeRunCompleteRoute
   ApiPublicScrapyIngestRoute: typeof ApiPublicScrapyIngestRoute
 }
 
@@ -400,6 +428,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicScrapyIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/scrape-run-complete': {
+      id: '/api/public/scrape-run-complete'
+      path: '/api/public/scrape-run-complete'
+      fullPath: '/api/public/scrape-run-complete'
+      preLoaderRoute: typeof ApiPublicScrapeRunCompleteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/run-recipes': {
       id: '/api/public/run-recipes'
       path: '/api/public/run-recipes'
@@ -433,6 +468,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/rerun-underwrite'
       fullPath: '/api/public/rerun-underwrite'
       preLoaderRoute: typeof ApiPublicRerunUnderwriteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/next-scrape-targets': {
+      id: '/api/public/next-scrape-targets'
+      path: '/api/public/next-scrape-targets'
+      fullPath: '/api/public/next-scrape-targets'
+      preLoaderRoute: typeof ApiPublicNextScrapeTargetsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/ingest-all': {
@@ -485,11 +527,13 @@ const rootRouteChildren: RootRouteChildren = {
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicIngestAllRoute: ApiPublicIngestAllRoute,
+  ApiPublicNextScrapeTargetsRoute: ApiPublicNextScrapeTargetsRoute,
   ApiPublicRerunUnderwriteRoute: ApiPublicRerunUnderwriteRoute,
   ApiPublicRunBulkLookupsRoute: ApiPublicRunBulkLookupsRoute,
   ApiPublicRunMonitoringRoute: ApiPublicRunMonitoringRoute,
   ApiPublicRunRealieEnrichmentRoute: ApiPublicRunRealieEnrichmentRoute,
   ApiPublicRunRecipesRoute: ApiPublicRunRecipesRoute,
+  ApiPublicScrapeRunCompleteRoute: ApiPublicScrapeRunCompleteRoute,
   ApiPublicScrapyIngestRoute: ApiPublicScrapyIngestRoute,
 }
 export const routeTree = rootRouteImport
