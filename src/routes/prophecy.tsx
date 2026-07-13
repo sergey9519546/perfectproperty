@@ -30,9 +30,9 @@ export const Route = createFileRoute("/prophecy")({
 });
 
 function ProphecyPage() {
-  const fn = useServerFn(listRankedParcels);
+  const fn = useServerFn(listProphecyParcels);
   const [sel, setSel] = useState<string | null>(null);
-  const q = useQuery({ queryKey: ["prophecy"], queryFn: () => fn({ data: { ring: 3, limit: 500 } }) });
+  const q = useQuery({ queryKey: ["prophecy"], queryFn: () => fn({ data: { min_score: 70, limit: 200 } }) });
   return (
     <>
       <div className="mx-auto max-w-[1400px] px-6 py-8">
