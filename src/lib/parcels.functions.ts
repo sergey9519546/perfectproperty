@@ -185,3 +185,92 @@ export const getCoverage = createServerFn({ method: "GET" })
   };
 });
 
+
+// ---------------------------------------------------------------------------
+// Per-field provenance for a single parcel — powers the "Why this score" tab.
+// ---------------------------------------------------------------------------
+export const getFieldProvenance = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: unknown) => z.object({ parcel_id: z.string().uuid() }).parse(data))
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase;
+    const [{ data: rows, error }, { data: score }] = await Promise.all([
+      (supabase as any)
+        .from("field_provenance")
+        .select("field_name, value, confidence, source, observed_at, written_at, provider_request_id")
+        .eq("parcel_id", data.parcel_id)
+        .order("written_at", { ascending: false }),
+      supabase
+        .from("parcel_scores")
+        .select("score_confidence, inputs_provenance, perfect_score, computed_at")
+        .eq("parcel_id", data.parcel_id)
+        .maybeSingle(),
+    ]);
+    if (error) throw new Error(error.message);
+    // Group: latest-per-field + full history per field.
+    const latest = new Map<string, any>();
+    const history: Record<string, any[]> = {};
+    for (const r of (rows ?? []) as any[]) {
+      if (!latest.has(r.field_name)) latest.set(r.field_name, r);
+      (history[r.field_name] ??= []).push(r);
+    }
+    return {
+      score_confidence: (score as any)?.score_confidence ?? null,
+      inputs_provenance: (score as any)?.inputs_provenance ?? null,
+      perfect_score: (score as any)?.perfect_score ?? null,
+      computed_at: (score as any)?.computed_at ?? null,
+      fields: Array.from(latest.values()),
+      history,
+    };
+  });
+
+// ---------------------------------------------------------------------------
+// Orchestrator status — coverage matrix + Zyte/Realie budget for /admin/health.
+// ---------------------------------------------------------------------------
+export const getOrchestratorStats = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const supabase = context.supabase;
+    const dayStart = new Date(); dayStart.setUTCHours(0, 0, 0, 0);
+
+    const [cfg, targets, runs] = await Promise.all([
+      supabase.from("orchestrator_config").select("*").eq("id", 1).maybeSingle(),
+      supabase.from("scrape_targets")
+        .select("county_fips, source_kind, priority, needs_zyte, paused, penalty, last_success_at, trigger_yield_30d, cost_per_trigger_usd")
+        .order("priority", { ascending: false }).limit(200),
+      supabase.from("scrape_runs")
+        .select("cost_usd, used_zyte, triggers_produced, requests_made, status, started_at, county_fips, source_kind")
+        .gte("started_at", dayStart.toISOString()),
+    ]);
+
+    const runRows = (runs.data ?? []) as any[];
+    const zyteSpent = runRows.filter((r) => r.used_zyte).reduce((a, r) => a + Number(r.cost_usd || 0), 0);
+    const triggersToday = runRows.reduce((a, r) => a + Number(r.triggers_produced || 0), 0);
+    const requestsToday = runRows.reduce((a, r) => a + Number(r.requests_made || 0), 0);
+    const blocksToday = runRows.filter((r) => r.status === "blocked").length;
+
+    // Coverage matrix: county × source_kind → hours since last success.
+    const matrix: Record<string, Record<string, number | null>> = {};
+    for (const t of (targets.data ?? []) as any[]) {
+      matrix[t.county_fips] ??= {};
+      const hours = t.last_success_at
+        ? (Date.now() - Date.parse(t.last_success_at)) / 3600000
+        : null;
+      matrix[t.county_fips][t.source_kind] = hours;
+    }
+
+    return {
+      config: cfg.data ?? null,
+      today: {
+        zyte_spent_usd: Math.round(zyteSpent * 100) / 100,
+        triggers_produced: triggersToday,
+        requests_made: requestsToday,
+        blocks: blocksToday,
+        runs: runRows.length,
+      },
+      targets: (targets.data ?? []),
+      coverage_matrix: matrix,
+    };
+  });
+
+
