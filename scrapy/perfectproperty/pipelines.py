@@ -3,11 +3,13 @@
 Batches scraped items and POSTs them to /api/public/scrapy-ingest with an
 HMAC-SHA256 signature over the raw JSON body (header: x-signature).
 
-Env vars (set in Scrapy Cloud → Spiders → Settings):
-  LOVABLE_INGEST_URL    e.g. https://perfectproperty.lovable.app/api/public/scrapy-ingest
-  LOVABLE_INGEST_SECRET matches SCRAPY_INGEST_SECRET on the Lovable side
-  LOVABLE_RECIPE        foreclosure | probate | code_violation | sale | auction | parcel
-                        (a spider may override via `custom_settings` or item['_recipe'])
+Config (read from Scrapy settings first, falling back to env vars — so you
+can set them either as project Spider Settings in the Zyte UI or as
+per-job `job_settings`):
+  LOVABLE_INGEST_URL     https://perfectproperty.lovable.app/api/public/scrapy-ingest
+  LOVABLE_INGEST_SECRET  matches SCRAPY_INGEST_SECRET on the Lovable side
+  LOVABLE_RECIPE         foreclosure | probate | code_violation | sale | auction | parcel
+  LOVABLE_BATCH_SIZE     default 100
 """
 import hashlib
 import hmac
@@ -17,14 +19,33 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
 
+def _cfg(settings, key, default=None, required=False):
+    val = settings.get(key)
+    if val in (None, ""):
+        val = os.environ.get(key, default)
+    if required and not val:
+        raise RuntimeError(f"LovableIngestPipeline: missing {key} (set as Spider Setting or env var)")
+    return val
+
+
 class LovableIngestPipeline:
-    def __init__(self):
-        self.url = os.environ["LOVABLE_INGEST_URL"]
-        self.secret = os.environ["LOVABLE_INGEST_SECRET"].encode()
-        self.default_recipe = os.environ.get("LOVABLE_RECIPE", "foreclosure")
-        self.batch_size = int(os.environ.get("LOVABLE_BATCH_SIZE", "100"))
+    def __init__(self, url: str, secret: str, default_recipe: str, batch_size: int):
+        self.url = url
+        self.secret = secret.encode()
+        self.default_recipe = default_recipe
+        self.batch_size = batch_size
         # one batch per recipe so a spider can emit mixed items
         self.batches: dict[str, list] = {}
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        s = crawler.settings
+        return cls(
+            url=_cfg(s, "LOVABLE_INGEST_URL", required=True),
+            secret=_cfg(s, "LOVABLE_INGEST_SECRET", required=True),
+            default_recipe=_cfg(s, "LOVABLE_RECIPE", default="foreclosure"),
+            batch_size=int(_cfg(s, "LOVABLE_BATCH_SIZE", default="100")),
+        )
 
     def process_item(self, item, spider):
         d = dict(item)
@@ -48,7 +69,12 @@ class LovableIngestPipeline:
             self.url,
             data=body,
             method="POST",
-            headers={"content-type": "application/json", "x-signature": sig},
+            headers={
+                "content-type": "application/json",
+                "x-signature": sig,
+                "user-agent": "PerfectPropertyScrapyIngest/1.0",
+                "accept": "application/json",
+            },
         )
         try:
             with urlopen(req, timeout=30) as r:

@@ -2,4 +2,4 @@ project: 870105
 requirements:
   file: requirements.txt
 stacks:
-  default: scrapy:2.11-20240501
+  default: scrapy:2.17
