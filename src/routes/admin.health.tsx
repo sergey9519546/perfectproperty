@@ -1,9 +1,11 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getPipelineHealth } from "@/lib/health.functions";
+import { getZyteStatus, scheduleZyteJob } from "@/lib/zyte.functions";
 import { SectionBoundary } from "@/components/SectionBoundary";
 import { DataFreshness } from "@/components/DataFreshness";
+
 
 function statusColor(s: string): string {
   if (s === "green") return "bg-profit-strong";
@@ -107,9 +109,113 @@ function HealthView() {
           </table>
         </div>
       </section>
+
+      <ZytePanel />
     </div>
   );
 }
+
+function ZytePanel() {
+  const fn = useServerFn(getZyteStatus);
+  const schedule = useServerFn(scheduleZyteJob);
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: ["zyte-status"],
+    queryFn: () => fn(),
+    refetchInterval: 30_000,
+  });
+  const m = useMutation({
+    mutationFn: (v: { spider: string; recipe?: string }) => schedule({ data: v }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["zyte-status"] }),
+  });
+
+  if (q.isLoading) return null;
+  const d = q.data;
+  if (!d) return null;
+
+  return (
+    <section className="rounded-lg border border-border bg-surface p-4">
+      <div className="flex items-baseline justify-between">
+        <div>
+          <h2 className="text-sm font-semibold">Zyte / Scrapy Cloud</h2>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {d.enabled
+              ? <>Project <span className="font-mono">{d.project}</span> · fallback fetcher active for blocked county sources.</>
+              : <>Not configured. Add <span className="font-mono">ZYTE_API_KEY</span> to enable the anti-bot fallback.</>}
+          </p>
+        </div>
+        {d.enabled && (
+          <div className="flex gap-2">
+            <ScheduleButton onSchedule={(spider, recipe) => m.mutate({ spider, recipe })} pending={m.isPending} />
+          </div>
+        )}
+      </div>
+      {d.error && <div className="mt-2 text-[11px] text-destructive">{d.error}</div>}
+      {m.error && <div className="mt-2 text-[11px] text-destructive">{String((m.error as Error).message)}</div>}
+      {m.data && <div className="mt-2 text-[11px] text-muted-foreground">Scheduled job {m.data.jobid}</div>}
+
+      {d.enabled && (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-[12px]">
+            <thead className="text-left text-muted-foreground">
+              <tr>
+                <th className="pb-2">Job</th>
+                <th className="pb-2">Spider</th>
+                <th className="pb-2">State</th>
+                <th className="pb-2 text-right">Items</th>
+                <th className="pb-2 text-right">Errors</th>
+                <th className="pb-2">Started</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.jobs.length === 0 && (
+                <tr><td colSpan={6} className="py-4 text-center text-muted-foreground">No recent Scrapy Cloud jobs.</td></tr>
+              )}
+              {d.jobs.map((j: any) => (
+                <tr key={j.id} className="border-t border-border/40">
+                  <td className="py-2 font-mono text-[11px]">{j.id}</td>
+                  <td className="py-2">{j.spider}</td>
+                  <td className="py-2">
+                    <span className={`inline-block h-2 w-2 rounded-full mr-2 ${
+                      j.state === "finished" && j.close_reason === "finished" ? "bg-profit-strong"
+                      : j.state === "running" ? "bg-amber-400"
+                      : j.close_reason && j.close_reason !== "finished" ? "bg-destructive"
+                      : "bg-muted-foreground"
+                    }`} />
+                    {j.state}{j.close_reason && j.close_reason !== "finished" ? ` · ${j.close_reason}` : ""}
+                  </td>
+                  <td className="py-2 text-right num">{j.items_scraped.toLocaleString()}</td>
+                  <td className="py-2 text-right num">{j.errors_count > 0 ? <span className="text-destructive">{j.errors_count}</span> : "0"}</td>
+                  <td className="py-2 whitespace-nowrap">
+                    {j.started_time ? <DataFreshness timestamp={j.started_time} prefix="" /> : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ScheduleButton({ onSchedule, pending }: { onSchedule: (spider: string, recipe?: string) => void; pending: boolean }) {
+  return (
+    <button
+      disabled={pending}
+      onClick={() => {
+        const spider = window.prompt("Spider name to schedule (as configured in Scrapy Cloud):");
+        if (!spider) return;
+        const recipe = window.prompt("Recipe (foreclosure | probate | code_violation | sale | parcel):", "foreclosure") ?? undefined;
+        onSchedule(spider.trim(), recipe?.trim() || undefined);
+      }}
+      className="rounded-md border border-border px-3 py-1 text-[11px] hover:bg-muted/40 disabled:opacity-50"
+    >
+      {pending ? "Scheduling…" : "Schedule job"}
+    </button>
+  );
+}
+
 
 function HealthPage() {
   return (
