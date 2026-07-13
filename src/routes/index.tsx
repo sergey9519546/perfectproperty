@@ -93,11 +93,14 @@ function CoverageStrip({ cov }: { cov: Awaited<ReturnType<typeof getCoverage>> |
       <div className="text-[11px] uppercase tracking-wider text-muted-foreground">On the map right now</div>
       <div className="num mt-1 text-2xl font-semibold">
         {cov.total_parcels.toLocaleString()}
-        <span className="ml-1 text-sm font-normal text-muted-foreground">deals with a real trigger</span>
+        <span className="ml-1 text-sm font-normal text-muted-foreground">
+          {triggered > 0 ? "deals with a real trigger" : "engine-scored parcels"}
+        </span>
       </div>
       <div className="mt-1 text-[12px] text-muted-foreground">
-        Filtered to parcels with a distress event or active listing in the last 180 days.
-        {triggered > 0 && ` ${triggered.toLocaleString()} triggered · ${queue.toLocaleString()} awaiting enrichment.`}
+        {triggered > 0
+          ? `Filtered to parcels with a distress event or active listing in the last 180 days. ${triggered.toLocaleString()} triggered · ${queue.toLocaleString()} awaiting enrichment.`
+          : `No live distress or listing triggers yet — showing every parcel the engine has scored. ${queue.toLocaleString()} awaiting enrichment.`}
       </div>
 
       <div className="mt-3 text-[10px] uppercase tracking-wider text-muted-foreground">Buy rating</div>

@@ -20,31 +20,32 @@ export const listRankedParcels = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const supabase = context.supabase;
 
-    // Gate 1: only parcels with a real deal trigger in the last 180 days
-    // (distress event or active listing). No trigger = no reason to be on
-    // the map, regardless of score.
+    // Trigger gate: parcels with a distress event or listing in the last
+    // 180 days. When the pipeline has at least one active trigger we filter
+    // to it (that's the "reason to be a deal"). When zero triggers exist —
+    // fresh install, spiders not wired yet — we fall back to top-scored
+    // LIVE parcels with real underwriting inputs so the app still shows the
+    // engine's real output instead of a blank page.
     const { data: triggerRows, error: trigErr } = await (supabase as any)
       .rpc("parcels_with_active_trigger", { _days: 180 });
     if (trigErr) throw new Error(trigErr.message);
     const triggeredIds = ((triggerRows ?? []) as Array<{ parcel_id: string }>)
       .map((r) => r.parcel_id)
       .filter(Boolean);
-    if (triggeredIds.length === 0) return [];
 
-    // Gate 2: require real underwriting inputs (living_sqft + year_built).
-    // Without them the underwrite falls back to defaults and every row
-    // collapses to the same "mock" numbers.
     let q = supabase
       .from("parcel_scores")
       .select(
         "parcel_id, perfect_score, gross_profit, risk_adjusted_profit, modeled_offer, acquisition_probability, exit_days, ring, confidence_grade, skeptic_flags, recommended_scope, reno_cost, data_source, computed_at, mc_profit_p5, mc_profit_p50, mc_p_loss, cosmetic_arv, full_reno_arv, expanded_arv, as_is_value, carry_cost, selling_cost, ead, pd_credit, lgd, risk_adjusted_profit_credit, parcels!inner(id, address, city, state, zip, lat, lng, living_sqft, year_built, bedrooms, bathrooms, condition_grade, owner_is_absentee, is_listed, is_vacant, county_fips, data_source)",
       )
       .eq("data_source", "LIVE")
-      .in("parcel_id", triggeredIds)
       .not("parcels.living_sqft", "is", null)
       .not("parcels.year_built", "is", null)
       .order("perfect_score", { ascending: false })
       .limit(data.limit);
+
+    if (triggeredIds.length > 0) q = q.in("parcel_id", triggeredIds);
+
 
     if (data.ring) q = q.eq("ring", data.ring);
     if (data.min_score !== undefined) q = q.gte("perfect_score", data.min_score);
@@ -134,16 +135,23 @@ export const getCoverage = createServerFn({ method: "GET" })
   const [counties, runs, scores, outcomes, liveByCounty, queueRows] = await Promise.all([
     supabase.from("counties").select("*").order("state").order("name"),
     supabase.from("ingestion_runs").select("*").order("started_at", { ascending: false }).limit(30),
-    // Match listRankedParcels: LIVE + real inputs + has an active trigger.
-    triggeredIds.length === 0
-      ? Promise.resolve({ data: [] as any[] })
+    // Match listRankedParcels: LIVE + real inputs. Apply the active-trigger
+    // filter only when at least one trigger exists (fresh installs shouldn't
+    // show zero tiers/rings just because spiders haven't emitted yet).
+    (triggeredIds.length === 0
+      ? supabase
+          .from("parcel_scores")
+          .select("parcel_id, perfect_score, ring, confidence_grade, data_source, parcels!inner(county_fips, living_sqft, year_built)")
+          .eq("data_source", "LIVE")
+          .not("parcels.living_sqft", "is", null)
+          .not("parcels.year_built", "is", null)
       : supabase
           .from("parcel_scores")
           .select("parcel_id, perfect_score, ring, confidence_grade, data_source, parcels!inner(county_fips, living_sqft, year_built)")
           .eq("data_source", "LIVE")
           .in("parcel_id", triggeredIds)
           .not("parcels.living_sqft", "is", null)
-          .not("parcels.year_built", "is", null),
+          .not("parcels.year_built", "is", null)),
     supabase.from("prediction_outcomes").select("outcome, error_pct, predicted_profit, actual_profit"),
     supabase.from("parcels").select("county_fips").eq("data_source", "LIVE").not("living_sqft", "is", null).not("year_built", "is", null),
     supabase.from("enrichment_queue").select("status"),
