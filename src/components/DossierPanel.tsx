@@ -37,6 +37,7 @@ export function DossierPanel({ parcelId, onClose }: Props) {
         <div className="space-y-6 p-5">
           <Header d={q.data} />
           <ScoreStrip d={q.data} />
+          {parcelId && <WhyThisScorePanel parcelId={parcelId} />}
           <ValueLadder d={q.data} />
           <MonteCarloBlock d={q.data} />
           <V12RiskBlock d={q.data} />
