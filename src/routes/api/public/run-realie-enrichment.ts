@@ -248,13 +248,43 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
           } as any);
         }
 
+        // 6. When any parcel was successfully enriched, re-score all parcels
+        // so /deals reflects the fresh living_sqft / year_built immediately,
+        // then refresh the monitoring snapshot. Failures here are logged but
+        // do NOT fail the enrichment run itself.
+        let rescored = 0;
+        let monitoring_refreshed = false;
+        if (enriched > 0) {
+          try {
+            const { scoreAllCore } = await import("@/lib/ingest-core");
+            const r = await scoreAllCore();
+            rescored = r.scored ?? 0;
+          } catch (e: any) {
+            console.error("post-enrichment scoreAll failed:", e?.message ?? e);
+          }
+          try {
+            const origin = new URL(request.url).origin;
+            const res = await fetch(`${origin}/api/public/run-monitoring`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", apikey: expectedKey! },
+              body: "{}",
+            });
+            monitoring_refreshed = res.ok;
+          } catch (e: any) {
+            console.error("post-enrichment monitoring refresh failed:", e?.message ?? e);
+          }
+        }
+
         return Response.json({
           ok: failed === 0,
           processed: results.length,
           enriched,
           failed,
+          rescored,
+          monitoring_refreshed,
           results,
         });
+
       },
     },
   },
