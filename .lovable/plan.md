@@ -1,154 +1,171 @@
+# Scrapy/Zyte orchestration + Realie contract + provenance UI
 
-## The real problem (not what it looks like)
+Three coordinated workstreams. Everything below is additive to the trigger-based pipeline already shipped (`enrichment_queue`, `parcels_with_active_trigger`, `/api/public/run-realie-enrichment`).
 
-Today's DB tells a clearer story than "524 parcels missing sqft":
+---
 
-| Table | Rows | Meaning |
-|---|---|---|
-| `parcels` (LIVE) | 1,014 | Addresses we know about |
-| `parcels` with sqft+year | 490 | Enough to underwrite |
-| `sales` | 4,939 | Comps (good) |
-| `distress_events` | **0** | **No reason any of these are deals** |
-| `listings` | **0** | **No on-market signal either** |
+## 1) Scrapy/Zyte orchestration (funnel side)
 
-Even the 490 "enriched" parcels are just houses with defaults for owner/vacancy/absentee — the score is math over assumptions, not over a real deal trigger. That's why the ranked list collapses to identical numbers.
+**Goal:** maximize *triggered parcels/day* under a fixed Zyte budget without banging any single county too hard.
 
-**The fix isn't more sqft. It's giving each parcel a reason to be shown.**
+### Priority model (per-spider, per-target)
 
-## Role of each source (one job each — stop overlapping them)
+A single `scrape_targets` table drives every spider. Rows are (county_fips, source_kind, url_or_query, priority, cadence). Priority is computed daily:
 
-```text
-SCRAPY (discovery + signals)     realie enrichment (attributes)      ZYTE (transport)
-────────────────────────────     ──────────────────────────────      ────────────────
-- foreclosure filings            - sqft, year, beds/baths            - proxy + headless
-- probate cases                  - owner name, mailing addr          - used silently by
-- code violations                - assessed value, tax status          scrapy + arcgis
-- tax delinquents                - last sale price / date              adapters when the
-- absentee-owner rolls           - listing status (some markets)       county site blocks
-- MLS scrapes / new listings                                           direct fetch
-- county parcel drops (thin)     Called ONLY when a parcel has        
-                                 a fresh trigger AND is missing       Never a "source"
-Cheap. Volume. Nightly.          the fields underwriting needs.       on its own.
-                                 Metered $/call — must be gated.
+```
+priority = w1 * trigger_yield_30d          -- distress+listing events last 30 days per 1k requests
+         + w2 * conversion_to_realie       -- % of scraped rows that end up enriching a parcel
+         + w3 * deal_score_lift            -- avg parcel_scores.overall for parcels this source found
+         - w4 * cost_per_trigger_usd       -- Zyte spend / trigger delivered
+         - w5 * staleness_penalty          -- hours since last successful crawl
 ```
 
-Rule: **Realie is the wallet. Scrapy is the funnel. Zyte is the pipe.** Never call Realie for a parcel without a trigger.
+Weights live in `orchestrator_config` (single row, editable in admin). Nightly job recomputes priority; scheduler pulls top-N per tick.
 
-## Minimum data a parcel needs before it hits the map
+### Rate-limit + budget controls
 
-1. `lat/lng` — pin
-2. `address, city, state` — label
-3. `living_sqft, year_built` — non-default underwrite
-4. **At least one trigger in the last 180d** — the reason it's a deal:
-   - distress event (foreclosure / probate / code violation / tax lien), OR
-   - active listing priced below county median $/sqft, OR
-   - recent absentee-owner + long tenure (>15y), OR
-   - operator manual lookup
+Enforced at the orchestrator, not per-spider:
 
-`listRankedParcels` already filters 1–3. It should also require 4. Anything else is noise on the map.
+- **Per-host token bucket** (Redis or Postgres advisory lock): `requests_per_min` and `concurrent_requests` per hostname. Default 30/min, 4 concurrent.
+- **Per-county daily cap**: max requests/day, prevents one county monopolizing.
+- **Zyte daily $ cap**: hard stop when spend crosses threshold; scheduler skips Zyte-flagged targets and falls back to direct fetch for that day.
+- **Backoff on signal**: 429/403/captcha increments `source_health.penalty`; target skipped for `2^penalty * 15min`. Cleared on first success.
+- **Zyte only when needed**: target row has `needs_zyte: bool`. Spiders try direct first; on block, mark `needs_zyte=true` and re-queue.
 
-## The pipeline to build
+### Coverage-first scheduling
 
-```text
-   ┌───────── Scrapy Cloud (nightly, per county) ─────────┐
-   │  spider:foreclosure  → recipe:foreclosure            │
-   │  spider:probate      → recipe:probate                │
-   │  spider:codeviol     → recipe:code_violation         │
-   │  spider:mls_new      → recipe:listing  (new)         │
-   │  spider:parcel_drop  → recipe:parcel   (thin)        │
-   └───────────────────────┬──────────────────────────────┘
-                           │  HMAC webhook → /api/public/scrapy-ingest
-                           ▼
-              distress_events / listings / sales / parcels
-                           │
-                           ▼
-              DB trigger: enqueue_enrichment()
-                fires when a parcel gains a trigger
-                AND is missing sqft/year/beds
-                           │
-                           ▼
-                enrichment_queue (new table)
-                  priority = signal_recency * county_weight
-                  status: pending → inflight → done | failed
-                           │
-                           ▼
-        cron: /api/public/run-realie-enrichment
-          pulls top N (daily budget cap, e.g. 300)
-          calls realieLookupAddress()
-          upserts parcel, marks queue done
-                           │
-                           ▼
-        cron: /api/public/rerun-underwrite (exists)
-          re-scores touched parcels
-                           │
-                           ▼
-                    parcel_scores
-                           │
-                           ▼
-              Map + Deals (already filter to real inputs;
-              add "has trigger" filter in same server fn)
+Every tick the scheduler picks jobs in this order:
+1. Counties with 0 triggers in last 7 days (cold coverage) — floor of 20% of budget.
+2. Highest `priority` targets (hot coverage).
+3. Refresh cadence sweeps (weekly for stale sources).
+
+Result surfaced on admin dashboard: coverage matrix (county x source_kind) with color = days-since-trigger.
+
+### New tables (this repo)
+
+- `scrape_targets` — the queue Scrapy pulls from via `/api/public/next-scrape-targets`.
+- `scrape_runs` — one row per spider execution, records cost, requests, triggers produced, blocks.
+- `orchestrator_config` — single-row weights + caps.
+
+Scrapy pulls targets via signed request, posts results to the existing ingestion webhook, and posts run stats to `/api/public/scrape-run-complete`.
+
+---
+
+## 2) Realie input data contract
+
+Realie is called only when a parcel has a trigger AND we're missing underwriting inputs. To make re-underwrite reliable, define the exact required output shape.
+
+### Required fields (Realie must return, else mark `insufficient`)
+
+| Field | Type | Purpose in underwrite | Min freshness | Min confidence |
+|---|---|---|---|---|
+| `living_sqft` | int | ARV, comp matching | assessor within 24 mo | 0.8 |
+| `year_built` | int | condition curve | any age | 0.9 |
+| `beds` | int | comp filter | 24 mo | 0.7 |
+| `baths` | numeric(3,1) | comp filter | 24 mo | 0.7 |
+| `lot_sqft` | int | ARV bump | 24 mo | 0.7 |
+| `assessed_value` | numeric | fallback ARV floor | 12 mo | 0.8 |
+| `last_sale_price` | numeric | equity math | any | 0.9 |
+| `last_sale_date` | date | equity/tenure | any | 0.9 |
+| `owner_name` | text | absentee flag | 12 mo | 0.7 |
+| `owner_mailing_address` | text | absentee flag | 12 mo | 0.7 |
+| `property_type` | enum | SFR gate | any | 0.9 |
+| `lat`, `lng` | float | comps, map | any | 0.95 |
+
+### Optional (boost score if present)
+
+`hoa_fee`, `taxes_annual`, `zoning`, `last_permit_date`, `condition_grade`.
+
+### Contract wrapper (what Realie writes into `parcels` + provenance)
+
+Every enrichment response is validated by Zod against:
+
+```ts
+RealieResponse = {
+  fields: Record<FieldName, { value: unknown; confidence: number; source: string; observed_at: string }>,
+  provider_request_id: string,
+  cost_usd: number,
+}
 ```
 
-## What to build, in order
+Rules:
+- Reject the whole response if any **required** field is missing or below its `min_confidence` — mark queue row `insufficient`, no partial writes.
+- Merge policy: field is overwritten only if `incoming.confidence > existing.confidence` OR `incoming.observed_at` is newer by >90 days.
+- After merge, re-underwrite is auto-triggered via existing `/api/public/rerun-underwrite`.
 
-**1. Kill the ghost rows in one migration**
-   - Add `has_trigger` boolean column on `parcel_scores` (or compute in server fn via join).
-   - Update `listRankedParcels` + `getCoverage` to require a trigger. Result: map goes from 490 → whatever has real signals (likely a small number until spiders run — this is correct).
+### Freshness policy
 
-**2. `enrichment_queue` table + trigger**
-   ```
-   enrichment_queue(
-     parcel_id uuid PK,
-     priority int,
-     reason text,          -- 'foreclosure' | 'probate' | 'listing' | 'manual'
-     status text,          -- pending|inflight|done|failed
-     attempts int, last_error text,
-     requested_at, completed_at
-   )
-   ```
-   Trigger on `distress_events` insert + on `listings` insert: enqueue parent parcel if `parcels.living_sqft IS NULL OR year_built IS NULL`.
+Each field carries `observed_at`. Underwriter downgrades score when any input is >18 months old. Parcels with >3 stale required fields go back on `enrichment_queue` at low priority.
 
-**3. `/api/public/run-realie-enrichment` (server route)**
-   - HMAC-guarded like the other cron endpoints.
-   - Pulls `LIMIT :budget` from queue ordered by priority.
-   - Calls existing `realieLookupAddress`, upserts parcel row.
-   - Marks queue done; failures increment attempts, back off at 3.
-   - Emits `ingestion_runs` row `source = REALIE:enrichment`.
-   - Wire pg_cron to hit it every 15 min with a daily cap column.
+---
 
-**4. Auto-rerun-underwrite**
-   - After enrichment finishes a batch, POST to existing `/api/public/rerun-underwrite` for the touched parcel_ids.
+## 3) Per-field provenance + confidence UI
 
-**5. Spider inventory (parallel work in the scrapy repo)**
-   - Current: only `smoke` exists. Nothing is discovering signals.
-   - Highest-leverage first (matches the counties already in DB):
-     - Miami-Dade (12086): Clerk foreclosure filings, probate court
-     - Los Angeles (06037): LA County Recorder NOD/NOS, code enforcement
-     - NYC boroughs (36061/36005/36081): ACRIS distress deeds, HPD violations, PLUTO parcels
-     - SF (06075): Assessor sales, DBI complaints
-   - One recipe per source; all push to the same webhook. This is what turns `distress_events` from 0 → real numbers.
+Users need to see *why* a deal scores what it does.
 
-**6. Small operator surface (admin only)**
-   - Queue depth, daily Realie spend, last cron run, per-recipe row counts in last 24h.
-   - Already have `admin.health.tsx` — add three cards.
+### Data model
 
-## Cost math (why the gating matters)
+New table `field_provenance`:
+- `parcel_id`, `field_name`, `value`, `confidence` (0–1), `source` (e.g. `REALIE`, `SCRAPY:miamidade_foreclosure`, `COUNTY_ASSESSOR`), `provider_request_id`, `observed_at`, `written_at`.
+- One row per (parcel, field, source). Latest-per-field is the "live" value.
 
-If Realie is ~$0.05/call and we blindly enrich all 524 unenriched parcels: ~$26 once, then again every time Scrapy discovers a new address. With a trigger gate + a 300/day cap, cost stays predictable and every call is spent on a parcel that already has a reason to be a deal.
+Writes:
+- Realie enrichment worker writes one row per field.
+- Scrapy ingestion webhook writes provenance for every field it sets.
+- Underwriter reads latest-per-field to build `parcel_scores`, and stamps `parcel_scores.inputs_provenance` (jsonb) with `{field: {source, confidence, observed_at}}` — snapshot at score time.
 
-## What NOT to do
+### Score confidence
 
-- Do not backfill Realie for the 524 unenriched parcels right now. They have no triggers — you'd pay to enrich random houses. Enrich them **after** a spider produces a signal for them.
-- Do not add more `data_source` variants. Keep `LIVE` for real, `SCRAPY` for smoke-only until it's producing real recipes, then merge.
-- Do not expand Zyte usage on its own — it's a transport, not a source.
+`parcel_scores.score_confidence` = weighted product of the confidence of the fields that actually drove the score (ARV inputs weighted highest). Stored alongside `overall`.
 
-## Deliverables for this turn
+### UI: Deal drawer → "Why this score" tab
 
-If you approve, I'll ship in this order:
-1. Migration: `enrichment_queue` + triggers + `has_trigger` view/column.
-2. `/api/public/run-realie-enrichment` route + wire to existing cron.
-3. Update `listRankedParcels`/`getCoverage` to require a trigger.
-4. Admin health cards for queue + Realie spend.
-5. A `docs/pipeline.md` describing the spider recipes we still need in the Scrapy repo (that work happens there, not here).
+On the parcel detail drawer, add a section with:
 
-Steps 1–4 are all in this repo. Step 5 is the checklist you take to the Scrapy project.
+```text
+Score  82   Confidence  0.71  (Medium)
+────────────────────────────────────────
+ARV $412k    from: living_sqft, comps(6)
+  living_sqft   1,840   ● 0.90   REALIE      2026-06
+  year_built    1968    ● 0.95   ASSESSOR    2025-11
+  beds/baths    3 / 2   ● 0.80   REALIE      2026-06
+Equity $180k from: last_sale + assessed
+  last_sale     $232k   ● 0.95   DEED        2019-04
+Trigger       Foreclosure filed 2026-05-02
+  source: SCRAPY:miamidade_foreclosure  ● 1.00
+────────────────────────────────────────
+Stale fields: none.   [Refresh from Realie]
+```
+
+Confidence dot color: green ≥0.85, amber 0.65–0.84, red <0.65. Clicking any row opens a small popover with the full history of that field (all provenance rows, newest first).
+
+### Homepage / list
+
+- Add a confidence pill next to each deal score.
+- Coverage strip shows: `524 triggered · avg confidence 0.78 · 42 stale`.
+
+---
+
+## Technical rollout
+
+Order minimizes blocked steps:
+
+1. **Migration**: `scrape_targets`, `scrape_runs`, `orchestrator_config`, `field_provenance` (all with GRANTs + RLS + `service_role` full access; `authenticated` read on `field_provenance` for the UI).
+2. **Server functions**: `getFieldProvenance(parcelId)`, `getCoverageMatrix()`, `getOrchestratorStats()`.
+3. **Public routes**:
+   - `GET /api/public/next-scrape-targets` — HMAC signed, returns N targets respecting budget/rate.
+   - `POST /api/public/scrape-run-complete` — records `scrape_runs` row, updates `source_health`.
+   - Extend the existing ingestion webhook to also write `field_provenance` for every field.
+   - Extend `/api/public/run-realie-enrichment` to enforce the Zod contract above and write per-field provenance.
+4. **Underwriter** (`src/lib/parcels.functions.ts`): read latest-per-field, compute `score_confidence`, stamp `inputs_provenance`.
+5. **UI**:
+   - Deal drawer "Why this score" tab.
+   - Confidence pill on parcel list + map popup.
+   - `/admin/health` — add coverage matrix + orchestrator budget widget.
+6. **Nightly cron**: `recompute-scrape-priorities` (SQL only, `pg_cron`).
+
+### Non-goals (this plan)
+
+- No Scrapy repo code — that stays in the external project; this plan defines only the contracts it must speak.
+- No change to trigger definition (still distress event or listing within 180 days).
+- No new auth surface — provenance is public-readable at the same level as `parcel_scores`.
