@@ -75,6 +75,23 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
         }
         const byId = new Map((parcels ?? []).map((p) => [p.id, p]));
 
+        // Map county_fips → Realie-friendly county name. Realie rejects
+        // `{city, state}` without a county, so we always supply one.
+        // NYC boroughs collapse to "New York" for Realie's purposes.
+        const countyByFips: Record<string, string> = {
+          "06037": "Los Angeles",
+          "06075": "San Francisco",
+          "06073": "San Diego",
+          "12086": "Miami-Dade",
+          "12011": "Broward",
+          "17031": "Cook",
+          "36005": "Bronx",
+          "36047": "Kings",
+          "36061": "New York",
+          "36081": "Queens",
+          "36085": "Richmond",
+        };
+
         // 4. Enrich one-by-one (Realie is per-address, no bulk endpoint).
         const results: Array<{ parcel_id: string; ok: boolean; note: string }> = [];
         for (const item of items) {
@@ -93,10 +110,13 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
             continue;
           }
           try {
+            const county = p.county_fips ? countyByFips[p.county_fips] : undefined;
             await lookupParcelByAddressCore({
               address: p.address,
               state: p.state.toUpperCase(),
-              city: p.city ?? undefined,
+              // Only pass city when we also have a county (Realie requires both).
+              city: county ? (p.city ?? undefined) : undefined,
+              county,
             });
 
             // Contract check: after Realie writes + underwrite runs, the
