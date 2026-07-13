@@ -53,6 +53,42 @@ function HealthView() {
       </div>
 
       <section className="rounded-lg border border-border bg-surface p-4">
+        <div className="flex items-baseline justify-between">
+          <div>
+            <h2 className="text-sm font-semibold">Enrichment pipeline (Realie)</h2>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Parcels queued for address enrichment because they gained a distress event or listing but are missing key attributes.
+              The cron endpoint <code className="rounded bg-surface-2 px-1">/api/public/run-realie-enrichment</code> drains this queue.
+            </p>
+          </div>
+          {d.last_realie_run && (
+            <div className="text-[11px] text-muted-foreground">
+              last run <DataFreshness timestamp={d.last_realie_run} prefix="" />
+            </div>
+          )}
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-6">
+          <Card title="Pending" value={d.enrichment.pending} />
+          <Card title="Inflight" value={d.enrichment.inflight} />
+          <Card title="Done" value={d.enrichment.done} />
+          <Card title="Failed" value={d.enrichment.failed} />
+          <Card title="Total in queue" value={d.enrichment.total} />
+          <Card title="Enriched (24h)" value={d.realie_enriched_24h} sub="via cron worker" />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+          {Object.entries(d.enrichment.by_reason).map(([reason, n]) => (
+            <span
+              key={reason}
+              className="rounded-full border border-border bg-surface-2 px-2 py-0.5 text-muted-foreground"
+              title={`${n} pending or inflight items with reason "${reason}"`}
+            >
+              {reason} <span className="num text-foreground">{n as number}</span>
+            </span>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-border bg-surface p-4">
         <h2 className="text-sm font-semibold">Source health</h2>
         <p className="mt-1 text-[11px] text-muted-foreground">Circuit breaker state. Red means the ingest cron skips the source until it recovers.</p>
         <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
