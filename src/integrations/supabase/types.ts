@@ -1230,6 +1230,63 @@ export type Database = {
           },
         ]
       }
+      scrape_target_templates: {
+        Row: {
+          applies_to_fips: string[] | null
+          applies_to_states: string[] | null
+          cadence_hours: number
+          concurrent_requests: number
+          created_at: string
+          daily_request_cap: number
+          enabled: boolean
+          id: string
+          needs_zyte: boolean
+          notes: string | null
+          priority_boost: number
+          requests_per_min: number
+          source_kind: string
+          spider: string
+          updated_at: string
+          url_template: string
+        }
+        Insert: {
+          applies_to_fips?: string[] | null
+          applies_to_states?: string[] | null
+          cadence_hours?: number
+          concurrent_requests?: number
+          created_at?: string
+          daily_request_cap?: number
+          enabled?: boolean
+          id?: string
+          needs_zyte?: boolean
+          notes?: string | null
+          priority_boost?: number
+          requests_per_min?: number
+          source_kind: string
+          spider: string
+          updated_at?: string
+          url_template: string
+        }
+        Update: {
+          applies_to_fips?: string[] | null
+          applies_to_states?: string[] | null
+          cadence_hours?: number
+          concurrent_requests?: number
+          created_at?: string
+          daily_request_cap?: number
+          enabled?: boolean
+          id?: string
+          needs_zyte?: boolean
+          notes?: string | null
+          priority_boost?: number
+          requests_per_min?: number
+          source_kind?: string
+          spider?: string
+          updated_at?: string
+          url_template?: string
+        }
+        Relationships: []
+      }
       scrape_targets: {
         Row: {
           cadence_hours: number
@@ -1432,6 +1489,10 @@ export type Database = {
       record_underwrite_atomic: {
         Args: { p_audit: Json; p_score: Json }
         Returns: undefined
+      }
+      seed_scrape_targets_from_templates: {
+        Args: { _only_fips?: string }
+        Returns: number
       }
     }
     Enums: {
