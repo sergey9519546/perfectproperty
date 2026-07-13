@@ -2,7 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { listRankedParcels } from "@/lib/parcels.functions";
+import { listProphecyParcels } from "@/lib/parcels.functions";
 import { DossierPanel } from "@/components/DossierPanel";
 import { PageHead } from "./deals";
 import { fmt$, tierLabel } from "@/lib/format";
