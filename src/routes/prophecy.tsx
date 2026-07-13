@@ -2,7 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { listRankedParcels } from "@/lib/parcels.functions";
+import { listProphecyParcels } from "@/lib/parcels.functions";
 import { DossierPanel } from "@/components/DossierPanel";
 import { PageHead } from "./deals";
 import { fmt$, tierLabel } from "@/lib/format";
@@ -30,9 +30,9 @@ export const Route = createFileRoute("/prophecy")({
 });
 
 function ProphecyPage() {
-  const fn = useServerFn(listRankedParcels);
+  const fn = useServerFn(listProphecyParcels);
   const [sel, setSel] = useState<string | null>(null);
-  const q = useQuery({ queryKey: ["prophecy"], queryFn: () => fn({ data: { ring: 3, limit: 500 } }) });
+  const q = useQuery({ queryKey: ["prophecy"], queryFn: () => fn({ data: { min_score: 15, limit: 200 } }) });
   return (
     <>
       <div className="mx-auto max-w-[1400px] px-6 py-8">
