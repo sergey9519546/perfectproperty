@@ -50,6 +50,31 @@ export async function lookupParcelByAddressCore(args: LookupArgs) {
     parcelId = inserted.id;
   }
 
+  // Stamp per-field provenance for every non-null field Realie provided so
+  // "Why this score" can attribute each input back to its source.
+  try {
+    const { writeProvenance, DEFAULT_CONFIDENCE } = await import("@/lib/provenance.server");
+    const conf = DEFAULT_CONFIDENCE.REALIE;
+    const observedAt = new Date().toISOString();
+    const provFields: Array<keyof typeof row> = [
+      "living_sqft", "year_built", "bedrooms", "bathrooms", "lot_sqft",
+      "assessed_value", "owner_name", "property_type", "lat", "lng",
+      "condition_grade", "flood_zone",
+    ] as any;
+    const entries = provFields
+      .filter((f) => (row as any)[f] !== null && (row as any)[f] !== undefined)
+      .map((f) => ({
+        field: (f === "bedrooms" ? "beds" : f === "bathrooms" ? "baths" : String(f)) as any,
+        value: (row as any)[f],
+        confidence: conf,
+        source: "REALIE",
+        observed_at: observedAt,
+      }));
+    if (entries.length) await writeProvenance(parcelId!, entries);
+  } catch (e) {
+    console.warn("provenance write (realie) failed:", (e as Error).message);
+  }
+
   const { rerunUnderwriteCore } = await import("@/lib/underwrite-core");
   const result = await rerunUnderwriteCore(parcelId!);
   return { parcel_id: parcelId!, ...result };

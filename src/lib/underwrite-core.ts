@@ -113,7 +113,20 @@ export async function rerunUnderwriteCore(parcel_id: string) {
     ead: u.ead, lgd: u.lgd, expected_loss: u.expected_loss,
     risk_adjusted_profit_credit: u.risk_adjusted_profit_credit, raroc: u.raroc,
     gate_status: u.gate_status,
+    score_confidence: null as number | null,
+    inputs_provenance: null as any,
   };
+
+  // Attach per-field provenance snapshot + weighted score confidence.
+  try {
+    const { readLatestProvenance, computeScoreConfidence, buildProvenanceSnapshot } =
+      await import("@/lib/provenance.server");
+    const { latest } = await readLatestProvenance(parcel.id);
+    row.score_confidence = computeScoreConfidence(latest as any);
+    row.inputs_provenance = buildProvenanceSnapshot(latest);
+  } catch (e) {
+    console.warn("score confidence stamp failed:", (e as Error).message);
+  }
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { recordFailure } = await import("@/lib/dlq");

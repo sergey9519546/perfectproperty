@@ -4,6 +4,7 @@ import { getDossier } from "@/lib/parcels.functions";
 import { fmt$, pct, tierLabel } from "@/lib/format";
 import { X, TrendingUp, AlertTriangle, Building2, ScrollText, Zap, Activity, ShieldCheck, Lock } from "lucide-react";
 import { DataFreshness } from "@/components/DataFreshness";
+import { WhyThisScorePanel } from "@/components/WhyThisScorePanel";
 
 
 interface Props {
@@ -36,6 +37,7 @@ export function DossierPanel({ parcelId, onClose }: Props) {
         <div className="space-y-6 p-5">
           <Header d={q.data} />
           <ScoreStrip d={q.data} />
+          {parcelId && <WhyThisScorePanel parcelId={parcelId} />}
           <ValueLadder d={q.data} />
           <MonteCarloBlock d={q.data} />
           <V12RiskBlock d={q.data} />

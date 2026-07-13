@@ -118,10 +118,41 @@ async function dispatch(recipe: string, items: any[], sourceUrl?: string) {
       last_seen_at: started,
     })).filter((r) => r.apn && r.county_fips);
     if (rows.length) {
-      const { error } = await supabaseAdmin.from("parcels")
-        .upsert(rows as any, { onConflict: "county_fips,apn" });
+      const { data: upserted, error } = await supabaseAdmin.from("parcels")
+        .upsert(rows as any, { onConflict: "county_fips,apn" })
+        .select("id, county_fips, apn");
       if (error) throw new Error(error.message);
       inserted = rows.length;
+
+      // Provenance: one entry per non-null field the spider provided.
+      try {
+        const { writeProvenance, DEFAULT_CONFIDENCE } = await import("@/lib/provenance.server");
+        const idByKey = new Map(
+          ((upserted ?? []) as any[]).map((u) => [`${u.county_fips}:${u.apn}`, u.id]),
+        );
+        const conf = DEFAULT_CONFIDENCE["SCRAPY:parcel"] ?? 0.7;
+        const provFields = [
+          "living_sqft", "year_built", "lot_sqft", "assessed_value",
+          "owner_name", "property_type", "lat", "lng",
+          "condition_grade", "flood_zone",
+        ];
+        for (const r of rows) {
+          const pid = idByKey.get(`${r.county_fips}:${r.apn}`);
+          if (!pid) continue;
+          const entries = provFields
+            .filter((f) => (r as any)[f] !== null && (r as any)[f] !== undefined)
+            .map((f) => ({
+              field: f as any,
+              value: (r as any)[f],
+              confidence: conf,
+              source: "SCRAPY:parcel",
+              observed_at: started,
+            }));
+          if (entries.length) await writeProvenance(pid, entries);
+        }
+      } catch (e) {
+        console.warn("provenance write (scrapy parcel) failed:", (e as Error).message);
+      }
     }
     note = `upserted ${inserted}/${items.length} parcels`;
   }
