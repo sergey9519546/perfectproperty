@@ -135,16 +135,23 @@ export const getCoverage = createServerFn({ method: "GET" })
   const [counties, runs, scores, outcomes, liveByCounty, queueRows] = await Promise.all([
     supabase.from("counties").select("*").order("state").order("name"),
     supabase.from("ingestion_runs").select("*").order("started_at", { ascending: false }).limit(30),
-    // Match listRankedParcels: LIVE + real inputs + has an active trigger.
-    triggeredIds.length === 0
-      ? Promise.resolve({ data: [] as any[] })
+    // Match listRankedParcels: LIVE + real inputs. Apply the active-trigger
+    // filter only when at least one trigger exists (fresh installs shouldn't
+    // show zero tiers/rings just because spiders haven't emitted yet).
+    (triggeredIds.length === 0
+      ? supabase
+          .from("parcel_scores")
+          .select("parcel_id, perfect_score, ring, confidence_grade, data_source, parcels!inner(county_fips, living_sqft, year_built)")
+          .eq("data_source", "LIVE")
+          .not("parcels.living_sqft", "is", null)
+          .not("parcels.year_built", "is", null)
       : supabase
           .from("parcel_scores")
           .select("parcel_id, perfect_score, ring, confidence_grade, data_source, parcels!inner(county_fips, living_sqft, year_built)")
           .eq("data_source", "LIVE")
           .in("parcel_id", triggeredIds)
           .not("parcels.living_sqft", "is", null)
-          .not("parcels.year_built", "is", null),
+          .not("parcels.year_built", "is", null)),
     supabase.from("prediction_outcomes").select("outcome, error_pct, predicted_profit, actual_profit"),
     supabase.from("parcels").select("county_fips").eq("data_source", "LIVE").not("living_sqft", "is", null).not("year_built", "is", null),
     supabase.from("enrichment_queue").select("status"),
