@@ -355,8 +355,8 @@ describe("Full underwrite pipeline invariants", () => {
       expect(Number.isFinite(v)).toBe(true);
       expect(v).toBeGreaterThan(0);
     }
-    expect(r.arv_exit_p5).toBeLessThanOrEqual(r.arv_exit_p50);
-    expect(r.arv_exit_p50).toBeLessThanOrEqual(r.arv_exit_p95);
+    expect(r.arv_exit_p5!).toBeLessThanOrEqual(r.arv_exit_p50!);
+    expect(r.arv_exit_p50!).toBeLessThanOrEqual(r.arv_exit_p95!);
   });
 
   it("handles the no-comps heuristic fallback without NaN", () => {
@@ -417,5 +417,3 @@ describe("Acquisition & exit velocity bounds", () => {
     expect(e.exit_days).toBeGreaterThanOrEqual(14);
   });
 });
-
-
