@@ -283,26 +283,25 @@ export async function persistRealiePropertyCore(
   // complete response in the snapshot. Stable provider-derived keys make a
   // refreshed snapshot idempotent.
   try {
-    const deedRows = realieToDeedRows(property).map(({ source_key, ...deed }) => ({
+    const deedRows = realieToDeedRows(property).map(({ source_key: _source_key, ...deed }) => ({
       ...deed,
       parcel_id: parcelId!,
-      source_event_id: source_key,
     }));
     if (deedRows.length > 0) {
       const { error } = await supabaseAdmin
         .from("deeds")
-        .upsert(deedRows as any, { onConflict: "data_source,source_event_id" });
+        .insert(deedRows);
       if (error) throw error;
     }
 
-    const distressRows = realieToDistressRows(property).map((event) => ({
+    const distressRows = realieToDistressRows(property).map(({ source_event_id: _sid, ...event }: any) => ({
       ...event,
       parcel_id: parcelId!,
     }));
     if (distressRows.length > 0) {
       const { error } = await supabaseAdmin
         .from("distress_events")
-        .upsert(distressRows as any, { onConflict: "data_source,source_event_id" });
+        .insert(distressRows);
       if (error) throw error;
     }
   } catch (error) {
