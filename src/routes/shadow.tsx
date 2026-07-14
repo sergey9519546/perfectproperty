@@ -5,10 +5,11 @@ import { useState } from "react";
 import { listRankedParcels } from "@/lib/parcels.functions";
 import { DossierPanel } from "@/components/DossierPanel";
 import { PageHead } from "./deals";
-import { fmt$, tierLabel } from "@/lib/format";
-import { Sparkles } from "lucide-react";
+import { fmt$ } from "@/lib/format";
+import { Sparkle } from "@phosphor-icons/react";
 import { supabase } from "@/integrations/supabase/client";
 import { SectionBoundary } from "@/components/SectionBoundary";
+import { ScorePill } from "@/components/ScorePill";
 
 export const Route = createFileRoute("/shadow")({
   ssr: false,
@@ -38,22 +39,22 @@ function ShadowPage() {
       <div className="mx-auto max-w-[1400px] px-6 py-8">
         <div className="flex items-center gap-3">
           <div className="rounded-lg p-2" style={{ backgroundColor: "color-mix(in oklab, var(--shadow-ring) 18%, transparent)" }}>
-            <Sparkles className="h-5 w-5 text-shadow-ring" />
+            <Sparkle className="h-5 w-5 text-shadow-ring" />
           </div>
           <PageHead title="Shadow Market" sub="Parcels no portal shows: distress signals stacked and ranked. The Formula's top scores live here — because nobody has competed for them yet." />
         </div>
         <div className="mt-6 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {(q.data ?? []).map((r: any) => {
-            const t = tierLabel(Number(r.perfect_score));
+          {q.isLoading && Array.from({length:6}).map((_,i)=>(<div key={i} className="rounded-lg border border-border bg-surface p-4"><div className="skeleton h-5 w-3/4 rounded-sm" /><div className="skeleton mt-3 h-4 w-1/2 rounded-sm" /><div className="skeleton mt-2 h-4 w-2/3 rounded-sm" /></div>))}
+          {(q.data ?? []).map((r: any, i: number) => {
             const flags = (r.skeptic_flags as string[]) ?? [];
             return (
-              <button key={r.parcel_id} onClick={() => setSel(r.parcel_id)} className="text-left rounded-lg border border-border bg-surface p-4 transition-colors hover:border-border-strong hover:bg-surface-2">
+              <button key={r.parcel_id} onClick={() => setSel(r.parcel_id)} style={{animationDelay:`${Math.min(i*50,500)}ms`}} className="text-left rounded-lg border border-border bg-surface p-4 transition-colors hover:border-border-strong hover:bg-surface-2 animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-backwards">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="truncate text-[14px] font-medium">{r.parcels.address}</div>
                     <div className="truncate text-[11px] text-muted-foreground">{r.parcels.city}, {r.parcels.state}</div>
                   </div>
-                  <div className="num text-2xl font-semibold" style={{ color: t.color }}>{r.perfect_score}</div>
+                  <ScorePill score={Number(r.perfect_score)} size="lg" />
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
                   <Metric label="Offer" v={fmt$(Number(r.modeled_offer))} />

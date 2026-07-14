@@ -76,94 +76,10 @@
   --color-pp-gold: var(--pp-gold, #efaa2d);
   --color-pp-gold-bright: var(--pp-gold-bright, #f5b83c);
   --color-pp-live: var(--pp-live, #05d680);
-
-  /* Elevation shadows */
-  --color-shadow-sm: var(--shadow-sm);
-  --color-shadow-md: var(--shadow-md);
-  --color-shadow-lg: var(--shadow-lg);
-  --color-shadow-xl: var(--shadow-xl);
-  /* Elevation shadows */
-  --color-shadow-xs: var(--shadow-xs);
-  --color-shadow-sm: var(--shadow-sm);
-  --color-shadow-md: var(--shadow-md);
-  --color-shadow-lg: var(--shadow-lg);
-  --color-shadow-xl: var(--shadow-xl);
-  --color-shadow-2xl: var(--shadow-2xl);
-  --color-shadow-dialog: var(--shadow-dialog);
-  --color-shadow-toast: var(--shadow-toast);
-  --color-shadow-map-panel: var(--shadow-map-panel);
-  --color-shadow-map-controls: var(--shadow-map-controls);
-  --color-shadow-inset-border: var(--shadow-inset-border);
-  --color-shadow-inset-sidebar: var(--shadow-inset-sidebar);
-  --color-shadow-glow-live: var(--shadow-glow-live);
-  --color-shadow-glow-gold: var(--shadow-glow-gold);
-  --color-shadow-inset-gold: var(--shadow-inset-gold);
-  --color-pp-blue: var(--pp-blue);
-  --color-pp-blue-strong: var(--pp-blue-strong);
-  --color-pp-tier-strong: var(--pp-tier-strong);
-  --color-pp-tier-moderate: var(--pp-tier-moderate);
-  --color-pp-tier-weak: var(--pp-tier-weak);
-  /* Typography */
-  --font-size-pp-xs: var(--pp-text-xs);
-  --font-size-pp-sm: var(--pp-text-sm);
-  --font-size-pp-base: var(--pp-text-base);
-  --font-size-pp-md: var(--pp-text-md);
-  --font-size-pp-lg: var(--pp-text-lg);
-  --font-size-pp-xl: var(--pp-text-xl);
-  --font-size-pp-2xl: var(--pp-text-2xl);
-  --font-size-pp-3xl: var(--pp-text-3xl);
-  --font-size-pp-4xl: var(--pp-text-4xl);
-  --font-size-pp-5xl: var(--pp-text-5xl);
-  --font-size-pp-6xl: var(--pp-text-6xl);
-  --font-size-pp-hero: var(--pp-text-hero);
-  /* Spacing */
-  --spacing-pp-1: var(--pp-space-1);
-  --spacing-pp-2: var(--pp-space-2);
-  --spacing-pp-3: var(--pp-space-3);
-  --spacing-pp-4: var(--pp-space-4);
-  --spacing-pp-5: var(--pp-space-5);
-  --spacing-pp-6: var(--pp-space-6);
-  --spacing-pp-8: var(--pp-space-8);
-  --spacing-pp-10: var(--pp-space-10);
-  --spacing-pp-12: var(--pp-space-12);
-  --spacing-pp-16: var(--pp-space-16);
-  --spacing-pp-20: var(--pp-space-20);
-  --spacing-pp-24: var(--pp-space-24);
-  /* Border radius */
-  --radius-pp-sm: var(--pp-radius-sm);
-  --radius-pp-md: var(--pp-radius-md);
-  --radius-pp-lg: var(--pp-radius-lg);
-  --radius-pp-xl: var(--pp-radius-xl);
-  --radius-pp-2xl: var(--pp-radius-2xl);
-  /* Line height */
-  --leading-pp-none: var(--pp-leading-none);
-  --leading-pp-tight: var(--pp-leading-tight);
-  --leading-pp-snug: var(--pp-leading-snug);
-  --leading-pp-normal: var(--pp-leading-normal);
-  --leading-pp-relaxed: var(--pp-leading-relaxed);
-  --leading-pp-loose: var(--pp-leading-loose);
 }
 
 :root {
   --radius: 0.5rem;
-
-  /* Elevation shadows */
-  --shadow-xs: inset 0 1px 0 rgba(255, 255, 255, 0.025), 0 2px 6px rgba(0, 5, 9, 0.30);
-  --shadow-sm: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 4px 12px rgba(0, 5, 9, 0.35);
-  --shadow-md: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 8px 24px rgba(0, 5, 9, 0.40);
-  --shadow-lg: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 32px rgba(0, 5, 9, 0.48);
-  --shadow-xl: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 20px 60px rgba(0, 5, 9, 0.55);
-  --shadow-2xl: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 30px 90px rgba(0, 5, 9, 0.62);
-  /* Semantic shadows */
-  --shadow-glow-gold: 0 0 16px rgba(239, 170, 45, 0.20), 0 8px 32px rgba(0, 5, 9, 0.35);
-  --shadow-dialog: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 30px 100px rgba(0, 5, 9, 0.58);
-  --shadow-inset-gold: inset 0 1px 0 rgba(255, 214, 122, 0.08);
-  --shadow-toast: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 20px 60px rgba(0, 5, 9, 0.46);
-  --shadow-map-panel: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 18px 48px rgba(0, 5, 9, 0.42);
-  --shadow-map-controls: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 12px 34px rgba(0, 5, 9, 0.28);
-  --shadow-inset-border: inset 0 -1px 0 rgba(255, 255, 255, 0.014);
-  --shadow-inset-sidebar: inset -1px 0 0 rgba(255, 255, 255, 0.012);
-  --shadow-glow-live: 0 0 14px rgba(5, 214, 128, 0.64);
   --background: #01070c;
   --foreground: oklch(0.96 0.005 240);
   --surface: #061018;
@@ -232,28 +148,6 @@
 @utility hairline { border-color: var(--color-border); }
 @utility hairline-strong { border-color: var(--color-border-strong); }
 
-/* Custom utilities only — do NOT override Tailwind core (text-*, px-*, rounded-*, shadow-sm/md/lg). */
-@utility text-md { font-size: 13px; line-height: 1.4; }
-@utility text-hero { font-size: clamp(2.4rem, 5vw, 3.5rem); line-height: 1.08; letter-spacing: -0.045em; }
-
-@utility shadow-xs { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025), 0 2px 6px rgba(0, 5, 9, 0.30); }
-@utility shadow-dialog { box-shadow: var(--shadow-dialog); }
-@utility shadow-toast { box-shadow: var(--shadow-toast); }
-@utility shadow-map-panel { box-shadow: var(--shadow-map-panel); }
-@utility shadow-map-controls { box-shadow: var(--shadow-map-controls); }
-@utility shadow-inset-border { box-shadow: var(--shadow-inset-border); }
-@utility shadow-inset-sidebar { box-shadow: var(--shadow-inset-sidebar); }
-@utility shadow-glow-live { box-shadow: var(--shadow-glow-live); }
-@utility shadow-glow-gold { box-shadow: var(--shadow-glow-gold); }
-@utility shadow-inset-gold { box-shadow: var(--shadow-inset-gold); }
-
-@utility raised-surface {
-  background: linear-gradient(180deg, rgba(10, 24, 34, 0.96), rgba(5, 15, 22, 0.96));
-  border: 1px solid var(--pp-border);
-  border-radius: 5px;
-  box-shadow: var(--shadow-md);
-}
-
 /* Map custom marker glow */
 .opp-pulse {
   animation: opp-pulse 2.6s ease-in-out infinite;
@@ -264,24 +158,6 @@
    theme resolves cleanly. --faint bumped from #657581 (4.03:1 FAIL) to #7e8c98
    (5.56:1 PASS WCAG AA small text). Borders strengthened for visibility. */
 .perfect-property-ui {
-
-  /* Elevation shadows */
-  --shadow-xs: inset 0 1px 0 rgba(255, 255, 255, 0.025), 0 2px 6px rgba(0, 5, 9, 0.30);
-  --shadow-sm: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 4px 12px rgba(0, 5, 9, 0.35);
-  --shadow-md: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 8px 24px rgba(0, 5, 9, 0.40);
-  --shadow-lg: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 32px rgba(0, 5, 9, 0.48);
-  --shadow-xl: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 20px 60px rgba(0, 5, 9, 0.55);
-  --shadow-2xl: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 30px 90px rgba(0, 5, 9, 0.62);
-  /* Semantic shadows */
-  --shadow-glow-gold: 0 0 16px rgba(239, 170, 45, 0.20), 0 8px 32px rgba(0, 5, 9, 0.35);
-  --shadow-dialog: inset 0 1px 0 rgba(255, 255, 255, 0.055), 0 30px 100px rgba(0, 5, 9, 0.58);
-  --shadow-inset-gold: inset 0 1px 0 rgba(255, 214, 122, 0.08);
-  --shadow-toast: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 20px 60px rgba(0, 5, 9, 0.46);
-  --shadow-map-panel: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 18px 48px rgba(0, 5, 9, 0.42);
-  --shadow-map-controls: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 12px 34px rgba(0, 5, 9, 0.28);
-  --shadow-inset-border: inset 0 -1px 0 rgba(255, 255, 255, 0.014);
-  --shadow-inset-sidebar: inset -1px 0 0 rgba(255, 255, 255, 0.012);
-  --shadow-glow-live: 0 0 14px rgba(5, 214, 128, 0.64);
   --pp-page: #01070c;
   --pp-header: #02080d;
   --pp-surface: #061018;
@@ -289,66 +165,12 @@
   --pp-surface-soft: #07131b;
   --pp-border: rgba(120, 147, 165, 0.22);
   --pp-border-strong: rgba(120, 147, 165, 0.34);
-  --pp-border-subtle: rgba(120, 147, 165, 0.10);
-  --pp-border-default: rgba(120, 147, 165, 0.18);
-  --pp-text-secondary: #cad3d9;
-  --pp-text-dim: #82919b;
-  --pp-text-label: #718391;
-  --pp-text-active-filter: #ffc24c;
-  --pp-text-on-primary: #101313;
   --pp-text: #f3f6f8;
   --pp-muted: #aab8c2;
   --pp-faint: #7e8c98;
   --pp-gold: #efaa2d;
   --pp-gold-bright: #f5b83c;
   --pp-live: #05d680;
-  /* Typography scale */
-  --pp-text-xs: 10px;
-  --pp-text-sm: 11px;
-  --pp-text-base: 12px;
-  --pp-text-md: 13px;
-  --pp-text-lg: 14px;
-  --pp-text-xl: 16px;
-  --pp-text-2xl: 18px;
-  --pp-text-3xl: 21px;
-  --pp-text-4xl: 24px;
-  --pp-text-5xl: 34px;
-  --pp-text-6xl: 43px;
-  --pp-text-hero: 56px;
-
-  /* Spacing scale */
-  --pp-space-1: 2px;
-  --pp-space-2: 4px;
-  --pp-space-3: 8px;
-  --pp-space-4: 12px;
-  --pp-space-5: 16px;
-  --pp-space-6: 20px;
-  --pp-space-8: 24px;
-  --pp-space-10: 32px;
-  --pp-space-12: 40px;
-  --pp-space-16: 56px;
-  --pp-space-20: 80px;
-  --pp-space-24: 96px;
-
-  /* Border radius */
-  --pp-radius-sm: 3px;
-  --pp-radius-md: 5px;
-  --pp-radius-lg: 7px;
-  --pp-radius-xl: 10px;
-  --pp-radius-2xl: 14px;
-
-  /* Line height */
-  --pp-leading-none: 1;
-  --pp-leading-tight: 1.2;
-  --pp-leading-snug: 1.4;
-  --pp-leading-normal: 1.5;
-  --pp-leading-relaxed: 1.7;
-  --pp-leading-loose: 2;
-  --pp-blue: rgba(26, 84, 125, 0.16);
-  --pp-blue-strong: rgba(26, 84, 125, 0.22);
-  --pp-tier-strong: #a97828;
-  --pp-tier-moderate: #607482;
-  --pp-tier-weak: #34434d;
   min-width: 320px;
   font-family: var(--font-sans);
   font-synthesis: none;
@@ -390,7 +212,7 @@
   border-radius: 5px;
   background: linear-gradient(180deg, rgba(10, 24, 34, 0.96), rgba(5, 15, 22, 0.96));
   padding: 0 12px;
-  color: var(--pp-text-secondary);
+  color: #cad3d9;
   font-size: 12px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 8px 24px rgba(0, 5, 9, 0.16);
   transition: background 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.22s cubic-bezier(0.16, 1, 0.3, 1), color 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
@@ -417,9 +239,9 @@
   gap: 8px;
   border: 1px solid rgba(255, 202, 85, 0.78);
   border-radius: 5px;
-  background: linear-gradient(180deg, var(--pp-gold-bright), var(--pp-gold));
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
   padding: 0 16px;
-  color: var(--pp-text-on-primary);
+  color: #101313;
   font-size: 12px;
   font-weight: 650;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 8px 22px rgba(239, 170, 45, 0.12);
@@ -442,7 +264,7 @@
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
-  color: var(--pp-text-dim);
+  color: #82919b;
   transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.18s ease;
 }
 
@@ -459,7 +281,7 @@
   border-radius: 4px;
   background: rgba(5, 15, 22, 0.88);
   padding: 0 12px;
-  color: var(--pp-text-secondary);
+  color: #99a8b2;
   font-size: 11px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.018);
   transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.18s ease;
@@ -474,12 +296,12 @@
 .perfect-property-ui .filter-button.active-filter {
   border-color: rgba(239, 170, 45, 0.72);
   background: rgba(239, 170, 45, 0.105);
-  color: var(--pp-text-active-filter);
+  color: #ffc24c;
   box-shadow: inset 0 1px 0 rgba(255, 215, 128, 0.065);
 }
 
 .perfect-property-ui .label {
-  color: var(--pp-text-label);
+  color: #718391;
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -537,7 +359,7 @@
 .perfect-property-ui .market-popup strong { font-size: 12px; }
 .perfect-property-ui .market-popup span {
   margin-top: 4px;
-  color: var(--pp-gold);
+  color: var(--gold);
   font-family: "Geist Mono Variable", monospace;
   font-size: 10px;
 }

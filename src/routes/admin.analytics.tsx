@@ -90,8 +90,8 @@ function AnalyticsView() {
         <>
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <KpiCard label="Qualified activation" value={formatRate(latest.qualified_activation_rate)} detail={`${latest.qualified_activations} of ${latest.landing_sessions} landing sessions completed the ordered journey.`} />
-            <KpiCard label="Landing → workspace" value={formatRate(latest.landing_to_workspace_rate)} detail={`${latest.workspace_sessions} sessions entered the decision workspace.`} />
-            <KpiCard label="Evidence → action" value={formatRate(latest.evidence_to_action_rate)} detail="Requires evidence and a later server-confirmed action for the same market." />
+            <KpiCard label="Landing to workspace" value={formatRate(latest.landing_to_workspace_rate)} detail={`${latest.workspace_sessions} sessions entered the decision workspace.`} />
+            <KpiCard label="Evidence to action" value={formatRate(latest.evidence_to_action_rate)} detail="Requires evidence and a later server-confirmed action for the same market." />
             <KpiCard label="Median time to action" value={formatDuration(latest.median_seconds_to_action)} detail="From workspace entry to first confirmed underwrite or brief export." />
           </section>
 

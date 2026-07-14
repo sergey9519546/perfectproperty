@@ -1,8 +1,9 @@
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getDossier } from "@/lib/parcels.functions";
 import { fmt$, pct, tierLabel } from "@/lib/format";
-import { X, TrendingUp, AlertTriangle, Building2, ScrollText, Zap, Activity, ShieldCheck, Lock } from "lucide-react";
+import { X, TrendUp, Warning, Buildings, Scroll, Lightning, Pulse, ShieldCheck, Lock, Check } from "@phosphor-icons/react";
 import { DataFreshness } from "@/components/DataFreshness";
 import { WhyThisScorePanel } from "@/components/WhyThisScorePanel";
 
@@ -14,27 +15,97 @@ interface Props {
 
 export function DossierPanel({ parcelId, onClose }: Props) {
   const fetchDossier = useServerFn(getDossier);
+  const panelRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
   const q = useQuery({
     queryKey: ["dossier", parcelId],
     queryFn: () => fetchDossier({ data: { parcel_id: parcelId! } }),
     enabled: !!parcelId,
   });
 
+  // Focus management + ESC handler — the panel is a modal dialog while open.
+  useLayoutEffect(() => {
+    if (!parcelId) return;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    // Move focus into the panel on open.
+    const t = window.setTimeout(() => closeRef.current?.focus(), 0);
+    return () => {
+      window.clearTimeout(t);
+      // Restore focus to the trigger on close.
+      previouslyFocused?.focus?.();
+    };
+  }, [parcelId]);
+
+  useEffect(() => {
+    if (!parcelId) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      // Simple focus trap within the panel.
+      const panel = panelRef.current;
+      if (!panel) return;
+      const focusable = Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.offsetParent !== null);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [parcelId, onClose]);
+
   if (!parcelId) return null;
 
   return (
-    <aside className="pointer-events-auto fixed inset-y-14 right-0 z-30 w-full max-w-[520px] overflow-y-auto border-l border-border-strong bg-surface shadow-2xl">
+    <>
+      <button
+        type="button"
+        aria-label="Close dossier backdrop"
+        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px] max-md:bg-black/60"
+        onClick={onClose}
+      />
+      <aside
+      ref={panelRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dossier-heading"
+      tabIndex={-1}
+      className="pointer-events-auto fixed top-0 bottom-0 right-0 z-50 flex w-full max-w-[520px] flex-col overflow-hidden border-l border-border-strong bg-surface shadow-[0_24px_80px_-20px_rgba(0,0,0,0.6)] animate-in slide-in-from-right duration-300 max-md:max-w-none"
+    >
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-surface px-5 py-3">
-        <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Dossier</div>
-        <button onClick={onClose} className="rounded-md p-1.5 text-muted-foreground hover:bg-surface-2 hover:text-foreground">
+        <h2 id="dossier-heading" className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">Dossier</h2>
+        <button ref={closeRef} onClick={onClose} aria-label="Close dossier" className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      {q.isLoading && <div className="p-6 text-sm text-muted-foreground">Underwriting the parcel…</div>}
+      {q.isLoading && (
+        <div className="space-y-3 p-6" aria-live="polite" aria-busy="true">
+          <div className="skeleton h-4 w-1/2 rounded-sm" />
+          <div className="skeleton h-3 w-2/3 rounded-sm" />
+          <div className="skeleton h-3 w-1/2 rounded-sm" />
+          <div className="skeleton h-20 w-full rounded-md" />
+          <div className="skeleton h-3 w-full rounded-sm" />
+          <div className="skeleton h-3 w-4/5 rounded-sm" />
+        </div>
+      )}
 
       {q.data && (
-        <div className="space-y-6 p-5">
+        <div className="space-y-6 overflow-y-auto p-5">
           <Header d={q.data} />
           <ScoreStrip d={q.data} />
           {parcelId && <WhyThisScorePanel parcelId={parcelId} />}
@@ -52,6 +123,7 @@ export function DossierPanel({ parcelId, onClose }: Props) {
         </div>
       )}
     </aside>
+    </>
   );
 }
 
@@ -127,7 +199,7 @@ function ValueLadder({ d }: { d: D }) {
   const comps = ((s as any).comps_used as any[]) ?? [];
   return (
     <section>
-      <SectionHead icon={<Building2 className="h-3.5 w-3.5" />} title="Value Ladder" />
+      <SectionHead icon={<Buildings className="h-3.5 w-3.5" />} title="Value Ladder" />
       <div className="mt-1 flex items-center gap-2 text-[10px] uppercase tracking-widest">
         <span className="rounded-full px-2 py-0.5" style={{
           color: arvSource === "COMPS" ? "var(--profit-strong)" : "var(--muted-foreground)",
@@ -208,7 +280,7 @@ function OfferCurve({ d }: { d: D }) {
   });
   return (
     <section>
-      <SectionHead icon={<TrendingUp className="h-3.5 w-3.5" />} title="Offer Curve — where three curves cross" />
+      <SectionHead icon={<TrendUp className="h-3.5 w-3.5" />} title="Offer Curve — where three curves cross" />
       <div className="mt-2 overflow-hidden rounded-md border border-border">
         <table className="w-full text-[12px]">
           <thead className="bg-surface-2 text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -256,7 +328,7 @@ function MonteCarloBlock({ d }: { d: D }) {
 
   return (
     <section>
-      <SectionHead icon={<Activity className="h-3.5 w-3.5" />} title="Monte Carlo — 800 draws" />
+      <SectionHead icon={<Pulse className="h-3.5 w-3.5" />} title="Monte Carlo — 800 draws" />
       <div className="mt-2 rounded-lg border border-border bg-surface-2 p-3">
         <div className="relative h-8 rounded bg-surface-3" style={{ backgroundColor: "var(--surface-3)" }}>
           <div className="absolute h-full opacity-60" style={{
@@ -291,7 +363,7 @@ function ExitForecast({ d }: { d: D }) {
   const s = d.score; if (!s) return null;
   return (
     <section>
-      <SectionHead icon={<Zap className="h-3.5 w-3.5" />} title="Exit Velocity" />
+      <SectionHead icon={<Lightning className="h-3.5 w-3.5" />} title="Exit Velocity" />
       <div className="mt-2 grid grid-cols-2 gap-2">
         <MiniStat label="Days on market (renovated)" v={<span className="num">{s.exit_days}</span>} />
         <MiniStat label="Exit confidence" v={pct(Number(s.exit_confidence))} />
@@ -305,17 +377,17 @@ function SkepticBlock({ d }: { d: D }) {
   const flags = (s.skeptic_flags as string[]) ?? [];
   if (flags.length === 0) return (
     <section>
-      <SectionHead icon={<AlertTriangle className="h-3.5 w-3.5" />} title="Skeptic report" />
+      <SectionHead icon={<Warning className="h-3.5 w-3.5" />} title="Skeptic report" />
       <div className="mt-2 rounded-md border border-border bg-surface-2 px-3 py-2 text-[12px] text-muted-foreground">No red flags surfaced. Standard due diligence still required.</div>
     </section>
   );
   return (
     <section>
-      <SectionHead icon={<AlertTriangle className="h-3.5 w-3.5" />} title="Skeptic report" />
+      <SectionHead icon={<Warning className="h-3.5 w-3.5" />} title="Skeptic report" />
       <ul className="mt-2 space-y-1.5">
         {flags.map((f, i) => (
           <li key={i} className="flex items-start gap-2 rounded-md border border-skeptic/30 bg-skeptic/8 px-3 py-2 text-[12px] text-foreground" style={{ backgroundColor: "color-mix(in oklab, var(--skeptic) 10%, transparent)", borderColor: "color-mix(in oklab, var(--skeptic) 40%, transparent)" }}>
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-skeptic" />
+            <Warning className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-skeptic" />
             <span>{f}</span>
           </li>
         ))}
@@ -327,7 +399,7 @@ function SkepticBlock({ d }: { d: D }) {
 function TransactionHistory({ d }: { d: D }) {
   return (
     <section>
-      <SectionHead icon={<ScrollText className="h-3.5 w-3.5" />} title={`Transaction bloodline (${d.deeds.length})`} />
+      <SectionHead icon={<Scroll className="h-3.5 w-3.5" />} title={`Transaction bloodline (${d.deeds.length})`} />
       <div className="mt-2 space-y-1">
         {d.deeds.length === 0 && <div className="text-[12px] text-muted-foreground">No recorded deeds in the genome.</div>}
         {d.deeds.map((x: any) => (
@@ -346,7 +418,7 @@ function DistressLog({ d }: { d: D }) {
   if (d.distress.length === 0) return null;
   return (
     <section>
-      <SectionHead icon={<AlertTriangle className="h-3.5 w-3.5" />} title={`Legal weather (${d.distress.length})`} />
+      <SectionHead icon={<Warning className="h-3.5 w-3.5" />} title={`Legal weather (${d.distress.length})`} />
       <div className="mt-2 space-y-1">
         {d.distress.map((x: any) => (
           <div key={x.id} className="rounded-md border px-3 py-2 text-[12px]" style={{ backgroundColor: "color-mix(in oklab, var(--shadow-ring) 8%, transparent)", borderColor: "color-mix(in oklab, var(--shadow-ring) 30%, transparent)" }}>
@@ -410,7 +482,7 @@ function V12RiskBlock({ d }: { d: D }) {
   if (!Number.isFinite(primary) && !Number.isFinite(arvT)) return null;
   return (
     <section>
-      <SectionHead icon={<Activity className="h-3.5 w-3.5" />} title="Risk — v12 exit distribution" />
+      <SectionHead icon={<Pulse className="h-3.5 w-3.5" />} title="Risk — v12 exit distribution" />
       <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
         <MiniStat label="ARV today" v={<span className="num">{Number.isFinite(arvT) ? fmt$(arvT) : "—"}</span>} />
         <MiniStat label="ARV exit P50" v={<span className="num">{Number.isFinite(p50) ? fmt$(p50) : "—"}</span>} />
@@ -489,7 +561,7 @@ function GatesBlock({ d }: { d: D }) {
                 color: ok ? "var(--profit-strong)" : "var(--muted-foreground)",
               }}
             >
-              G{n}{ok ? " ✓" : ""}
+              G{n}{ok ? <Check size={11} className="inline-block text-profit-strong" aria-label="passed" /> : ""}
             </span>
           );
         })}

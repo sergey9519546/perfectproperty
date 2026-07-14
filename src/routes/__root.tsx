@@ -22,13 +22,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown } from "lucide-react";
+import { CaretDown } from "@phosphor-icons/react";
 import { supabase } from "@/integrations/supabase/client";
 import { Brand } from "@/features/perfect-property/components/Brand";
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 dark">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 dark">
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-bold text-foreground num">404</h1>
         <p className="mt-4 text-sm text-muted-foreground">This parcel isn't in the genome.</p>
@@ -50,7 +50,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4 dark">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-background px-4 dark">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold text-foreground">The engine hit an exception</h1>
         <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
@@ -121,7 +121,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
-      { rel: "stylesheet", href: "https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" },
+      { rel: "stylesheet", href: "/maplibre-gl.css" },
     ],
   }),
   shellComponent: RootShell,
@@ -151,7 +151,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="dark min-h-screen bg-background text-foreground">
+      <div className="dark min-h-[100dvh] bg-background text-foreground">
         {pathname === "/auth" || pathname === "/" || pathname === "/workspace" ? null : <TopNav />}
         <Outlet />
         <Toaster theme="dark" position="bottom-right" />
@@ -236,7 +236,7 @@ function TopNav() {
           ))}
           <DropdownMenu>
             <DropdownMenuTrigger className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-muted-foreground transition-colors hover:bg-surface hover:text-foreground data-[state=open]:bg-surface data-[state=open]:text-foreground">
-              More <ChevronDown className="h-3.5 w-3.5" />
+              More <CaretDown className="h-3.5 w-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-64">
               <DropdownMenuLabel className="text-[11px] font-normal uppercase tracking-wider text-muted-foreground">

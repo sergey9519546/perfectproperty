@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { listRankedParcels, lookupParcelByAddress } from "@/lib/parcels.functions";
 import { DossierPanel } from "@/components/DossierPanel";
-import { fmt$, tierLabel, ringLabel } from "@/lib/format";
+import { fmt$, ringLabel } from "@/lib/format";
 import {
   stressedDeal,
   portfolioStressLossMean,
@@ -16,6 +16,8 @@ import { BulkLookupPanel } from "@/components/BulkLookupPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { SectionBoundary } from "@/components/SectionBoundary";
 import { DataFreshness } from "@/components/DataFreshness";
+import { ScorePill } from "@/components/ScorePill";
+import { TableSkeleton } from "@/components/TableSkeleton";
 
 export const Route = createFileRoute("/deals")({
   ssr: false,
@@ -70,6 +72,7 @@ function DealsPage() {
           <table className="w-full text-[14px]">
             <thead className="bg-surface-2 text-[11px] uppercase tracking-wider text-muted-foreground">
               <tr>
+                <th className="w-8 px-2 py-3 text-center text-[10px] text-muted-foreground/60">#</th>
                 <th className="px-4 py-3 text-left">Property</th>
                 <th
                   className="px-4 py-3 text-right"
@@ -86,7 +89,7 @@ function DealsPage() {
                 <th className="px-4 py-3 text-left" title="Recommended renovation plan.">
                   Plan
                 </th>
-                <th className="px-4 py-3 text-right" title="What we'd offer the seller today.">
+                <th className="border-l border-border/50 px-4 py-3 text-right" title="What we'd offer the seller today.">
                   Our offer
                 </th>
                 <th
@@ -101,7 +104,7 @@ function DealsPage() {
                 >
                   Typical · Worst case
                 </th>
-                <th className="px-4 py-3 text-right" title="Chance the deal loses money.">
+                <th className="border-l border-border/50 px-4 py-3 text-right" title="Chance the deal loses money.">
                   Loss risk
                 </th>
                 <th className="px-4 py-3 text-right" title="Chance the seller accepts our offer.">
@@ -122,17 +125,19 @@ function DealsPage() {
               </tr>
             </thead>
             <tbody>
-              {(q.data ?? []).map((r: any) => {
-                const t = tierLabel(Number(r.perfect_score));
+              {q.isLoading && <TableSkeleton rows={10} columns={12} />}
+              {!q.isLoading && (q.data ?? []).map((r: any, i: number) => {
                 const flags = (r.skeptic_flags as string[]) ?? [];
                 const pLoss = Number(r.mc_p_loss);
                 return (
                   <tr
                     key={r.parcel_id}
                     onClick={() => setSelected(r.parcel_id)}
-                    className="cursor-pointer border-t border-border hover:bg-surface-2"
+                    style={{ animationDelay: `${Math.min(i * 35, 600)}ms` }}
+                    className="group cursor-pointer border-t border-border transition-colors hover:bg-surface-2 animate-in fade-in slide-in-from-bottom-1 duration-300 fill-mode-backwards"
                   >
-                    <td className="px-4 py-3">
+                    <td className="px-2 py-3 text-center text-[11px] text-muted-foreground/50 num">{i + 1}</td>
+                    <td className="sticky left-0 z-10 bg-surface px-4 py-3 group-hover:bg-surface-2">
                       <div className="font-medium">{r.parcels.address}</div>
                       <div className="text-[12px] text-muted-foreground">
                         {r.parcels.city}, {r.parcels.state}
@@ -144,13 +149,12 @@ function DealsPage() {
                       />
                     </td>
 
-                    <td className="num px-4 py-3 text-right font-semibold" title={t.hint}>
-                      <span style={{ color: t.color }}>{r.perfect_score}</span>
-                      <div className="text-[11px] font-normal text-muted-foreground">{t.label}</div>
+                    <td className="px-4 py-3 text-right">
+                      <ScorePill score={Number(r.perfect_score)} />
                     </td>
                     <td className="px-4 py-3 text-[13px]">{ringLabel(r.ring)}</td>
                     <td className="px-4 py-3 text-[13px]">{r.recommended_scope}</td>
-                    <td className="num px-4 py-3 text-right">{fmt$(Number(r.modeled_offer))}</td>
+                    <td className="num border-l border-border/50 px-4 py-3 text-right">{fmt$(Number(r.modeled_offer))}</td>
                     <td className="num px-4 py-3 text-right text-profit-strong font-medium">
                       {fmt$(Number(r.gross_profit))}
                     </td>
@@ -183,6 +187,13 @@ function DealsPage() {
                   </tr>
                 );
               })}
+              {!q.isLoading && (q.data ?? []).length === 0 && (
+                <tr>
+                  <td colSpan={12} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                    No scored properties yet. Run the underwriter from the admin panel to generate deals.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -218,9 +229,9 @@ function HelpStrip() {
 
 export function PageHead({ title, sub }: { title: string; sub: string }) {
   return (
-    <div>
-      <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
-      <p className="mt-2 max-w-3xl text-[15px] leading-relaxed text-muted-foreground">{sub}</p>
+    <div className="border-b border-border pb-5">
+      <h1 className="text-[34px] font-semibold leading-[1.1] tracking-[-0.035em] text-foreground">{title}</h1>
+      <p className="mt-2.5 max-w-[60ch] text-[14px] leading-relaxed text-muted-foreground">{sub}</p>
     </div>
   );
 }

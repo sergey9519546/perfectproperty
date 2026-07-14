@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { getCoverage } from "@/lib/parcels.functions";
 import { PageHead } from "./deals";
+import { TableSkeleton } from "@/components/TableSkeleton";
 import { fmt$ } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -28,6 +29,26 @@ function AccuracyPage() {
   return (
     <div className="mx-auto max-w-[1200px] px-6 py-8">
       <PageHead title="Learning Loop · Layer 5" sub="Predicted-vs-actual, self-audited every night. Accuracy is measured hardest at the top of the rankings and published openly." />
+      {q.isLoading && (
+        <>
+          <div className="mt-8 grid grid-cols-4 gap-3">
+            {Array.from({length:4}).map((_,i)=>(
+              <div key={i} className="rounded-lg border border-border bg-surface p-4">
+                <div className="skeleton h-3 w-1/2 rounded-sm" />
+                <div className="skeleton mt-2 h-7 w-2/3 rounded-sm" />
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 overflow-hidden rounded-lg border border-border bg-surface">
+            <table className="w-full text-[13px]">
+              <thead className="bg-surface-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+                <tr>{["","","","","","",""].map((_,j)=><th key={j} className="px-4 py-2" />)}</tr>
+              </thead>
+              <TableSkeleton rows={6} columns={7} />
+            </table>
+          </div>
+        </>
+      )}
       {c && (
         <>
           <div className="mt-8 grid grid-cols-4 gap-3">

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { getFieldProvenance } from "@/lib/parcels.functions";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { CaretDown, CaretRight } from "@phosphor-icons/react";
 
 const FIELD_LABEL: Record<string, string> = {
   living_sqft: "Living sqft",
@@ -103,7 +103,7 @@ export function WhyThisScorePanel({ parcelId }: { parcelId: string }) {
                 onClick={() => setOpenField(isOpen ? null : f)}
                 className="flex w-full items-center gap-3 text-left text-[12px] hover:bg-surface-2/40"
               >
-                {isOpen ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+                {isOpen ? <CaretDown className="h-3 w-3 text-muted-foreground" /> : <CaretRight className="h-3 w-3 text-muted-foreground" />}
                 <span className="w-32 shrink-0 text-muted-foreground">{FIELD_LABEL[f] ?? f}</span>
                 <span className="w-28 shrink-0 font-medium text-foreground">{fmtValue(f, row.value)}</span>
                 <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${confidenceColor(c)}`} />

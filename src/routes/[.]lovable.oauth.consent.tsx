@@ -42,7 +42,7 @@ export const Route = createFileRoute("/.lovable/oauth/consent")({
   },
   component: Consent,
   errorComponent: ({ error }) => (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 dark">
+    <main className="flex min-h-[100dvh] items-center justify-center bg-background px-4 dark">
       <div className="max-w-md text-sm text-foreground">
         Could not load this authorization request: {String((error as Error)?.message ?? error)}
       </div>
@@ -71,7 +71,7 @@ function Consent() {
   const clientName = details?.client?.name ?? "an application";
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 dark">
+    <main className="flex min-h-[100dvh] items-center justify-center bg-background px-4 dark">
       <div className="w-full max-w-md rounded-lg border border-border bg-surface p-6">
         <h1 className="text-xl font-semibold text-foreground">
           Connect {clientName} to Perfect Property

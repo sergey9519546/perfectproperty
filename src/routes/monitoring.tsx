@@ -55,7 +55,16 @@ function MonitoringPage() {
         </p>
       </div>
 
-      {q.isLoading && <div className="mt-6 text-sm text-muted-foreground">Loading metrics…</div>}
+      {q.isLoading && (
+        <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+          {Array.from({length:4}).map((_,i)=>(
+            <div key={i} className="rounded-lg border border-border bg-surface p-4">
+              <div className="skeleton h-3 w-1/2 rounded-sm" />
+              <div className="skeleton mt-2 h-6 w-3/4 rounded-sm" />
+            </div>
+          ))}
+        </div>
+      )}
       {!q.isLoading && !latest && (
         <div className="mt-6 rounded-md border border-border bg-surface px-4 py-3 text-sm text-muted-foreground">
           No monitoring snapshot yet. The nightly cron will populate this after its first run.
