@@ -9,6 +9,12 @@ import { DealTable } from "./components/DealTable";
 import { CommandPalette } from "./components/CommandPalette";
 import { MapCanvas } from "./components/MapCanvas";
 import {
+  observeProductExperience,
+  recordWorkflowAction,
+  trackProductEvent,
+  type WorkflowActionType,
+} from "@/lib/product-analytics";
+import {
   deals,
   markets,
   type LayerMode,
@@ -34,7 +40,9 @@ export function MarketWorkspace() {
   const [selected, setSelected] = useState<Market | null>(markets[0]);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<WorkflowActionType | null>(null);
   const toastTimerRef = useRef<number | null>(null);
+  const pendingActionRef = useRef(false);
 
   const filteredMarkets = useMemo(
     () =>
@@ -57,6 +65,25 @@ export function MarketWorkspace() {
       setSelected(filteredMarkets[0]);
     }
   }, [filteredMarkets, selected]);
+
+  useEffect(() => {
+    void trackProductEvent("workspace_opened", { onceKey: "workspace-opened" });
+    return observeProductExperience("workspace");
+  }, []);
+
+  useEffect(() => {
+    if (!selected) return;
+    const timer = window.setTimeout(() => {
+      void trackProductEvent("evidence_viewed", {
+        entityType: "market",
+        entityId: selected.id,
+        durationMs: 5000,
+        properties: { market_name: selected.name, score: selected.score },
+        onceKey: `evidence-viewed-${selected.id}`,
+      });
+    }, 5000);
+    return () => window.clearTimeout(timer);
+  }, [selected]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -85,15 +112,97 @@ export function MarketWorkspace() {
     }, 2600);
   }, []);
 
+  const selectMarket = useCallback((market: Market, source: "map" | "deal_table" | "command_palette") => {
+    setSelected(market);
+    void trackProductEvent("market_selected", {
+      entityType: "market",
+      entityId: market.id,
+      properties: { source, market_name: market.name, state: market.state, score: market.score },
+    });
+  }, []);
+
   const selectFromDeal = (marketName: string) => {
     const [name] = marketName.split(",");
     const market = markets.find((item) => item.name === name);
     if (market) {
       setRegion("All markets");
       setPropertyType("All types");
-      setSelected(market);
+      selectMarket(market, "deal_table");
     }
   };
+
+  const runWorkflowAction = useCallback(async (actionType: WorkflowActionType) => {
+    if (!selected || pendingActionRef.current) return;
+    const market = selected;
+    pendingActionRef.current = true;
+    setPendingAction(actionType);
+    const requestedEvent = actionType === "underwrite" ? "underwrite_requested" : "brief_export_requested";
+    const failedEvent = actionType === "underwrite" ? "underwrite_failed" : "brief_export_failed";
+    void trackProductEvent(requestedEvent, {
+      entityType: "market",
+      entityId: market.id,
+      properties: { market_name: market.name, score: market.score },
+    });
+
+    try {
+      const actionId = await recordWorkflowAction({
+        actionType,
+        marketId: market.id,
+        marketName: `${market.name}, ${market.state}`,
+        inputSnapshot: {
+          score: market.score,
+          state: market.state,
+          property_type: market.type,
+          strategy: market.strategy,
+          data_updated: market.updated,
+        },
+        properties: { layer },
+      });
+
+      if (!actionId) {
+        void trackProductEvent(failedEvent, {
+          entityType: "market",
+          entityId: market.id,
+          success: false,
+          properties: { reason: "action_unavailable" },
+        });
+        notify(actionType === "underwrite" ? "Underwrite could not be created" : "Brief export failed");
+        return;
+      }
+
+      if (actionType === "brief_export") {
+        const brief = {
+          actionId,
+          exportedAt: new Date().toISOString(),
+          market: `${market.name}, ${market.state}`,
+          opportunityScore: market.score,
+          confidenceInterval: market.confidence,
+          strategy: market.strategy,
+          propertyType: market.type,
+          evidence: {
+            rentDurability: market.rent,
+            supplyPressure: market.supply,
+            liquidity: market.liquidity,
+            insuranceExposure: market.insurance,
+          },
+        };
+        const url = URL.createObjectURL(new Blob([JSON.stringify(brief, null, 2)], {
+          type: "application/json;charset=utf-8",
+        }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `perfect-property-${market.id}-brief.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+        notify(`${market.name} investment brief exported`);
+      } else {
+        notify(`${market.name} underwrite request recorded`);
+      }
+    } finally {
+      pendingActionRef.current = false;
+      setPendingAction(null);
+    }
+  }, [layer, notify, selected]);
 
   const handleNavigation = (id: string) => {
     setActiveNav(id);
@@ -112,7 +221,8 @@ export function MarketWorkspace() {
         onHome={() => void navigate({ to: "/" })}
         onAccount={() => void navigate({ to: "/auth", search: { next: "/workspace" } })}
         onOpenPalette={() => setPaletteOpen(true)}
-        onExport={() => notify("Investment brief exported")}
+        onExport={() => void runWorkflowAction("brief_export")}
+        exporting={pendingAction === "brief_export"}
       />
       <div className="app-body grid min-h-0 grid-cols-[64px_minmax(0,1fr)] max-md:grid-cols-1">
         <NavigationRail active={activeNav} onChange={handleNavigation} />
@@ -121,7 +231,7 @@ export function MarketWorkspace() {
             <MapCanvas
               markets={filteredMarkets}
               selected={selected}
-              onSelect={setSelected}
+              onSelect={(market) => selectMarket(market, "map")}
               region={region}
               propertyType={propertyType}
               onRegionChange={setRegion}
@@ -137,7 +247,8 @@ export function MarketWorkspace() {
           </div>
           <EvidencePanel
             market={selected}
-            onUnderwrite={() => notify(`${selected?.name ?? "Market"} underwrite created`)}
+            onUnderwrite={() => void runWorkflowAction("underwrite")}
+            isSubmitting={pendingAction === "underwrite"}
           />
         </div>
       </div>
@@ -148,7 +259,7 @@ export function MarketWorkspace() {
         onSelect={(market) => {
           setRegion("All markets");
           setPropertyType("All types");
-          setSelected(market);
+          selectMarket(market, "command_palette");
         }}
       />
       <AnimatePresence>

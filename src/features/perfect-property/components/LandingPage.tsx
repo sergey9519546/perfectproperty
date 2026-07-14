@@ -6,6 +6,7 @@ import {
 } from '@phosphor-icons/react'
 import { Brand } from './Brand'
 import type { MapParcel } from '@/components/MapView'
+import { observeProductExperience, trackProductEvent } from '@/lib/product-analytics'
 
 const LazyMapView = lazy(() => import('@/components/MapView').then((module) => ({ default: module.MapView })))
 
@@ -45,6 +46,11 @@ export function LandingPage({ onExplore, onSignIn }: { onExplore: () => void; on
   const [menuOpen, setMenuOpen] = useState(false)
 
   const scrollToStory = () => document.getElementById('story')?.scrollIntoView({ behavior: 'smooth' })
+
+  useEffect(() => {
+    void trackProductEvent('landing_view', { onceKey: 'landing-view' })
+    return observeProductExperience('landing')
+  }, [])
 
   useEffect(() => {
     if (!menuOpen) return
@@ -160,6 +166,7 @@ const railReveal = { hidden: { opacity: 0, x: 18 }, visible: { opacity: 1, x: 0,
 
 function MotionShowcase({ onExplore }: { onExplore: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const storyRef = useRef<HTMLElement>(null)
   const [isPlaying, setIsPlaying] = useState(false)
 
   useEffect(() => {
@@ -182,6 +189,37 @@ function MotionShowcase({ onExplore }: { onExplore: () => void }) {
     return () => observer.disconnect()
   }, [])
 
+  useEffect(() => {
+    const story = storyRef.current
+    if (!story) return
+    let exposureTimer: number | null = null
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          if (exposureTimer === null) {
+            exposureTimer = window.setTimeout(() => {
+              void trackProductEvent('story_viewed', {
+                durationMs: 5000,
+                properties: { visibility_threshold: 0.35 },
+                onceKey: 'story-exposure',
+              })
+              exposureTimer = null
+            }, 5000)
+          }
+        } else if (exposureTimer !== null) {
+          window.clearTimeout(exposureTimer)
+          exposureTimer = null
+        }
+      },
+      { threshold: 0.35 },
+    )
+    observer.observe(story)
+    return () => {
+      observer.disconnect()
+      if (exposureTimer !== null) window.clearTimeout(exposureTimer)
+    }
+  }, [])
+
   const togglePlayback = () => {
     const video = videoRef.current
     if (!video) return
@@ -193,7 +231,7 @@ function MotionShowcase({ onExplore }: { onExplore: () => void }) {
   }
 
   return (
-    <section id="story" className="scroll-mt-20 border-b border-[#7893a5]/16 bg-[radial-gradient(circle_at_76%_42%,rgba(26,84,125,.16),transparent_34%),#030b11] px-8 py-16 max-md:px-4 max-md:py-10">
+    <section ref={storyRef} id="story" className="scroll-mt-20 border-b border-[#7893a5]/16 bg-[radial-gradient(circle_at_76%_42%,rgba(26,84,125,.16),transparent_34%),#030b11] px-8 py-16 max-md:px-4 max-md:py-10">
       <div className="mx-auto max-w-[1400px]">
         <div className="mb-9 grid grid-cols-[minmax(0,1fr)_430px] items-end gap-12 max-lg:grid-cols-1 max-lg:gap-5">
           <div>
@@ -223,6 +261,10 @@ function MotionShowcase({ onExplore }: { onExplore: () => void }) {
               preload="metadata"
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
+              onError={() => void trackProductEvent('media_error', {
+                properties: { media: 'product_walkthrough' },
+                onceKey: 'product-walkthrough-media-error',
+              })}
               aria-label="Animated Perfect Property workflow from market signal through evidence and underwriting action"
             >
               <source src="/perfect-property-motion.webm" type="video/webm"/>

@@ -8,6 +8,7 @@ export const clientProductEvents = [
   "underwrite_failed",
   "brief_export_requested",
   "brief_export_failed",
+  "media_error",
   "web_vital",
 ] as const;
 
@@ -51,9 +52,10 @@ const sessionKey = "pp.analytics.session-id.v1";
 const oncePrefix = "pp.analytics.once.";
 
 function newId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  const cryptoApi = globalThis.crypto;
+  if (typeof cryptoApi.randomUUID === "function") return cryptoApi.randomUUID();
   const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
+  cryptoApi.getRandomValues(bytes);
   bytes[6] = (bytes[6] & 0x0f) | 0x40;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
   const hex = [...bytes].map((value) => value.toString(16).padStart(2, "0")).join("");
@@ -127,13 +129,26 @@ function acquisitionProperties(): AnalyticsProperties {
   return properties;
 }
 
-async function post(path: string, body: object): Promise<Response | null> {
+async function authorizationHeader(): Promise<Record<string, string>> {
   try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    return token ? { authorization: `Bearer ${token}` } : {};
+  } catch {
+    // Authentication attribution is opportunistic; the action still works anonymously.
+    return {};
+  }
+}
+
+async function post(path: string, body: object, includeAuth = false): Promise<Response | null> {
+  try {
+    const authHeaders = includeAuth ? await authorizationHeader() : {};
     return await fetch(path, {
       method: "POST",
       credentials: "same-origin",
       keepalive: true,
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...authHeaders },
       body: JSON.stringify(body),
     });
   } catch {
@@ -183,7 +198,7 @@ export async function recordWorkflowAction(input: WorkflowActionInput): Promise<
     market_name: input.marketName,
     input_snapshot: input.inputSnapshot,
     properties: { ...acquisitionProperties(), ...input.properties },
-  });
+  }, true);
   if (!response?.ok) return null;
   try {
     const payload = (await response.json()) as { action_id?: string };
@@ -191,4 +206,84 @@ export async function recordWorkflowAction(input: WorkflowActionInput): Promise<
   } catch {
     return null;
   }
+}
+
+type LayoutShiftEntry = PerformanceEntry & { value: number; hadRecentInput: boolean };
+
+/**
+ * Captures lightweight, browser-native experience guardrails. The interaction
+ * duration is diagnostic and intentionally not presented as standards-compliant INP.
+ */
+export function observeProductExperience(surface: "landing" | "workspace"): () => void {
+  if (typeof window === "undefined" || typeof PerformanceObserver === "undefined") {
+    return () => undefined;
+  }
+
+  const observers: PerformanceObserver[] = [];
+  let lcp = 0;
+  let cls = 0;
+  let interactionLatency = 0;
+  let flushed = false;
+
+  const observe = (type: string, handler: (entries: PerformanceEntry[]) => void) => {
+    try {
+      const observer = new PerformanceObserver((list) => handler(list.getEntries()));
+      observer.observe({ type, buffered: true });
+      observers.push(observer);
+    } catch {
+      // Unsupported entry types are expected in older browsers.
+    }
+  };
+
+  observe("largest-contentful-paint", (entries) => {
+    const latest = entries.at(-1);
+    if (latest) lcp = Math.max(lcp, latest.startTime);
+  });
+  observe("layout-shift", (entries) => {
+    for (const entry of entries as LayoutShiftEntry[]) {
+      if (!entry.hadRecentInput) cls += entry.value;
+    }
+  });
+  observe("event", (entries) => {
+    for (const entry of entries) interactionLatency = Math.max(interactionLatency, entry.duration);
+  });
+
+  const flush = () => {
+    if (flushed) return;
+    flushed = true;
+    if (lcp > 0) {
+      void trackProductEvent("web_vital", {
+        durationMs: Math.round(lcp),
+        properties: { metric_name: "LCP", surface },
+        onceKey: `vital-lcp-${surface}`,
+      });
+    }
+    if (cls > 0) {
+      void trackProductEvent("web_vital", {
+        durationMs: Math.round(cls * 1000),
+        properties: { metric_name: "CLS_MILLI", surface },
+        onceKey: `vital-cls-${surface}`,
+      });
+    }
+    if (interactionLatency > 0) {
+      void trackProductEvent("web_vital", {
+        durationMs: Math.round(interactionLatency),
+        properties: { metric_name: "INTERACTION_LATENCY", surface },
+        onceKey: `vital-interaction-${surface}`,
+      });
+    }
+  };
+
+  const onVisibilityChange = () => {
+    if (document.visibilityState === "hidden") flush();
+  };
+  document.addEventListener("visibilitychange", onVisibilityChange);
+  window.addEventListener("pagehide", flush, { once: true });
+
+  return () => {
+    flush();
+    observers.forEach((observer) => observer.disconnect());
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+    window.removeEventListener("pagehide", flush);
+  };
 }

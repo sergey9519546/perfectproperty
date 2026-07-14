@@ -21,6 +21,7 @@ import { Route as AccuracyRouteImport } from './routes/accuracy'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminHealthRouteImport } from './routes/admin.health'
+import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as ApiPublicScrapyIngestRouteImport } from './routes/api/public/scrapy-ingest'
@@ -34,6 +35,8 @@ import { Route as ApiPublicNextScrapeTargetsRouteImport } from './routes/api/pub
 import { Route as ApiPublicIngestOutcomesRouteImport } from './routes/api/public/ingest-outcomes'
 import { Route as ApiPublicIngestAllRouteImport } from './routes/api/public/ingest-all'
 import { Route as ApiPublicBackfillOutcomesRouteImport } from './routes/api/public/backfill-outcomes'
+import { Route as ApiAnalyticsEventsRouteImport } from './routes/api/analytics/events'
+import { Route as ApiAnalyticsActionsRouteImport } from './routes/api/analytics/actions'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 
@@ -95,6 +98,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
 const AdminHealthRoute = AdminHealthRouteImport.update({
   id: '/health',
   path: '/health',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
   getParentRoute: () => AdminRoute,
 } as any)
 const Char91DotwellKnownChar93OauthProtectedResourceRoute =
@@ -169,6 +177,16 @@ const ApiPublicBackfillOutcomesRoute =
     path: '/api/public/backfill-outcomes',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiAnalyticsEventsRoute = ApiAnalyticsEventsRouteImport.update({
+  id: '/api/analytics/events',
+  path: '/api/analytics/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAnalyticsActionsRoute = ApiAnalyticsActionsRouteImport.update({
+  id: '/api/analytics/actions',
+  path: '/api/analytics/actions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
   Char91DotmcpChar93InvokeToolToolRouteImport.update({
     id: '/.mcp/invoke-tool/$tool',
@@ -194,10 +212,13 @@ export interface FileRoutesByFullPath {
   '/workspace': typeof WorkspaceRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/': typeof AdminIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/analytics/actions': typeof ApiAnalyticsActionsRoute
+  '/api/analytics/events': typeof ApiAnalyticsEventsRoute
   '/api/public/backfill-outcomes': typeof ApiPublicBackfillOutcomesRoute
   '/api/public/ingest-all': typeof ApiPublicIngestAllRoute
   '/api/public/ingest-outcomes': typeof ApiPublicIngestOutcomesRoute
@@ -222,10 +243,13 @@ export interface FileRoutesByTo {
   '/workspace': typeof WorkspaceRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin': typeof AdminIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/analytics/actions': typeof ApiAnalyticsActionsRoute
+  '/api/analytics/events': typeof ApiAnalyticsEventsRoute
   '/api/public/backfill-outcomes': typeof ApiPublicBackfillOutcomesRoute
   '/api/public/ingest-all': typeof ApiPublicIngestAllRoute
   '/api/public/ingest-outcomes': typeof ApiPublicIngestOutcomesRoute
@@ -252,10 +276,13 @@ export interface FileRoutesById {
   '/workspace': typeof WorkspaceRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/health': typeof AdminHealthRoute
   '/admin/': typeof AdminIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/analytics/actions': typeof ApiAnalyticsActionsRoute
+  '/api/analytics/events': typeof ApiAnalyticsEventsRoute
   '/api/public/backfill-outcomes': typeof ApiPublicBackfillOutcomesRoute
   '/api/public/ingest-all': typeof ApiPublicIngestAllRoute
   '/api/public/ingest-outcomes': typeof ApiPublicIngestOutcomesRoute
@@ -283,10 +310,13 @@ export interface FileRouteTypes {
     | '/workspace'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/admin/analytics'
     | '/admin/health'
     | '/admin/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/analytics/actions'
+    | '/api/analytics/events'
     | '/api/public/backfill-outcomes'
     | '/api/public/ingest-all'
     | '/api/public/ingest-outcomes'
@@ -311,10 +341,13 @@ export interface FileRouteTypes {
     | '/workspace'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/admin/analytics'
     | '/admin/health'
     | '/admin'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/analytics/actions'
+    | '/api/analytics/events'
     | '/api/public/backfill-outcomes'
     | '/api/public/ingest-all'
     | '/api/public/ingest-outcomes'
@@ -340,10 +373,13 @@ export interface FileRouteTypes {
     | '/workspace'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
+    | '/admin/analytics'
     | '/admin/health'
     | '/admin/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/analytics/actions'
+    | '/api/analytics/events'
     | '/api/public/backfill-outcomes'
     | '/api/public/ingest-all'
     | '/api/public/ingest-outcomes'
@@ -372,6 +408,8 @@ export interface RootRouteChildren {
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  ApiAnalyticsActionsRoute: typeof ApiAnalyticsActionsRoute
+  ApiAnalyticsEventsRoute: typeof ApiAnalyticsEventsRoute
   ApiPublicBackfillOutcomesRoute: typeof ApiPublicBackfillOutcomesRoute
   ApiPublicIngestAllRoute: typeof ApiPublicIngestAllRoute
   ApiPublicIngestOutcomesRoute: typeof ApiPublicIngestOutcomesRoute
@@ -471,6 +509,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminHealthRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/analytics': {
+      id: '/admin/analytics'
+      path: '/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AdminAnalyticsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/.well-known/oauth-protected-resource': {
       id: '/.well-known/oauth-protected-resource'
       path: '/.well-known/oauth-protected-resource'
@@ -562,6 +607,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicBackfillOutcomesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/analytics/events': {
+      id: '/api/analytics/events'
+      path: '/api/analytics/events'
+      fullPath: '/api/analytics/events'
+      preLoaderRoute: typeof ApiAnalyticsEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/analytics/actions': {
+      id: '/api/analytics/actions'
+      path: '/api/analytics/actions'
+      fullPath: '/api/analytics/actions'
+      preLoaderRoute: typeof ApiAnalyticsActionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/.mcp/invoke-tool/$tool': {
       id: '/.mcp/invoke-tool/$tool'
       path: '/.mcp/invoke-tool/$tool'
@@ -580,11 +639,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminAnalyticsRoute: typeof AdminAnalyticsRoute
   AdminHealthRoute: typeof AdminHealthRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminAnalyticsRoute: AdminAnalyticsRoute,
   AdminHealthRoute: AdminHealthRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
@@ -607,6 +668,8 @@ const rootRouteChildren: RootRouteChildren = {
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  ApiAnalyticsActionsRoute: ApiAnalyticsActionsRoute,
+  ApiAnalyticsEventsRoute: ApiAnalyticsEventsRoute,
   ApiPublicBackfillOutcomesRoute: ApiPublicBackfillOutcomesRoute,
   ApiPublicIngestAllRoute: ApiPublicIngestAllRoute,
   ApiPublicIngestOutcomesRoute: ApiPublicIngestOutcomesRoute,

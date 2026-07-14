@@ -25,14 +25,46 @@ const contextSchema = z.object({
   analytics_allowed: z.boolean(),
 });
 
-export const productEventSchema = contextSchema.extend({
-  event_name: z.enum(clientProductEvents),
-  entity_type: z.string().max(40).optional(),
-  entity_id: z.string().max(160).optional(),
-  success: z.boolean().optional(),
-  duration_ms: z.number().int().min(0).max(86_400_000).optional(),
-  properties: properties.default({}),
-});
+export const productEventSchema = contextSchema
+  .extend({
+    event_name: z.enum(clientProductEvents),
+    entity_type: z.string().max(40).optional(),
+    entity_id: z.string().max(160).optional(),
+    success: z.boolean().optional(),
+    duration_ms: z.number().int().min(0).max(86_400_000).optional(),
+    properties: properties.default({}),
+  })
+  .superRefine((event, context) => {
+    if (event.event_name === "market_selected" || event.event_name === "evidence_viewed") {
+      if (event.entity_type !== "market" || !event.entity_id) {
+        context.addIssue({
+          code: "custom",
+          path: ["entity_id"],
+          message: "Market events require a market identity",
+        });
+      }
+    }
+    if (
+      (event.event_name === "story_viewed" || event.event_name === "evidence_viewed") &&
+      (event.duration_ms ?? 0) < 5000
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["duration_ms"],
+        message: "Qualified exposure requires at least five seconds",
+      });
+    }
+    if (event.event_name === "web_vital") {
+      const metricName = event.properties.metric_name;
+      if (!["LCP", "CLS_MILLI", "INTERACTION_LATENCY"].includes(String(metricName))) {
+        context.addIssue({
+          code: "custom",
+          path: ["properties", "metric_name"],
+          message: "Unsupported experience metric",
+        });
+      }
+    }
+  });
 
 export const workflowActionSchema = contextSchema.extend({
   action_type: z.enum(["underwrite", "brief_export"]),
