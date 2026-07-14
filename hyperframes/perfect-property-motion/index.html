@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face {
+        font-family: "Geist";
+        src: url("assets/fonts/geist-latin-wght-normal.woff2") format("woff2");
+        font-style: normal;
+        font-weight: 100 900;
+      }
+      @font-face {
+        font-family: "Geist Mono";
+        src: url("assets/fonts/geist-mono-latin-wght-normal.woff2") format("woff2");
+        font-style: normal;
+        font-weight: 100 900;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #01070c;
+      }
+      body {
+        color: #f3f6f8;
+        font-family: "Geist", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .mono {
+        font-family: "Geist Mono", monospace;
+        font-variant-numeric: tabular-nums;
+      }
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #01070c;
+      }
+      .scene {
+        position: absolute;
+        inset: 0;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background-color: #01070c;
+      }
+      .scene:not(#scene-1) { opacity: 0; }
+      .scene-content {
+        position: relative;
+        z-index: 3;
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+        padding: 82px 112px 88px;
+        gap: 28px;
+      }
+      .scene-grid {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        opacity: 0.2;
+        background-image:
+          linear-gradient(rgba(120,147,165,0.16) 1px, rgba(120,147,165,0) 1px),
+          linear-gradient(90deg, rgba(120,147,165,0.16) 1px, rgba(120,147,165,0) 1px);
+        background-size: 84px 84px;
+        mask-image: radial-gradient(circle at 68% 50%, black 0%, rgba(0,0,0,0.72) 48%, rgba(0,0,0,0) 82%);
+      }
+      .scene-glow {
+        position: absolute;
+        z-index: 0;
+        width: 960px;
+        height: 960px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(26,84,125,0.28), rgba(1,7,12,0) 68%);
+        pointer-events: none;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        min-height: 58px;
+        color: #f3f6f8;
+      }
+      .brand svg { width: 58px; height: 58px; flex: none; }
+      .brand-name {
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+      }
+      .top-rule {
+        position: absolute;
+        top: 165px;
+        right: 112px;
+        left: 112px;
+        height: 1px;
+        background: #263844;
+        transform-origin: left center;
+      }
+      .eyebrow {
+        color: #efaa2d;
+        font-size: 19px;
+        font-weight: 750;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .headline {
+        max-width: 1040px;
+        margin: 0;
+        font-size: 104px;
+        font-weight: 900;
+        line-height: 0.98;
+        letter-spacing: -0.05em;
+      }
+      .body-copy {
+        max-width: 760px;
+        margin: 0;
+        color: #aebbc4;
+        font-size: 27px;
+        font-weight: 350;
+        line-height: 1.52;
+      }
+      .gold { color: #efaa2d; }
+      .live { color: #05d680; }
+      .status-line {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        color: #91a2ad;
+        font-size: 17px;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+      }
+      .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #05d680;
+        box-shadow: 0 0 18px rgba(5,214,128,0.65);
+      }
+      .panel {
+        border: 1px solid rgba(120,147,165,0.28);
+        background: rgba(6,16,24,0.94);
+        box-shadow: 0 32px 90px rgba(0,5,9,0.48), inset 0 1px 0 rgba(255,255,255,0.035);
+      }
+
+      /* Scene 1 */
+      #scene-1 { z-index: 1; }
+      #scene-1 .scene-glow { right: -190px; bottom: -310px; }
+      .s1-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 690px;
+        align-items: center;
+        flex: 1;
+        gap: 88px;
+        padding-top: 54px;
+      }
+      .s1-copy { display: flex; flex-direction: column; gap: 30px; }
+      .map-panel {
+        position: relative;
+        height: 690px;
+        overflow: hidden;
+      }
+      .map-panel::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(circle at 37% 46%, rgba(26,84,125,0.26), rgba(6,16,24,0) 32%),
+          linear-gradient(rgba(120,147,165,0.08) 1px, rgba(120,147,165,0) 1px),
+          linear-gradient(90deg, rgba(120,147,165,0.08) 1px, rgba(120,147,165,0) 1px);
+        background-size: auto, 58px 58px, 58px 58px;
+      }
+      .map-coast {
+        position: absolute;
+        inset: 80px 34px 32px;
+        width: calc(100% - 68px);
+        height: calc(100% - 112px);
+      }
+      .map-topbar {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 72px;
+        padding: 0 25px;
+        border-bottom: 1px solid rgba(120,147,165,0.2);
+      }
+      .map-topbar strong { font-size: 19px; }
+      .map-topbar span { color: #05d680; font-size: 15px; letter-spacing: 0.08em; }
+      .map-marker {
+        position: absolute;
+        z-index: 2;
+        display: grid;
+        width: 66px;
+        height: 66px;
+        place-items: center;
+        border: 2px solid #ffd16f;
+        border-radius: 50%;
+        background: #efaa2d;
+        color: #111616;
+        font-size: 18px;
+        font-weight: 800;
+        box-shadow: 0 0 0 15px rgba(239,170,45,0.11), 0 0 42px rgba(239,170,45,0.26);
+      }
+      .m1 { left: 105px; top: 335px; }
+      .m2 { left: 184px; top: 450px; width: 82px; height: 82px; }
+      .m3 { right: 94px; top: 405px; }
+      .m4 { right: 142px; top: 520px; width: 76px; height: 76px; }
+      .scan-line {
+        position: absolute;
+        z-index: 1;
+        right: 0;
+        left: 0;
+        top: 156px;
+        height: 2px;
+        background: #efaa2d;
+        box-shadow: 0 0 24px rgba(239,170,45,0.72);
+        opacity: 0.56;
+      }
+
+      /* Scene 2 */
+      #scene-2 { z-index: 2; }
+      #scene-2 .scene-glow { left: -320px; top: -360px; }
+      .scene-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 58px;
+      }
+      .scene-index { color: #718592; font-size: 17px; letter-spacing: 0.12em; text-transform: uppercase; }
+      .signal-layout {
+        display: grid;
+        grid-template-columns: 660px minmax(0, 1fr);
+        flex: 1;
+        gap: 74px;
+        align-items: center;
+        padding-top: 40px;
+      }
+      .score-block { display: flex; flex-direction: column; gap: 25px; }
+      .score-value {
+        font-size: 214px;
+        font-weight: 850;
+        line-height: 0.82;
+        letter-spacing: -0.085em;
+      }
+      .score-label { color: #dbe3e7; font-size: 29px; font-weight: 600; }
+      .delta {
+        width: max-content;
+        border: 1px solid rgba(5,214,128,0.32);
+        background: rgba(5,214,128,0.08);
+        padding: 12px 17px;
+        color: #62e3a0;
+        font-size: 18px;
+      }
+      .rank-panel { padding: 34px 38px 38px; }
+      .panel-title { display: flex; justify-content: space-between; color: #dce4e9; font-size: 21px; }
+      .panel-title span { color: #718592; font-size: 16px; font-weight: 400; }
+      .rank-list { display: grid; gap: 28px; margin-top: 36px; }
+      .rank-row { display: grid; grid-template-columns: 42px 1fr 84px; align-items: center; gap: 20px; }
+      .rank-number { color: #efaa2d; font-size: 19px; }
+      .rank-market { font-size: 22px; font-weight: 600; }
+      .rank-score { color: #efaa2d; font-size: 22px; text-align: right; }
+      .bar-track { height: 7px; margin-top: 13px; background: #1b2a34; overflow: hidden; }
+      .bar-fill { height: 100%; background: #efaa2d; transform-origin: left center; }
+
+      /* Scene 3 */
+      #scene-3 { z-index: 3; }
+      #scene-3 .scene-glow { right: 140px; top: -400px; }
+      .evidence-layout {
+        display: grid;
+        grid-template-columns: 730px minmax(0, 1fr);
+        flex: 1;
+        gap: 100px;
+        align-items: center;
+        padding-top: 42px;
+      }
+      .evidence-copy { display: flex; flex-direction: column; gap: 30px; }
+      .evidence-copy .headline { font-size: 96px; max-width: 720px; }
+      .evidence-graph {
+        position: relative;
+        display: grid;
+        grid-template-columns: 1fr 130px 230px;
+        align-items: center;
+        min-height: 640px;
+      }
+      .source-list { display: grid; gap: 22px; }
+      .source-card {
+        display: grid;
+        grid-template-columns: 54px 1fr auto;
+        align-items: center;
+        gap: 17px;
+        min-height: 104px;
+        padding: 19px 23px;
+        border: 1px solid rgba(120,147,165,0.24);
+        background: #07131b;
+      }
+      .source-icon {
+        display: grid;
+        width: 50px;
+        height: 50px;
+        place-items: center;
+        border: 1px solid rgba(239,170,45,0.4);
+        color: #efaa2d;
+        font-size: 20px;
+      }
+      .source-card strong { display: block; font-size: 20px; }
+      .source-card small { display: block; margin-top: 7px; color: #81939e; font-size: 16px; }
+      .verified { color: #05d680; font-size: 15px; }
+      .connector {
+        position: relative;
+        height: 2px;
+        background: #4b6576;
+        transform-origin: left center;
+      }
+      .connector::after {
+        content: "";
+        position: absolute;
+        right: -3px;
+        top: -4px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #efaa2d;
+        box-shadow: 0 0 18px rgba(239,170,45,0.64);
+      }
+      .score-node {
+        display: grid;
+        width: 220px;
+        height: 220px;
+        place-items: center;
+        border: 2px solid #efaa2d;
+        border-radius: 50%;
+        background: #07131b;
+        box-shadow: 0 0 0 24px rgba(239,170,45,0.06), 0 0 90px rgba(239,170,45,0.15);
+      }
+      .score-node strong { display: block; color: #efaa2d; font-size: 65px; line-height: 1; }
+      .score-node span { display: block; margin-top: 12px; color: #9ba9b4; font-size: 17px; text-align: center; }
+
+      /* Scene 4 */
+      #scene-4 { z-index: 4; }
+      #scene-4 .scene-glow { left: 480px; bottom: -580px; width: 1200px; height: 1200px; }
+      .final-content {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+        padding: 94px 112px;
+        gap: 32px;
+      }
+      .final-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 640px;
+        flex: 1;
+        align-items: center;
+        gap: 90px;
+        padding-top: 34px;
+      }
+      .final-copy { display: flex; flex-direction: column; gap: 30px; }
+      .final-copy .headline { font-size: 100px; max-width: 930px; }
+      .action-panel { padding: 36px; }
+      .action-header { display: flex; align-items: center; justify-content: space-between; }
+      .action-header strong { font-size: 22px; }
+      .action-header span { color: #05d680; font-size: 15px; }
+      .action-score { margin-top: 42px; color: #efaa2d; font-size: 92px; font-weight: 800; }
+      .action-market { margin-top: 12px; color: #dce4e9; font-size: 25px; }
+      .action-rule { height: 1px; margin: 34px 0; background: #263844; transform-origin: left center; }
+      .action-row { display: flex; align-items: center; justify-content: space-between; color: #9ba9b4; font-size: 18px; }
+      .action-row strong { color: #f3f6f8; }
+      .cta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 74px;
+        margin-top: 34px;
+        padding: 0 27px;
+        background: #efaa2d;
+        color: #111616;
+        font-size: 20px;
+        font-weight: 800;
+      }
+      .cta-arrow { font-size: 31px; }
+      .footer-note {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: #718592;
+        font-size: 15px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="18" data-width="1920" data-height="1080">
+      <section id="scene-1" class="scene" data-layout-allow-overflow data-layout-allow-overlap>
+        <div class="scene-grid" data-layout-ignore></div>
+        <div class="scene-glow" data-layout-ignore></div>
+        <div class="scene-content">
+          <div class="brand s1-brand">
+            <svg viewBox="0 0 64 64" aria-hidden="true"><path fill="currentColor" d="M32 8 60 33v21l-9-8v-9L32 20 13 37v9l-9 8V33L32 8Z"/><g fill="#efaa2d"><rect x="22" y="37" width="8" height="8"/><rect x="34" y="37" width="8" height="8"/><rect x="22" y="49" width="8" height="8"/><rect x="34" y="49" width="8" height="8"/></g></svg>
+            <span class="brand-name">PERFECT PROPERTY</span>
+          </div>
+          <div class="top-rule s1-rule"></div>
+          <div class="s1-layout">
+            <div class="s1-copy">
+              <div class="eyebrow s1-eyebrow">AI-powered real estate intelligence</div>
+              <h1 class="headline s1-headline">Every parcel. <span class="gold">Underwritten every night.</span></h1>
+              <p class="body-copy s1-body">Market signals, source evidence, and underwriting actions move through one calibrated investment workspace.</p>
+              <div class="status-line s1-status"><i class="status-dot"></i><span>109 opportunities calibrated across CA + FL</span></div>
+            </div>
+            <div class="map-panel panel s1-panel">
+              <div class="map-topbar"><strong>Opportunity map</strong><span class="mono">● LIVE DATA</span></div>
+              <svg class="map-coast" viewBox="0 0 620 520" aria-hidden="true">
+                <path d="M31 80 92 40l70 18 62-19 48 39 74 2 38 43 77 13 58 52 64 26-14 52-50 22-17 77-59 18-46 61-92-22-52-65-69-18-28-82-67-30-25-74Z" fill="#111d25" stroke="#38505f" stroke-width="2"/>
+                <path d="M127 72 152 430M254 58l-6 344M382 95l-9 310M65 201l480 12M89 326l418-20" fill="none" stroke="#263a47" stroke-width="1.5"/>
+              </svg>
+              <div class="scan-line"></div>
+              <div class="map-marker m1 mono s1-marker">40</div>
+              <div class="map-marker m2 mono s1-marker">69</div>
+              <div class="map-marker m3 mono s1-marker">64</div>
+              <div class="map-marker m4 mono s1-marker">51</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="scene-2" class="scene" data-layout-allow-overflow data-layout-allow-overlap>
+        <div class="scene-grid" data-layout-ignore></div>
+        <div class="scene-glow" data-layout-ignore></div>
+        <div class="scene-content">
+          <div class="scene-header s2-header"><div class="brand"><svg viewBox="0 0 64 64" aria-hidden="true"><path fill="currentColor" d="M32 8 60 33v21l-9-8v-9L32 20 13 37v9l-9 8V33L32 8Z"/><g fill="#efaa2d"><rect x="22" y="37" width="8" height="8"/><rect x="34" y="37" width="8" height="8"/><rect x="22" y="49" width="8" height="8"/><rect x="34" y="49" width="8" height="8"/></g></svg><span class="brand-name">PERFECT PROPERTY</span></div><span class="scene-index mono">01 / MARKET SIGNAL</span></div>
+          <div class="top-rule s2-rule"></div>
+          <div class="signal-layout">
+            <div class="score-block">
+              <div class="eyebrow s2-eyebrow">Los Angeles, CA</div>
+              <div class="score-value mono gold s2-score">94.2</div>
+              <div class="score-label s2-label">Top opportunity score</div>
+              <div class="delta mono s2-delta">↑ 12.4 vs 30d ago</div>
+              <p class="body-copy s2-body">Calibrated rankings surface the markets worth an acquisitions team’s attention first.</p>
+            </div>
+            <div class="rank-panel panel s2-panel">
+              <div class="panel-title"><strong>Priority markets</strong><span>Opportunity score</span></div>
+              <div class="rank-list">
+                <div class="rank-row s2-row"><span class="rank-number mono">01</span><div><div class="rank-market">Los Angeles, CA</div><div class="bar-track"><div class="bar-fill" style="width:94.2%"></div></div></div><span class="rank-score mono">94.2</span></div>
+                <div class="rank-row s2-row"><span class="rank-number mono">02</span><div><div class="rank-market">Miami, FL</div><div class="bar-track"><div class="bar-fill" style="width:93.1%"></div></div></div><span class="rank-score mono">93.1</span></div>
+                <div class="rank-row s2-row"><span class="rank-number mono">03</span><div><div class="rank-market">Tampa, FL</div><div class="bar-track"><div class="bar-fill" style="width:92.8%"></div></div></div><span class="rank-score mono">92.8</span></div>
+                <div class="rank-row s2-row"><span class="rank-number mono">04</span><div><div class="rank-market">San Diego, CA</div><div class="bar-track"><div class="bar-fill" style="width:91.6%"></div></div></div><span class="rank-score mono">91.6</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="scene-3" class="scene" data-layout-allow-overflow data-layout-allow-overlap>
+        <div class="scene-grid" data-layout-ignore></div>
+        <div class="scene-glow" data-layout-ignore></div>
+        <div class="scene-content">
+          <div class="scene-header s3-header"><div class="brand"><svg viewBox="0 0 64 64" aria-hidden="true"><path fill="currentColor" d="M32 8 60 33v21l-9-8v-9L32 20 13 37v9l-9 8V33L32 8Z"/><g fill="#efaa2d"><rect x="22" y="37" width="8" height="8"/><rect x="34" y="37" width="8" height="8"/><rect x="22" y="49" width="8" height="8"/><rect x="34" y="49" width="8" height="8"/></g></svg><span class="brand-name">PERFECT PROPERTY</span></div><span class="scene-index mono">02 / SOURCE EVIDENCE</span></div>
+          <div class="top-rule s3-rule"></div>
+          <div class="evidence-layout">
+            <div class="evidence-copy">
+              <div class="eyebrow s3-eyebrow">Evidence by default</div>
+              <h2 class="headline s3-headline">Trace every score to its source.</h2>
+              <p class="body-copy s3-body">Rent, supply, sales, and insurance data remain visible from market ranking through committee review.</p>
+            </div>
+            <div class="evidence-graph">
+              <div class="source-list">
+                <div class="source-card s3-source"><span class="source-icon mono">R</span><span><strong>Rent durability</strong><small>CoStar · Apr 2024</small></span><span class="verified mono">VERIFIED</span></div>
+                <div class="source-card s3-source"><span class="source-icon mono">S</span><span><strong>Supply pressure</strong><small>Yardi Matrix · Apr 2024</small></span><span class="verified mono">VERIFIED</span></div>
+                <div class="source-card s3-source"><span class="source-icon mono">I</span><span><strong>Insurance exposure</strong><small>CoreLogic · May 2024</small></span><span class="verified mono">VERIFIED</span></div>
+                <div class="source-card s3-source"><span class="source-icon mono">L</span><span><strong>Liquidity</strong><small>RCA · Mar 2024</small></span><span class="verified mono">VERIFIED</span></div>
+              </div>
+              <div class="connector s3-connector"></div>
+              <div class="score-node s3-node"><span><strong class="mono">94.2</strong><span>Opportunity score</span></span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="scene-4" class="scene" data-layout-allow-overflow data-layout-allow-overlap>
+        <div class="scene-grid" data-layout-ignore></div>
+        <div class="scene-glow" data-layout-ignore></div>
+        <div class="final-content">
+          <div class="brand s4-brand"><svg viewBox="0 0 64 64" aria-hidden="true"><path fill="currentColor" d="M32 8 60 33v21l-9-8v-9L32 20 13 37v9l-9 8V33L32 8Z"/><g fill="#efaa2d"><rect x="22" y="37" width="8" height="8"/><rect x="34" y="37" width="8" height="8"/><rect x="22" y="49" width="8" height="8"/><rect x="34" y="49" width="8" height="8"/></g></svg><span class="brand-name">PERFECT PROPERTY</span></div>
+          <div class="top-rule s4-rule"></div>
+          <div class="final-layout">
+            <div class="final-copy">
+              <div class="eyebrow s4-eyebrow">Underwriting action</div>
+              <h2 class="headline s4-headline">Move from signal to investment memo.</h2>
+              <p class="body-copy s4-body">One workspace. No evidence handoff. Every decision stays connected to the data behind it.</p>
+            </div>
+            <div class="action-panel panel s4-panel">
+              <div class="action-header"><strong>Create underwrite</strong><span class="mono">READY</span></div>
+              <div class="action-score mono">94.2</div>
+              <div class="action-market">Los Angeles, CA · Multifamily</div>
+              <div class="action-rule"></div>
+              <div class="action-row"><span>Evidence families</span><strong class="mono">4 / 4 validated</strong></div>
+              <div class="cta"><span>Open interactive workspace</span><span class="cta-arrow">→</span></div>
+            </div>
+          </div>
+          <div class="footer-note s4-footer"><span>Evaluate markets · Rank opportunities · Trace every signal</span><span class="mono">PERFECTPROPERTY.APP</span></div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      /* Scene 1 entrance and ambient motion */
+      tl.from("#scene-1 .scene-grid", { opacity: 0, duration: 1.1, ease: "sine.out" }, 0.15);
+      tl.from("#scene-1 .scene-glow", { opacity: 0, scale: 0.72, duration: 1.4, ease: "power1.out" }, 0.18);
+      tl.from(".s1-brand", { x: -36, opacity: 0, duration: 0.58, ease: "expo.out" }, 0.2);
+      tl.from(".s1-rule", { scaleX: 0, duration: 0.75, ease: "power3.out" }, 0.28);
+      tl.from(".s1-eyebrow", { x: -26, opacity: 0, duration: 0.62, ease: "sine.out" }, 0.42);
+      tl.from(".s1-headline", { y: 54, opacity: 0, duration: 0.78, ease: "power4.out" }, 0.55);
+      tl.from(".s1-body", { x: -32, opacity: 0, duration: 0.54, ease: "circ.out" }, 0.82);
+      tl.from(".s1-status", { opacity: 0, scale: 0.96, duration: 0.42, ease: "back.out(1.25)" }, 1.06);
+      tl.from(".s1-panel", { x: 70, scale: 0.965, opacity: 0, duration: 0.86, ease: "expo.out" }, 0.44);
+      tl.from(".s1-marker", { scale: 0.25, opacity: 0, duration: 0.5, stagger: 0.1, ease: "back.out(1.45)" }, 1.05);
+      tl.from(".scan-line", { scaleX: 0, transformOrigin: "left center", duration: 0.66, ease: "power3.out" }, 1.22);
+      tl.to(".scan-line", { y: 390, duration: 2.1, repeat: 1, yoyo: true, ease: "sine.inOut" }, 1.65);
+      tl.to(".s1-marker", { scale: 1.08, duration: 0.62, repeat: 3, yoyo: true, stagger: 0.08, ease: "sine.inOut" }, 1.72);
+
+      /* Push transition: map to ranked market signal */
+      tl.to("#scene-1", { x: -1920, duration: 0.5, ease: "power3.inOut" }, 4.2);
+      tl.fromTo("#scene-2", { x: 1920, opacity: 1 }, { x: 0, duration: 0.5, ease: "power3.inOut" }, 4.2);
+      tl.from("#scene-2 .scene-grid", { opacity: 0, duration: 0.9, ease: "sine.out" }, 4.7);
+      tl.from("#scene-2 .scene-glow", { opacity: 0, scale: 0.78, duration: 1.15, ease: "power1.out" }, 4.72);
+      tl.from(".s2-header", { y: -32, opacity: 0, duration: 0.52, ease: "expo.out" }, 4.72);
+      tl.from(".s2-rule", { scaleX: 0, duration: 0.68, ease: "power3.out" }, 4.8);
+      tl.from(".s2-eyebrow", { x: -38, opacity: 0, duration: 0.44, ease: "circ.out" }, 4.94);
+      tl.from(".s2-score", { scale: 0.72, opacity: 0, transformOrigin: "left bottom", duration: 0.76, ease: "back.out(1.2)" }, 5.02);
+      tl.from(".s2-label", { y: 24, opacity: 0, duration: 0.4, ease: "power2.out" }, 5.3);
+      tl.from(".s2-delta", { x: -24, opacity: 0, duration: 0.38, ease: "expo.out" }, 5.44);
+      tl.from(".s2-body", { opacity: 0, duration: 0.62, ease: "sine.out" }, 5.58);
+      tl.from(".s2-panel", { x: 62, opacity: 0, duration: 0.72, ease: "power4.out" }, 4.94);
+      tl.from(".s2-row", { y: 25, opacity: 0, duration: 0.42, stagger: 0.09, ease: "power3.out" }, 5.42);
+      tl.from(".s2-row .bar-fill", { scaleX: 0, duration: 0.82, stagger: 0.08, ease: "expo.out" }, 5.72);
+
+      /* Push transition: ranking to evidence lineage */
+      tl.to("#scene-2", { x: -1920, duration: 0.5, ease: "power3.inOut" }, 8.6);
+      tl.fromTo("#scene-3", { x: 1920, opacity: 1 }, { x: 0, duration: 0.5, ease: "power3.inOut" }, 8.6);
+      tl.from("#scene-3 .scene-grid", { opacity: 0, duration: 0.95, ease: "sine.out" }, 9.1);
+      tl.from("#scene-3 .scene-glow", { opacity: 0, scale: 0.76, duration: 1.3, ease: "power1.out" }, 9.12);
+      tl.from(".s3-header", { x: -34, opacity: 0, duration: 0.5, ease: "expo.out" }, 9.12);
+      tl.from(".s3-rule", { scaleX: 0, duration: 0.7, ease: "power3.out" }, 9.2);
+      tl.from(".s3-eyebrow", { x: -28, opacity: 0, duration: 0.54, ease: "sine.out" }, 9.36);
+      tl.from(".s3-headline", { y: 48, opacity: 0, duration: 0.7, ease: "power4.out" }, 9.46);
+      tl.from(".s3-body", { x: -30, opacity: 0, duration: 0.52, ease: "circ.out" }, 9.76);
+      tl.from(".s3-source", { x: 48, opacity: 0, duration: 0.46, stagger: 0.1, ease: "expo.out" }, 9.42);
+      tl.from(".s3-connector", { scaleX: 0, duration: 0.72, ease: "power3.out" }, 10.08);
+      tl.from(".s3-node", { scale: 0.58, opacity: 0, duration: 0.78, ease: "back.out(1.25)" }, 10.2);
+      tl.to(".s3-node", { scale: 1.045, duration: 0.78, repeat: 2, yoyo: true, ease: "sine.inOut" }, 10.98);
+
+      /* Focus pull transition: evidence to action */
+      tl.to("#scene-3", { filter: "blur(15px)", duration: 0.5, ease: "power1.in" }, 12.8);
+      tl.to("#scene-3", { opacity: 0, duration: 0.3, ease: "power2.in" }, 13.05);
+      tl.fromTo("#scene-4", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 13.05);
+      tl.from("#scene-4 .scene-grid", { opacity: 0, duration: 1.0, ease: "sine.out" }, 13.35);
+      tl.from("#scene-4 .scene-glow", { opacity: 0, scale: 0.7, duration: 1.25, ease: "power1.out" }, 13.38);
+      tl.from(".s4-brand", { x: -36, opacity: 0, duration: 0.52, ease: "expo.out" }, 13.4);
+      tl.from(".s4-rule", { scaleX: 0, duration: 0.68, ease: "power3.out" }, 13.48);
+      tl.from(".s4-eyebrow", { x: -26, opacity: 0, duration: 0.55, ease: "sine.out" }, 13.62);
+      tl.from(".s4-headline", { y: 52, opacity: 0, duration: 0.76, ease: "power4.out" }, 13.72);
+      tl.from(".s4-body", { x: -32, opacity: 0, duration: 0.5, ease: "circ.out" }, 14.04);
+      tl.from(".s4-panel", { x: 64, scale: 0.97, opacity: 0, duration: 0.78, ease: "expo.out" }, 13.62);
+      tl.from(".action-header", { y: -18, opacity: 0, duration: 0.36, ease: "power2.out" }, 14.16);
+      tl.from(".action-score", { scale: 0.7, opacity: 0, transformOrigin: "left bottom", duration: 0.6, ease: "back.out(1.2)" }, 14.22);
+      tl.from(".action-market", { x: 24, opacity: 0, duration: 0.42, ease: "power3.out" }, 14.44);
+      tl.from(".action-rule", { scaleX: 0, duration: 0.55, ease: "expo.out" }, 14.55);
+      tl.from(".action-row", { opacity: 0, duration: 0.45, ease: "sine.out" }, 14.68);
+      tl.from(".cta", { y: 26, opacity: 0, duration: 0.5, ease: "power4.out" }, 14.82);
+      tl.from(".s4-footer", { y: 20, opacity: 0, duration: 0.48, ease: "circ.out" }, 15.0);
+      tl.to(".cta-arrow", { x: 12, duration: 0.42, repeat: 3, yoyo: true, ease: "sine.inOut" }, 15.46);
+
+      /* Final scene resolution */
+      tl.to(".final-content", { opacity: 0, duration: 0.55, ease: "power2.in" }, 17.35);
+      tl.to("#scene-4 .scene-grid", { opacity: 0, duration: 0.45, ease: "power1.in" }, 17.45);
+      tl.to("#scene-4 .scene-glow", { opacity: 0, duration: 0.45, ease: "power1.in" }, 17.45);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

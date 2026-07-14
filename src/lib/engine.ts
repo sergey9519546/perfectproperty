@@ -393,7 +393,7 @@ export function underwrite(
   if (taxAmt > 25000) defects.push({ cluster: "LEGAL", p: Math.min(0.6, taxAmt / 100000) });
   if ((ladder.comp_count ?? 0) < 3) defects.push({ cluster: "DATA_QUALITY", p: 0.5 });
   const sigmaMarginPct = sigma_arv_log; // in log-price / margin space, close enough
-  const suspZ = marginPct > 0.45 ? (marginPct - 0.3) / Math.max(sigmaMarginPct, 0.05) : 0;
+  const suspZ = marginPct > 0.45 ? (marginPct - 0.45) / Math.max(sigmaMarginPct, 0.05) : 0;
   const F_surv = v11.skepticFactor(defects, suspZ);
   const skeptic_flags = buildSkepticFlags(p, distress, marginPct);
 
@@ -486,7 +486,7 @@ export function underwrite(
   const monthsH = Math.max(3, Math.round(exit.exit_days / 30));
   const pd_credit = credit.pdCreditStationary(hazardFeatures, monthsH);
   const pd_project = clamp(pd_credit * 0.8, 0, 1);
-  const pd_exit = clamp((1 - v12.fExit90d(1 / Math.max(exit.exit_days, 1))) * 0.5, 0, 1);
+  const pd_exit = clamp((1 - v12.fExit90d(1 / Math.max(exit.exit_days, 1))) * 0.15, 0, 1);
   const ead = credit.exposureAtDefault({
     outstanding_principal: acq.modeled_offer,
     approved_undrawn_rehab_available: reno,
@@ -517,7 +517,10 @@ export function underwrite(
     liquidity_charge: ead * 0.005,
     servicing_and_workout_cost: 2500,
   });
-  const raroc = risk_adjusted_profit_credit / Math.max(ead * 0.1, 1); // EC ≈ 10% of EAD stub
+  // EC: use the larger of the 10%-of-EAD heuristic and the actual MC CVaR tail, so
+  // single-deal RAROC is comparable to the portfolio EC = CVaR - EL convention.
+  const ecRaroc = Math.max(mc.cvar_loss_05, ead * 0.1);
+  const raroc = risk_adjusted_profit_credit / Math.max(ecRaroc, 1);
 
   // --- (8) Gates 0-8 --------------------------------------------------------
   const passed = new Set<number>();

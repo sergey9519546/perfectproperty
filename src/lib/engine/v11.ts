@@ -283,14 +283,18 @@ export function pertSummary(L_hat: number, M_hat: number, H_hat: number) {
 }
 // Beta-PERT sampler (Vose formulation), positive-support.
 export function sampleBetaPert(L: number, M: number, H: number, rng: () => number, lambda = 4): number {
-  if (H <= L) return M;
-  const alpha = 1 + lambda * (M - L) / (H - L);
-  const beta  = 1 + lambda * (H - M) / (H - L);
+  // Sort to guarantee non-crossing L <= M <= H internally (defensive; engine
+  // always passes sorted). Prevents a negative alpha/beta when M is outside
+  // [L,H], which would bias the draw. Mirrors pertSummary's sort.
+  const [sL, sM, sH] = [L, M, H].sort((a, b) => a - b);
+  if (sH <= sL) return sM;
+  const alpha = 1 + lambda * (sM - sL) / (sH - sL);
+  const beta  = 1 + lambda * (sH - sM) / (sH - sL);
   // Beta(alpha,beta) via two gammas (Marsaglia-Tsang)
   const a = sampleGamma(alpha, rng);
   const b = sampleGamma(beta, rng);
   const x = a / (a + b);
-  return L + x * (H - L);
+  return sL + x * (sH - sL);
 }
 function sampleGamma(shape: number, rng: () => number): number {
   if (shape < 1) return sampleGamma(shape + 1, rng) * Math.pow(rng(), 1 / shape);
@@ -518,8 +522,20 @@ export function creditLossMetrics(c: CreditInputs) {
   const el = c.pd_credit * lgd * c.ead;
   return { net_recovery: netRecovery, lgd, el };
 }
-export function riskAdjustedProfit(e_profit_no_default: number, el: number, capital_charge: number, liquidity_charge: number) {
-  return e_profit_no_default - el - capital_charge - liquidity_charge;
+/**
+ * @deprecated Use credit.riskAdjustedProfit (object form) instead — it also subtracts
+ * the servicing/workout cost and is the canonical implementation actually used by the
+ * underwrite pipeline. This positional overload is retained only for backward
+ * compatibility; add servicing_and_workout_cost (defaults to 0) to match the credit layer.
+ */
+export function riskAdjustedProfit(
+  e_profit_no_default: number,
+  el: number,
+  capital_charge: number,
+  liquidity_charge: number,
+  servicing_and_workout_cost = 0,
+) {
+  return e_profit_no_default - el - capital_charge - liquidity_charge - servicing_and_workout_cost;
 }
 
 // =============================================================================

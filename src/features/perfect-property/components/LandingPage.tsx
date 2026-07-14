@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   ArrowRight, Brain, Buildings, ChartLineUp, Database, Gauge,
-  Lightning, List, LockKey, MapTrifold, Play, ShieldCheck, Stack, Target,
+  Lightning, List, LockKey, MapTrifold, Pause, Play, ShieldCheck, Stack, Target,
 } from '@phosphor-icons/react'
 import { Brand } from './Brand'
 import type { MapParcel } from '@/components/MapView'
@@ -44,7 +44,7 @@ const sampleParcels: MapParcel[] = [
 export function LandingPage({ onExplore, onSignIn }: { onExplore: () => void; onSignIn: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const scrollToPreview = () => document.getElementById('platform')?.scrollIntoView({ behavior: 'smooth' })
+  const scrollToStory = () => document.getElementById('story')?.scrollIntoView({ behavior: 'smooth' })
 
   useEffect(() => {
     if (!menuOpen) return
@@ -92,7 +92,7 @@ export function LandingPage({ onExplore, onSignIn }: { onExplore: () => void; on
             <motion.p variants={heroReveal} className="mt-6 max-w-[500px] text-[17px] leading-[1.7] text-[#b3bcc5] max-sm:mt-4 max-sm:text-[15px] max-sm:leading-6">Evaluate markets, rank opportunities, and trace every signal to its source—inside one investment workspace.</motion.p>
             <motion.div variants={heroReveal} className="mt-8 flex flex-wrap gap-3 max-sm:mt-6 max-sm:grid max-sm:grid-cols-1 max-sm:gap-2">
               <motion.button whileHover={{ x: 2, y: -2 }} whileTap={{ scale: .98 }} transition={{ type: 'spring', stiffness: 240, damping: 22 }} type="button" onClick={onExplore} className="landing-cta primary-button min-w-[205px] justify-between px-6 text-[13px] font-semibold shadow-lg shadow-[#efaa2d]/20 hover:shadow-[#efaa2d]/40 transition-shadow">Explore platform<ArrowRight size={18} weight="bold"/></motion.button>
-              <motion.button whileTap={{ scale: .98 }} type="button" onClick={scrollToPreview} className="landing-cta control-button min-w-[198px] justify-center bg-[#06131c]/65 px-5 text-[13px] font-semibold backdrop-blur-lg border border-[#7893a5]/30 hover:border-[#7893a5]/50 transition-all hover:bg-[#08161e]"><Play size={18} weight="fill" className="text-[#efaa2d]"/>See how it works</motion.button>
+              <motion.button whileTap={{ scale: .98 }} type="button" onClick={scrollToStory} className="landing-cta control-button min-w-[198px] justify-center bg-[#06131c]/65 px-5 text-[13px] font-semibold backdrop-blur-lg border border-[#7893a5]/30 hover:border-[#7893a5]/50 transition-all hover:bg-[#08161e]"><Play size={18} weight="fill" className="text-[#efaa2d]"/>See how it works</motion.button>
             </motion.div>
           </motion.div>
 
@@ -139,6 +139,8 @@ export function LandingPage({ onExplore, onSignIn }: { onExplore: () => void; on
         </div>
       </section>
 
+      <MotionShowcase onExplore={onExplore}/>
+
       <section id="platform" className="bg-[#01070c] px-8 pb-14 pt-12 max-md:px-4 max-md:pt-8">
         <div className="mx-auto grid max-w-[1400px] grid-cols-[minmax(0,1fr)_424px] gap-6 max-lg:grid-cols-1">
           <ProductPreview onExplore={onExplore}/>
@@ -155,6 +157,104 @@ export function LandingPage({ onExplore, onSignIn }: { onExplore: () => void; on
 
 const heroReveal = { hidden: { opacity: 0, y: 18 }, visible: { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 120, damping: 22 } } }
 const railReveal = { hidden: { opacity: 0, x: 18 }, visible: { opacity: 1, x: 0, transition: { type: 'spring' as const, stiffness: 140, damping: 24 } } }
+
+function MotionShowcase({ onExplore }: { onExplore: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting && !reducedMotion.matches) {
+          void video.play().catch(() => setIsPlaying(false))
+        } else {
+          video.pause()
+        }
+      },
+      { threshold: 0.35 },
+    )
+
+    observer.observe(video)
+    return () => observer.disconnect()
+  }, [])
+
+  const togglePlayback = () => {
+    const video = videoRef.current
+    if (!video) return
+    if (video.paused) {
+      void video.play().catch(() => setIsPlaying(false))
+    } else {
+      video.pause()
+    }
+  }
+
+  return (
+    <section id="story" className="scroll-mt-20 border-b border-[#7893a5]/16 bg-[radial-gradient(circle_at_76%_42%,rgba(26,84,125,.16),transparent_34%),#030b11] px-8 py-16 max-md:px-4 max-md:py-10">
+      <div className="mx-auto max-w-[1400px]">
+        <div className="mb-9 grid grid-cols-[minmax(0,1fr)_430px] items-end gap-12 max-lg:grid-cols-1 max-lg:gap-5">
+          <div>
+            <h2 className="max-w-[760px] text-[44px] font-bold leading-[1.08] tracking-[-.04em] max-md:text-[34px]">See the decision unfold.</h2>
+            <p className="mt-4 max-w-[720px] text-[15px] leading-7 text-[#9ba9b4] max-md:text-[14px]">Follow an opportunity from market signal to source evidence and a committee-ready underwriting action.</p>
+          </div>
+          <button type="button" onClick={onExplore} className="group ml-auto flex items-center gap-3 text-[12px] font-semibold text-[#efaa2d] transition-colors hover:text-[#ffc24c] max-lg:ml-0">
+            Open the interactive workspace
+            <ArrowRight size={17} className="transition-transform group-hover:translate-x-1"/>
+          </button>
+        </div>
+
+        <figure className="overflow-hidden border border-[#7893a5]/24 bg-[#01070c] shadow-[0_30px_90px_rgba(0,5,9,.48),inset_0_1px_0_rgba(255,255,255,.035)]">
+          <div className="flex min-h-13 items-center gap-3 border-b border-[#7893a5]/18 bg-[#06131c]/92 px-5">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#05d680] shadow-[0_0_14px_rgba(5,214,128,.64)]"/>
+            <strong className="text-[11px] font-semibold">Perfect Property decision sequence</strong>
+            <span className="ml-auto font-mono text-[9px] uppercase tracking-[.12em] text-[#718592]">18 seconds · No audio</span>
+          </div>
+          <div className="relative aspect-video bg-[#01070c]">
+            <video
+              ref={videoRef}
+              className="h-full w-full object-cover"
+              poster="/perfect-property-motion-poster.png"
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              aria-label="Animated Perfect Property workflow from market signal through evidence and underwriting action"
+            >
+              <source src="/perfect-property-motion.webm" type="video/webm"/>
+              <source src="/perfect-property-motion.mp4" type="video/mp4"/>
+            </video>
+            <button
+              type="button"
+              onClick={togglePlayback}
+              aria-label={isPlaying ? 'Pause product walkthrough' : 'Play product walkthrough'}
+              className="absolute bottom-4 right-4 flex h-10 items-center gap-2 border border-[#7893a5]/30 bg-[#06131c]/92 px-4 text-[11px] font-semibold text-[#f3f6f8] shadow-[0_12px_32px_rgba(0,5,9,.42)] backdrop-blur-md transition-colors hover:border-[#efaa2d]/60 hover:text-[#ffc24c] max-sm:bottom-2 max-sm:right-2 max-sm:h-9 max-sm:px-3"
+            >
+              {isPlaying ? <Pause size={15} weight="fill"/> : <Play size={15} weight="fill"/>}
+              <span className="max-sm:hidden">{isPlaying ? 'Pause' : 'Play'}</span>
+            </button>
+          </div>
+          <figcaption className="grid grid-cols-3 divide-x divide-[#7893a5]/14 border-t border-[#7893a5]/18 bg-[#061018] max-md:grid-cols-1 max-md:divide-x-0 max-md:divide-y">
+            {[
+              ['01', 'Market signal', 'Rank calibrated opportunity'],
+              ['02', 'Source evidence', 'Trace every score'],
+              ['03', 'Underwriting action', 'Move into diligence'],
+            ].map(([index, title, copy]) => (
+              <div key={index} data-motion-stage className="grid grid-cols-[36px_1fr] gap-3 px-6 py-5 max-md:py-4">
+                <span className="font-mono text-[10px] text-[#efaa2d]">{index}</span>
+                <span><strong className="block text-[12px]">{title}</strong><small className="mt-1 block text-[10px] text-[#718592]">{copy}</small></span>
+              </div>
+            ))}
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+  )
+}
 
 function ProductPreview({ onExplore }: { onExplore: () => void }) {
   const [selectedParcel, setSelectedParcel] = useState<string | null>(null)

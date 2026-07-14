@@ -21,6 +21,7 @@ import {
   psiBand,
   riskAppetiteBreached,
 } from "@/lib/engine/monitoring";
+import { psi as v11Psi } from "@/lib/engine/v11";
 
 function verify(secret: string, header: string | null): boolean {
   if (!header) return false;
@@ -28,27 +29,6 @@ function verify(secret: string, header: string | null): boolean {
   const b = Buffer.from(header.trim(), "utf8");
   if (a.length !== b.length) return false;
   try { return timingSafeEqual(a, b); } catch { return false; }
-}
-
-/** Population Stability Index between two discrete distributions (10 bins). */
-function psi(current: number[], baseline: number[], bins = 10): number {
-  if (!current.length || !baseline.length) return 0;
-  const lo = Math.min(...current, ...baseline);
-  const hi = Math.max(...current, ...baseline);
-  const width = (hi - lo) / bins || 1;
-  const binOf = (x: number) => Math.min(bins - 1, Math.max(0, Math.floor((x - lo) / width)));
-  const cCnt = new Array(bins).fill(0);
-  const bCnt = new Array(bins).fill(0);
-  for (const v of current) cCnt[binOf(v)] += 1;
-  for (const v of baseline) bCnt[binOf(v)] += 1;
-  const cN = current.length, bN = baseline.length;
-  let s = 0;
-  for (let i = 0; i < bins; i++) {
-    const p = (cCnt[i] + 0.5) / (cN + 0.5 * bins);
-    const q = (bCnt[i] + 0.5) / (bN + 0.5 * bins);
-    s += (p - q) * Math.log(p / q);
-  }
-  return s;
 }
 
 export const Route = createFileRoute("/api/public/run-monitoring")({
@@ -113,7 +93,7 @@ export const Route = createFileRoute("/api/public/run-monitoring")({
           .limit(1).maybeSingle();
         const currentScores = scores.map((r) => Number(r.perfect_score)).filter(Number.isFinite);
         const baselineScores: number[] = ((baselineRow?.summary as any)?.score_hist ?? []) as number[];
-        const psiValue = baselineScores.length ? psi(currentScores, baselineScores) : 0;
+        const psiValue = baselineScores.length ? v11Psi(currentScores, baselineScores) : 0;
         const psi_band = psiBand(psiValue);
 
         // ---- Liquidity coverage ratio (heuristic — no treasury table yet) --

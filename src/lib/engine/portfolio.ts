@@ -12,6 +12,7 @@
  */
 
 import * as v11 from "./v11";
+import { quantileInterp } from "./v11";
 
 export interface Candidate {
   id: string;
@@ -114,8 +115,9 @@ export function optimizePortfolio(
     const totals: number[] = new Array(N).fill(0);
     for (const d of draws) for (let i = 0; i < N; i++) totals[i] += d.profit_draws![i];
     const sorted = [...totals].sort((a, b) => a - b);
-    portfolio_p5 = sorted[Math.floor(0.05 * N)] ?? 0;
-    const tail = sorted.slice(0, Math.max(1, Math.floor(0.05 * N)));
+    portfolio_p5 = quantileInterp(sorted, 0.05, N) ?? 0;
+    const tailStart = Math.ceil(0.05 * N);
+    const tail = sorted.slice(0, Math.max(1, tailStart));
     portfolio_cvar_loss = -tail.reduce((a, b) => a + b, 0) / tail.length;
     expected_profit = totals.reduce((a, b) => a + b, 0) / N;
   } else {

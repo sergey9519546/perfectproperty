@@ -69,7 +69,7 @@ export function portfolioLossStats(lossDraws: number[], alpha = 0.05) {
   if (!n) return { EL: 0, VaR: 0, CVaR: 0, EC: 0 };
   const s = [...lossDraws].sort((a, b) => a - b);
   const EL = s.reduce((a, b) => a + b, 0) / n;
-  const cutIdx = Math.min(n - 1, Math.floor((1 - alpha) * n));
+  const cutIdx = Math.max(0, Math.ceil((1 - alpha) * n) - 1);
   const VaR = s[cutIdx];
   const tail = s.slice(cutIdx);
   const CVaR = tail.reduce((a, b) => a + b, 0) / Math.max(tail.length, 1);
