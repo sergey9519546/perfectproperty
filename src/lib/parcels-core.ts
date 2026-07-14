@@ -291,7 +291,7 @@ export async function persistRealiePropertyCore(
     if (deedRows.length > 0) {
       const { error } = await supabaseAdmin
         .from("deeds")
-        .upsert(deedRows, { onConflict: "data_source,source_event_id" });
+        .upsert(deedRows as any, { onConflict: "data_source,source_event_id" });
       if (error) throw error;
     }
 
