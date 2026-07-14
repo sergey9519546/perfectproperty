@@ -1093,6 +1093,72 @@ export type Database = {
         }
         Relationships: []
       }
+      product_events: {
+        Row: {
+          anonymous_id: string
+          client_event_id: string
+          device_class: string | null
+          duration_ms: number | null
+          entity_id: string | null
+          entity_type: string | null
+          event_name: string
+          event_version: number
+          experiment_id: string | null
+          experiment_variant: string | null
+          id: string
+          occurred_at: string
+          properties: Json
+          received_at: string
+          reduced_motion: boolean
+          route: string
+          session_id: string
+          success: boolean | null
+          user_id: string | null
+        }
+        Insert: {
+          anonymous_id: string
+          client_event_id: string
+          device_class?: string | null
+          duration_ms?: number | null
+          entity_id?: string | null
+          entity_type?: string | null
+          event_name: string
+          event_version?: number
+          experiment_id?: string | null
+          experiment_variant?: string | null
+          id?: string
+          occurred_at: string
+          properties?: Json
+          received_at?: string
+          reduced_motion?: boolean
+          route: string
+          session_id: string
+          success?: boolean | null
+          user_id?: string | null
+        }
+        Update: {
+          anonymous_id?: string
+          client_event_id?: string
+          device_class?: string | null
+          duration_ms?: number | null
+          entity_id?: string | null
+          entity_type?: string | null
+          event_name?: string
+          event_version?: number
+          experiment_id?: string | null
+          experiment_variant?: string | null
+          id?: string
+          occurred_at?: string
+          properties?: Json
+          received_at?: string
+          reduced_motion?: boolean
+          route?: string
+          session_id?: string
+          success?: boolean | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       realie_audit: {
         Row: {
           county_fips: string | null
@@ -1481,6 +1547,48 @@ export type Database = {
         }
         Relationships: []
       }
+      workflow_actions: {
+        Row: {
+          action_type: string
+          anonymous_id: string
+          client_event_id: string
+          created_at: string
+          id: string
+          input_snapshot: Json
+          market_id: string
+          market_name: string
+          session_id: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          action_type: string
+          anonymous_id: string
+          client_event_id: string
+          created_at?: string
+          id?: string
+          input_snapshot?: Json
+          market_id: string
+          market_name: string
+          session_id: string
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          anonymous_id?: string
+          client_event_id?: string
+          created_at?: string
+          id?: string
+          input_snapshot?: Json
+          market_id?: string
+          market_name?: string
+          session_id?: string
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1548,9 +1656,49 @@ export type Database = {
         }[]
       }
       recompute_scrape_priorities: { Args: never; Returns: number }
+      record_product_event: {
+        Args: {
+          p_anonymous_id: string
+          p_client_event_id: string
+          p_device_class?: string
+          p_duration_ms?: number
+          p_entity_id?: string
+          p_entity_type?: string
+          p_event_name: string
+          p_experiment_id?: string
+          p_experiment_variant?: string
+          p_occurred_at: string
+          p_properties?: Json
+          p_reduced_motion?: boolean
+          p_route: string
+          p_session_id: string
+          p_success?: boolean
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       record_underwrite_atomic: {
         Args: { p_audit: Json; p_score: Json }
         Returns: undefined
+      }
+      record_workflow_action: {
+        Args: {
+          p_action_type: string
+          p_anonymous_id: string
+          p_client_event_id: string
+          p_device_class: string
+          p_input_snapshot?: Json
+          p_market_id: string
+          p_market_name: string
+          p_occurred_at: string
+          p_properties?: Json
+          p_record_analytics: boolean
+          p_reduced_motion: boolean
+          p_route: string
+          p_session_id: string
+          p_user_id: string
+        }
+        Returns: string
       }
       seed_scrape_targets_from_templates: {
         Args: { _only_fips?: string }
