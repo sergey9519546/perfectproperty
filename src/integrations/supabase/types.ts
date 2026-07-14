@@ -274,7 +274,6 @@ export type Database = {
           recorded_at: string
           sale_price: number | null
           seller: string | null
-          source_event_id: string | null
         }
         Insert: {
           buyer?: string | null
@@ -287,7 +286,6 @@ export type Database = {
           recorded_at: string
           sale_price?: number | null
           seller?: string | null
-          source_event_id?: string | null
         }
         Update: {
           buyer?: string | null
@@ -300,7 +298,6 @@ export type Database = {
           recorded_at?: string
           sale_price?: number | null
           seller?: string | null
-          source_event_id?: string | null
         }
         Relationships: [
           {
@@ -324,7 +321,6 @@ export type Database = {
           id: string
           parcel_id: string
           severity: number
-          source_event_id: string | null
         }
         Insert: {
           amount?: number | null
@@ -337,7 +333,6 @@ export type Database = {
           id?: string
           parcel_id: string
           severity?: number
-          source_event_id?: string | null
         }
         Update: {
           amount?: number | null
@@ -350,7 +345,6 @@ export type Database = {
           id?: string
           parcel_id?: string
           severity?: number
-          source_event_id?: string | null
         }
         Relationships: [
           {
@@ -529,70 +523,40 @@ export type Database = {
       }
       listings: {
         Row: {
-          address: string | null
-          city: string | null
           created_at: string
           data_source: string
           dom: number | null
           id: string
-          last_seen_at: string
-          lat: number | null
           list_price: number
           listed_at: string
-          lng: number | null
-          metadata: Json
           original_price: number | null
-          parcel_id: string | null
+          parcel_id: string
           price_cuts: number | null
-          source_listing_id: string | null
-          source_url: string | null
-          state: string | null
           status: string
-          zip: string | null
         }
         Insert: {
-          address?: string | null
-          city?: string | null
           created_at?: string
           data_source?: string
           dom?: number | null
           id?: string
-          last_seen_at?: string
-          lat?: number | null
           list_price: number
           listed_at: string
-          lng?: number | null
-          metadata?: Json
           original_price?: number | null
-          parcel_id?: string | null
+          parcel_id: string
           price_cuts?: number | null
-          source_listing_id?: string | null
-          source_url?: string | null
-          state?: string | null
           status: string
-          zip?: string | null
         }
         Update: {
-          address?: string | null
-          city?: string | null
           created_at?: string
           data_source?: string
           dom?: number | null
           id?: string
-          last_seen_at?: string
-          lat?: number | null
           list_price?: number
           listed_at?: string
-          lng?: number | null
-          metadata?: Json
           original_price?: number | null
-          parcel_id?: string | null
+          parcel_id?: string
           price_cuts?: number | null
-          source_listing_id?: string | null
-          source_url?: string | null
-          state?: string | null
           status?: string
-          zip?: string | null
         }
         Relationships: [
           {
@@ -609,12 +573,7 @@ export type Database = {
           cold_coverage_reserve_pct: number
           id: number
           max_targets_per_tick: number
-          realie_comp_cache_ttl_days: number
           realie_daily_budget_usd: number
-          realie_daily_call_limit: number
-          realie_interactive_reserve: number
-          realie_negative_cache_ttl_days: number
-          realie_property_cache_ttl_days: number
           updated_at: string
           w_conversion: number
           w_cost_penalty: number
@@ -627,12 +586,7 @@ export type Database = {
           cold_coverage_reserve_pct?: number
           id?: number
           max_targets_per_tick?: number
-          realie_comp_cache_ttl_days?: number
           realie_daily_budget_usd?: number
-          realie_daily_call_limit?: number
-          realie_interactive_reserve?: number
-          realie_negative_cache_ttl_days?: number
-          realie_property_cache_ttl_days?: number
           updated_at?: string
           w_conversion?: number
           w_cost_penalty?: number
@@ -645,12 +599,7 @@ export type Database = {
           cold_coverage_reserve_pct?: number
           id?: number
           max_targets_per_tick?: number
-          realie_comp_cache_ttl_days?: number
           realie_daily_budget_usd?: number
-          realie_daily_call_limit?: number
-          realie_interactive_reserve?: number
-          realie_negative_cache_ttl_days?: number
-          realie_property_cache_ttl_days?: number
           updated_at?: string
           w_conversion?: number
           w_cost_penalty?: number
@@ -1144,164 +1093,6 @@ export type Database = {
         }
         Relationships: []
       }
-      realie_comp_cache: {
-        Row: {
-          cache_key: string
-          comparables: Json
-          created_at: string
-          expires_at: string
-          fetched_at: string
-          filters: Json
-          latitude: number
-          longitude: number
-          updated_at: string
-        }
-        Insert: {
-          cache_key: string
-          comparables?: Json
-          created_at?: string
-          expires_at: string
-          fetched_at?: string
-          filters?: Json
-          latitude: number
-          longitude: number
-          updated_at?: string
-        }
-        Update: {
-          cache_key?: string
-          comparables?: Json
-          created_at?: string
-          expires_at?: string
-          fetched_at?: string
-          filters?: Json
-          latitude?: number
-          longitude?: number
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      realie_negative_cache: {
-        Row: {
-          created_at: string
-          endpoint: string
-          expires_at: string
-          fetched_at: string
-          hit_count: number
-          status_code: number | null
-          last_error: string | null
-          lookup_key: string
-          reason: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          endpoint: string
-          expires_at: string
-          fetched_at?: string
-          hit_count?: number
-          status_code?: number | null
-          last_error?: string | null
-          lookup_key: string
-          reason: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          endpoint?: string
-          expires_at?: string
-          fetched_at?: string
-          hit_count?: number
-          status_code?: number | null
-          last_error?: string | null
-          lookup_key?: string
-          reason?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      realie_property_snapshots: {
-        Row: {
-          created_at: string
-          endpoint: string
-          expires_at: string
-          fetched_at: string
-          lookup_key: string | null
-          match_method: string | null
-          parcel_id: string | null
-          payload: Json
-          payload_hash: string
-          provider_parcel_id: string
-          provider_request_id: string | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          endpoint: string
-          expires_at: string
-          fetched_at?: string
-          lookup_key?: string | null
-          match_method?: string | null
-          parcel_id?: string | null
-          payload: Json
-          payload_hash: string
-          provider_parcel_id: string
-          provider_request_id?: string | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          endpoint?: string
-          expires_at?: string
-          fetched_at?: string
-          lookup_key?: string | null
-          match_method?: string | null
-          parcel_id?: string | null
-          payload?: Json
-          payload_hash?: string
-          provider_parcel_id?: string
-          provider_request_id?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "realie_property_snapshots_parcel_id_fkey"
-            columns: ["parcel_id"]
-            isOneToOne: false
-            referencedRelation: "parcels"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      realie_usage_daily: {
-        Row: {
-          endpoint: string
-          failure_count: number
-          property_count: number
-          request_count: number
-          success_count: number
-          updated_at: string
-          usage_date: string
-        }
-        Insert: {
-          endpoint: string
-          failure_count?: number
-          property_count?: number
-          request_count?: number
-          success_count?: number
-          updated_at?: string
-          usage_date: string
-        }
-        Update: {
-          endpoint?: string
-          failure_count?: number
-          property_count?: number
-          request_count?: number
-          success_count?: number
-          updated_at?: string
-          usage_date?: string
-        }
-        Relationships: []
-      }
       realie_audit: {
         Row: {
           county_fips: string | null
@@ -1757,21 +1548,9 @@ export type Database = {
         }[]
       }
       recompute_scrape_priorities: { Args: never; Returns: number }
-      record_realie_call_result: {
-        Args: {
-          p_endpoint: string
-          p_success: boolean
-          p_property_count?: number
-        }
-        Returns: undefined
-      }
       record_underwrite_atomic: {
         Args: { p_audit: Json; p_score: Json }
         Returns: undefined
-      }
-      reserve_realie_call: {
-        Args: { p_budget_class?: string; p_endpoint: string }
-        Returns: boolean
       }
       seed_scrape_targets_from_templates: {
         Args: { _only_fips?: string }
