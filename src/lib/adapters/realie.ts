@@ -317,12 +317,15 @@ function propertyFromResponse(
   response: RealieProperty | { property?: RealieProperty | null } | null | undefined,
 ): RealieProperty | null {
   if (!response || typeof response !== "object") return null;
+  // Lazy import so the schema module isn't in the hot path when unused.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { safeParseRealieProperty } = require("./realie.schema") as typeof import("./realie.schema");
   if ("property" in response) {
     const property = (response as { property?: RealieProperty | null }).property;
-    return property && typeof property === "object" ? property : null;
+    return property && typeof property === "object" ? safeParseRealieProperty(property) : null;
   }
   if ("parcelId" in response || "address" in response || "addressFull" in response) {
-    return response as RealieProperty;
+    return safeParseRealieProperty(response);
   }
   return null;
 }
