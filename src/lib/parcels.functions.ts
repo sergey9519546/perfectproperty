@@ -135,6 +135,51 @@ export const lookupParcelByAddress = createServerFn({ method: "POST" })
     });
   });
 
+/**
+ * Authenticated user-facing Realie lookup. Returns a normalized property
+ * payload for the frontend. Reuses the server-side snapshot + negative
+ * cache and the `reserve_realie_call` daily/interactive rate limits —
+ * never bypasses them. No underwriting, no paid premium comps.
+ */
+export const lookupPropertyByAddress = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: unknown) => LookupInput.parse(data))
+  .handler(async ({ data }) => {
+    const { lookupParcelByAddressCore } = await import("@/lib/parcels-core");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let parcelId: string;
+    try {
+      const res = await lookupParcelByAddressCore({
+        ...data,
+        underwrite: false,
+        budgetClass: "interactive",
+      });
+      parcelId = res.parcel_id;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { ok: false as const, error: msg };
+    }
+
+    const { data: parcel } = await supabaseAdmin
+      .from("parcels")
+      .select(
+        "id, address, city, county, state, zip, apn, owner_name, owner_mailing_address, absentee, living_sqft, year_built, beds, baths, lot_sqft, property_type, latitude, longitude, assessed_total, assessed_land, assessed_building, market_value, tax_amount, tax_year",
+      )
+      .eq("id", parcelId)
+      .maybeSingle();
+
+    const { data: score } = await supabaseAdmin
+      .from("parcel_scores")
+      .select("score, arv, offer, projected_profit, tier, ring, score_confidence, updated_at")
+      .eq("parcel_id", parcelId)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    return { ok: true as const, parcel_id: parcelId, parcel, score };
+  });
+
 export const getCoverage = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
