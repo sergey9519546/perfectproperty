@@ -171,9 +171,11 @@ export const lookupPropertyByAddress = createServerFn({ method: "POST" })
 
     const { data: score } = await supabaseAdmin
       .from("parcel_scores")
-      .select("score, arv, offer, projected_profit, tier, ring, score_confidence, updated_at")
+      .select(
+        "perfect_score, arv_today, modeled_offer, risk_adjusted_profit, ring, confidence_grade, score_confidence, computed_at",
+      )
       .eq("parcel_id", parcelId)
-      .order("updated_at", { ascending: false })
+      .order("computed_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
