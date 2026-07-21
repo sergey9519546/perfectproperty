@@ -8,6 +8,8 @@
  * Worker env injection works. Never call from the browser — this is server-only.
  */
 
+import { safeParseRealieProperty } from "./realie.schema";
+
 export type RealieBudgetClass = "background" | "interactive";
 
 export interface RealieAssessment {
@@ -319,10 +321,10 @@ function propertyFromResponse(
   if (!response || typeof response !== "object") return null;
   if ("property" in response) {
     const property = (response as { property?: RealieProperty | null }).property;
-    return property && typeof property === "object" ? property : null;
+    return property && typeof property === "object" ? safeParseRealieProperty(property) : null;
   }
   if ("parcelId" in response || "address" in response || "addressFull" in response) {
-    return response as RealieProperty;
+    return safeParseRealieProperty(response);
   }
   return null;
 }

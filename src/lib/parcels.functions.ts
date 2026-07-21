@@ -179,7 +179,17 @@ export const lookupPropertyByAddress = createServerFn({ method: "POST" })
       .limit(1)
       .maybeSingle();
 
-    return { ok: true as const, parcel_id: parcelId, parcel, score };
+    const { NormalizedPropertyLookupSchema } = await import("@/lib/adapters/realie.schema");
+    const payload = { ok: true as const, parcel_id: parcelId, parcel: parcel ?? null, score: score ?? null };
+    const parsed = NormalizedPropertyLookupSchema.safeParse(payload);
+    if (!parsed.success) {
+      console.warn(
+        "Normalized property lookup failed schema validation:",
+        parsed.error.issues.slice(0, 3).map((i) => `${i.path.join(".")}: ${i.message}`).join("; "),
+      );
+      return { ok: false as const, error: "Normalized property payload failed validation" };
+    }
+    return parsed.data;
   });
 
 export const getCoverage = createServerFn({ method: "GET" })
