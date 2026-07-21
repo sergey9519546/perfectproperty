@@ -163,8 +163,7 @@ const ParcelSchema = z
     condition_grade: z.union([z.string(), z.number()]).nullable(),
     updated_at: z.string().nullable(),
   })
-  .partial()
-  .loose();
+  .partial();
 
 const ScoreSchema = z
   .object({
