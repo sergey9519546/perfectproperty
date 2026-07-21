@@ -176,8 +176,7 @@ const ScoreSchema = z
     score_confidence: z.number().nullable(),
     computed_at: z.string().nullable(),
   })
-  .partial()
-  .loose();
+  .partial();
 
 export const NormalizedPropertyLookupSchema = z.discriminatedUnion("ok", [
   z.object({
