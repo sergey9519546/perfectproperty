@@ -8,6 +8,8 @@
  * Worker env injection works. Never call from the browser — this is server-only.
  */
 
+import { safeParseRealieProperty } from "./realie.schema";
+
 export type RealieBudgetClass = "background" | "interactive";
 
 export interface RealieAssessment {
