@@ -164,7 +164,7 @@ export const lookupPropertyByAddress = createServerFn({ method: "POST" })
     const { data: parcel } = await supabaseAdmin
       .from("parcels")
       .select(
-        "id, address, city, county, state, zip, apn, owner_name, owner_mailing_address, absentee, living_sqft, year_built, beds, baths, lot_sqft, property_type, latitude, longitude, assessed_total, assessed_land, assessed_building, market_value, tax_amount, tax_year",
+        "id, address, city, county_fips, state, zip, apn, owner_name, owner_is_absentee, owner_is_corporate, owner_since, living_sqft, year_built, bedrooms, bathrooms, lot_sqft, property_type, lat, lng, assessed_value, estimated_equity, is_listed, is_vacant, condition_grade, updated_at",
       )
       .eq("id", parcelId)
       .maybeSingle();
