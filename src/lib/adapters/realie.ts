@@ -545,7 +545,10 @@ export async function realiePropertySearchPage(
       },
       args.budgetClass,
     );
-    return { properties: r?.properties ?? [], metadata: r?.metadata ?? null };
+    return {
+      properties: safeParseRealieProperties(r?.properties ?? []),
+      metadata: safeParseRealieSearchMetadata(r?.metadata) ?? null,
+    };
   } catch (e: any) {
     if (String(e?.message ?? e).match(/404|No properties/i)) {
       return { properties: [], metadata: null };
