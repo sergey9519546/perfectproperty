@@ -106,8 +106,20 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
         }
 
         const queueByParcel = new Map(queueItems.map((item) => [item.parcel_id, item]));
+        const isRealAddress = (s: string | null | undefined) => {
+          if (!s) return false;
+          const t = s.trim();
+          if (t.length < 5) return false;
+          if (/^address\s+unknown/i.test(t)) return false;
+          if (/^(n|na|n\/a|unknown|null|none|-+)$/i.test(t)) return false;
+          if (!/\d/.test(t)) return false; // real street addresses contain a number
+          return true;
+        };
         const work = (parcelRows ?? [])
-          .filter((parcel) => parcel.address && parcel.state && queueByParcel.has(parcel.id))
+          .filter(
+            (parcel) =>
+              isRealAddress(parcel.address) && parcel.state && queueByParcel.has(parcel.id),
+          )
           .map<WorkItem>((parcel) => ({
             parcel_id: parcel.id,
             apn: parcel.apn,
@@ -121,6 +133,7 @@ export const Route = createFileRoute("/api/public/run-realie-enrichment")({
             lng: parcel.lng,
             queue: queueByParcel.get(parcel.id)!,
           }));
+
         const workById = new Map(work.map((item) => [item.parcel_id, item]));
         const remaining = new Map(workById);
         const results: WorkResult[] = [];
