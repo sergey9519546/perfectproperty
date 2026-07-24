@@ -625,7 +625,7 @@ export async function realieComparables(args: {
       },
       args.budgetClass,
     );
-    return r?.comparables ?? [];
+    return safeParseRealieComps(r?.comparables ?? []);
   } catch (e: any) {
     // "No comparable properties found" comes back as 404 in prod.
     if (String(e.message).match(/404|No comparable/i)) return [];
