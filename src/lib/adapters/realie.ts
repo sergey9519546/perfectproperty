@@ -588,7 +588,7 @@ export async function realieLocationSearch(args: {
       },
       args.budgetClass,
     );
-    return r?.properties ?? [];
+    return safeParseRealieProperties(r?.properties ?? []);
   } catch (e: any) {
     if (String(e?.message ?? e).match(/404|No properties/i)) return [];
     throw e;
