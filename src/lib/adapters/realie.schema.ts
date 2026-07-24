@@ -7,7 +7,7 @@
  * we validate what leaves our server for the browser.
  */
 import { z } from "zod";
-import type { RealieProperty } from "./realie";
+import type { RealieComp, RealieProperty, RealieSearchMetadata } from "./realie";
 
 const nullableString = z.string().nullish();
 const nullableNumber = z.union([z.number(), z.string()]).nullish().transform((v) => {
