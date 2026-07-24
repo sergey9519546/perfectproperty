@@ -133,6 +133,72 @@ export function safeParseRealieProperty(raw: unknown): RealieProperty | null {
   return result.data as unknown as RealieProperty;
 }
 
+// ---------- Comp + search metadata ----------
+
+export const RealieCompSchema = z.looseObject({
+  parcelId: nullableString,
+  address: nullableString,
+  addressFull: nullableString,
+  latitude: nullableNumber,
+  longitude: nullableNumber,
+  buildingArea: nullableNumber,
+  totalBedrooms: nullableNumber,
+  totalBathrooms: nullableNumber,
+  transferPrice: nullableNumber,
+  lastSalePrice: nullableNumber,
+  transferDateObject: nullableString,
+});
+
+export const RealieSearchMetadataSchema = z.looseObject({
+  limit: nullableNumber,
+  count: nullableNumber,
+  nextCursor: nullableString,
+  offset: nullableNumber,
+  deprecationNotice: nullableString,
+});
+
+function warn(label: string, issues: z.ZodIssue[]) {
+  console.warn(
+    `${label} failed schema validation:`,
+    issues.slice(0, 3).map((i) => `${i.path.join(".")}: ${i.message}`).join("; "),
+  );
+}
+
+/** Validate an array of raw Realie properties; drops individual invalid rows. */
+export function safeParseRealieProperties(raw: unknown): RealieProperty[] {
+  if (!Array.isArray(raw)) return [];
+  const out: RealieProperty[] = [];
+  for (const item of raw) {
+    const parsed = safeParseRealieProperty(item);
+    if (parsed) out.push(parsed);
+  }
+  return out;
+}
+
+/** Validate an array of raw Realie comps; drops individual invalid rows. */
+export function safeParseRealieComps(raw: unknown): RealieComp[] {
+  if (!Array.isArray(raw)) return [];
+  const out: RealieComp[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const result = RealieCompSchema.safeParse(item);
+    if (result.success) out.push(result.data as unknown as RealieComp);
+    else warn("Realie comp", result.error.issues);
+  }
+  return out;
+}
+
+/** Validate Realie search metadata; returns null when the shape is invalid. */
+export function safeParseRealieSearchMetadata(raw: unknown): RealieSearchMetadata | null {
+  if (!raw || typeof raw !== "object") return null;
+  const result = RealieSearchMetadataSchema.safeParse(raw);
+  if (!result.success) {
+    warn("Realie search metadata", result.error.issues);
+    return null;
+  }
+  return result.data as unknown as RealieSearchMetadata;
+}
+
 // ---------- Normalized frontend payload ----------
 
 const ParcelSchema = z
