@@ -8,7 +8,12 @@
  * Worker env injection works. Never call from the browser — this is server-only.
  */
 
-import { safeParseRealieProperty } from "./realie.schema";
+import {
+  safeParseRealieComps,
+  safeParseRealieProperties,
+  safeParseRealieProperty,
+  safeParseRealieSearchMetadata,
+} from "./realie.schema";
 
 export type RealieBudgetClass = "background" | "interactive";
 
@@ -540,7 +545,10 @@ export async function realiePropertySearchPage(
       },
       args.budgetClass,
     );
-    return { properties: r?.properties ?? [], metadata: r?.metadata ?? null };
+    return {
+      properties: safeParseRealieProperties(r?.properties ?? []),
+      metadata: safeParseRealieSearchMetadata(r?.metadata) ?? null,
+    };
   } catch (e: any) {
     if (String(e?.message ?? e).match(/404|No properties/i)) {
       return { properties: [], metadata: null };
@@ -580,7 +588,7 @@ export async function realieLocationSearch(args: {
       },
       args.budgetClass,
     );
-    return r?.properties ?? [];
+    return safeParseRealieProperties(r?.properties ?? []);
   } catch (e: any) {
     if (String(e?.message ?? e).match(/404|No properties/i)) return [];
     throw e;
@@ -617,7 +625,7 @@ export async function realieComparables(args: {
       },
       args.budgetClass,
     );
-    return r?.comparables ?? [];
+    return safeParseRealieComps(r?.comparables ?? []);
   } catch (e: any) {
     // "No comparable properties found" comes back as 404 in prod.
     if (String(e.message).match(/404|No comparable/i)) return [];
