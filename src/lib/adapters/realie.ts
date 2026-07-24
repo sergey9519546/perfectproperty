@@ -389,10 +389,17 @@ async function call<T>(
         }
         if (!res.ok) {
           const msg = body?.error ?? res.statusText ?? `HTTP ${res.status}`;
+          // Realie returns 403 with "Usage limit exceeded" when the account
+          // hits its daily/monthly quota. Treat identically to our own budget
+          // reservation exhaustion so callers stop retrying and defer work.
+          if (res.status === 403 && /usage limit/i.test(String(msg))) {
+            throw new RealieBudgetExhaustedError(path, budgetClass);
+          }
           const err = new Error(`Realie ${res.status}: ${msg}`);
           (err as any).status = res.status;
           throw err;
         }
+
         await recordRealieCallResult(path, true, propertyCountFromResponse(body));
         if (auditSink) {
           try {
