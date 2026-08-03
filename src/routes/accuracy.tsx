@@ -52,7 +52,7 @@ function AccuracyPage() {
       )}
       {c && (
         <>
-          <div className="mt-8 grid grid-cols-4 gap-3">
+          <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
             <BigStat label="Outcomes recorded" v={c.accuracy.total.toString()} />
             <BigStat label="Win rate" v={`${Math.round(c.accuracy.win_rate * 100)}%`} color="var(--profit-strong)" />
             <BigStat label="Losses" v={c.accuracy.losses.toString()} color="var(--skeptic)" />
