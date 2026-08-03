@@ -574,6 +574,8 @@ export type Database = {
           id: number
           max_targets_per_tick: number
           realie_daily_budget_usd: number
+          realie_negative_cache_ttl_days: number
+          realie_property_cache_ttl_days: number
           updated_at: string
           w_conversion: number
           w_cost_penalty: number
@@ -587,6 +589,8 @@ export type Database = {
           id?: number
           max_targets_per_tick?: number
           realie_daily_budget_usd?: number
+          realie_negative_cache_ttl_days?: number
+          realie_property_cache_ttl_days?: number
           updated_at?: string
           w_conversion?: number
           w_cost_penalty?: number
@@ -600,6 +604,8 @@ export type Database = {
           id?: number
           max_targets_per_tick?: number
           realie_daily_budget_usd?: number
+          realie_negative_cache_ttl_days?: number
+          realie_property_cache_ttl_days?: number
           updated_at?: string
           w_conversion?: number
           w_cost_penalty?: number
@@ -1214,6 +1220,80 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "realie_audit_parcel_id_fkey"
+            columns: ["parcel_id"]
+            isOneToOne: false
+            referencedRelation: "parcels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      realie_negative_cache: {
+        Row: {
+          endpoint: string | null
+          expires_at: string
+          fetched_at: string
+          hit_count: number
+          lookup_key: string
+          reason: string
+          status_code: number | null
+        }
+        Insert: {
+          endpoint?: string | null
+          expires_at?: string
+          fetched_at?: string
+          hit_count?: number
+          lookup_key: string
+          reason?: string
+          status_code?: number | null
+        }
+        Update: {
+          endpoint?: string | null
+          expires_at?: string
+          fetched_at?: string
+          hit_count?: number
+          lookup_key?: string
+          reason?: string
+          status_code?: number | null
+        }
+        Relationships: []
+      }
+      realie_property_snapshots: {
+        Row: {
+          endpoint: string | null
+          expires_at: string
+          fetched_at: string
+          lookup_key: string | null
+          match_method: string | null
+          parcel_id: string | null
+          payload: Json
+          payload_hash: string | null
+          provider_parcel_id: string
+        }
+        Insert: {
+          endpoint?: string | null
+          expires_at?: string
+          fetched_at?: string
+          lookup_key?: string | null
+          match_method?: string | null
+          parcel_id?: string | null
+          payload: Json
+          payload_hash?: string | null
+          provider_parcel_id: string
+        }
+        Update: {
+          endpoint?: string | null
+          expires_at?: string
+          fetched_at?: string
+          lookup_key?: string | null
+          match_method?: string | null
+          parcel_id?: string | null
+          payload?: Json
+          payload_hash?: string | null
+          provider_parcel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "realie_property_snapshots_parcel_id_fkey"
             columns: ["parcel_id"]
             isOneToOne: false
             referencedRelation: "parcels"
