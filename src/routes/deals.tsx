@@ -18,6 +18,7 @@ import { SectionBoundary } from "@/components/SectionBoundary";
 import { DataFreshness } from "@/components/DataFreshness";
 import { ScorePill } from "@/components/ScorePill";
 import { TableSkeleton } from "@/components/TableSkeleton";
+import { PageHeader } from "@/components/PageHeader";
 
 export const Route = createFileRoute("/deals")({
   ssr: false,
