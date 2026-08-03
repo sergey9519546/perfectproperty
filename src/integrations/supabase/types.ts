@@ -1594,6 +1594,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_enrichment_queue: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          parcel_id: string
+          priority: number
+          reason: string
+        }[]
+      }
       enqueue_enrichment_for_parcel: {
         Args: { _parcel_id: string; _priority?: number; _reason: string }
         Returns: undefined
