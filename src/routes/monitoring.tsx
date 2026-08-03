@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { fmt$ } from "@/lib/format";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabase as browserSupabase } from "@/integrations/supabase/client";
+import { PageHeader } from "@/components/PageHeader";
 
 const getLatestMetrics = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
