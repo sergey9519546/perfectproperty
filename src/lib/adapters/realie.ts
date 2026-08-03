@@ -389,10 +389,10 @@ async function call<T>(
         }
         if (!res.ok) {
           const msg = body?.error ?? res.statusText ?? `HTTP ${res.status}`;
-          // Realie returns 403 with "Usage limit exceeded" when the account
-          // hits its daily/monthly quota. Treat identically to our own budget
-          // reservation exhaustion so callers stop retrying and defer work.
-          if (res.status === 403 && /usage limit/i.test(String(msg))) {
+          // Realie returns 403 when the account hits its quota or has no
+          // payment method on file. Neither is retryable per-parcel: treat both
+          // as budget exhaustion so callers defer the remaining work.
+          if (res.status === 403) {
             throw new RealieBudgetExhaustedError(path, budgetClass);
           }
           const err = new Error(`Realie ${res.status}: ${msg}`);
