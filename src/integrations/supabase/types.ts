@@ -573,7 +573,11 @@ export type Database = {
           cold_coverage_reserve_pct: number
           id: number
           max_targets_per_tick: number
+          realie_background_call_limit: number
           realie_daily_budget_usd: number
+          realie_daily_call_limit: number
+          realie_negative_cache_ttl_days: number
+          realie_property_cache_ttl_days: number
           updated_at: string
           w_conversion: number
           w_cost_penalty: number
@@ -586,7 +590,11 @@ export type Database = {
           cold_coverage_reserve_pct?: number
           id?: number
           max_targets_per_tick?: number
+          realie_background_call_limit?: number
           realie_daily_budget_usd?: number
+          realie_daily_call_limit?: number
+          realie_negative_cache_ttl_days?: number
+          realie_property_cache_ttl_days?: number
           updated_at?: string
           w_conversion?: number
           w_cost_penalty?: number
@@ -599,7 +607,11 @@ export type Database = {
           cold_coverage_reserve_pct?: number
           id?: number
           max_targets_per_tick?: number
+          realie_background_call_limit?: number
           realie_daily_budget_usd?: number
+          realie_daily_call_limit?: number
+          realie_negative_cache_ttl_days?: number
+          realie_property_cache_ttl_days?: number
           updated_at?: string
           w_conversion?: number
           w_cost_penalty?: number
@@ -1221,6 +1233,110 @@ export type Database = {
           },
         ]
       }
+      realie_negative_cache: {
+        Row: {
+          endpoint: string | null
+          expires_at: string
+          fetched_at: string
+          hit_count: number
+          lookup_key: string
+          reason: string
+          status_code: number | null
+        }
+        Insert: {
+          endpoint?: string | null
+          expires_at?: string
+          fetched_at?: string
+          hit_count?: number
+          lookup_key: string
+          reason?: string
+          status_code?: number | null
+        }
+        Update: {
+          endpoint?: string | null
+          expires_at?: string
+          fetched_at?: string
+          hit_count?: number
+          lookup_key?: string
+          reason?: string
+          status_code?: number | null
+        }
+        Relationships: []
+      }
+      realie_property_snapshots: {
+        Row: {
+          endpoint: string | null
+          expires_at: string
+          fetched_at: string
+          lookup_key: string | null
+          match_method: string | null
+          parcel_id: string | null
+          payload: Json
+          payload_hash: string | null
+          provider_parcel_id: string
+        }
+        Insert: {
+          endpoint?: string | null
+          expires_at?: string
+          fetched_at?: string
+          lookup_key?: string | null
+          match_method?: string | null
+          parcel_id?: string | null
+          payload: Json
+          payload_hash?: string | null
+          provider_parcel_id: string
+        }
+        Update: {
+          endpoint?: string | null
+          expires_at?: string
+          fetched_at?: string
+          lookup_key?: string | null
+          match_method?: string | null
+          parcel_id?: string | null
+          payload?: Json
+          payload_hash?: string | null
+          provider_parcel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "realie_property_snapshots_parcel_id_fkey"
+            columns: ["parcel_id"]
+            isOneToOne: false
+            referencedRelation: "parcels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      realie_usage_daily: {
+        Row: {
+          endpoint: string
+          failure_count: number
+          property_count: number
+          request_count: number
+          success_count: number
+          updated_at: string
+          usage_date: string
+        }
+        Insert: {
+          endpoint: string
+          failure_count?: number
+          property_count?: number
+          request_count?: number
+          success_count?: number
+          updated_at?: string
+          usage_date?: string
+        }
+        Update: {
+          endpoint?: string
+          failure_count?: number
+          property_count?: number
+          request_count?: number
+          success_count?: number
+          updated_at?: string
+          usage_date?: string
+        }
+        Relationships: []
+      }
       sales: {
         Row: {
           address: string | null
@@ -1594,6 +1710,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_enrichment_queue: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          parcel_id: string
+          priority: number
+          reason: string
+        }[]
+      }
       enqueue_enrichment_for_parcel: {
         Args: { _parcel_id: string; _priority?: number; _reason: string }
         Returns: undefined
@@ -1677,6 +1802,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      record_realie_call_result: {
+        Args: {
+          p_endpoint: string
+          p_property_count?: number
+          p_success: boolean
+        }
+        Returns: undefined
+      }
       record_underwrite_atomic: {
         Args: { p_audit: Json; p_score: Json }
         Returns: undefined
@@ -1699,6 +1832,10 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
+      }
+      reserve_realie_call: {
+        Args: { p_budget_class?: string; p_endpoint: string }
+        Returns: boolean
       }
       seed_scrape_targets_from_templates: {
         Args: { _only_fips?: string }
