@@ -143,7 +143,8 @@ export function LandingPage({ onExplore, onSignIn }: { onExplore: () => void; on
         <motion.img initial={false} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 1.15, ease: [0.16, 1, 0.3, 1] }} src="/perfect-property-hero.png" alt="" className="absolute inset-y-0 left-0 h-full w-[104%] max-w-none object-cover object-[50%_58%] max-md:w-full max-md:object-[64%_52%]"/>
         <div className="landing-hero-exposure absolute inset-0"/>
         <div className="relative grid min-h-[584px] grid-cols-[minmax(0,1fr)_286px] gap-12 pl-[90px] pr-[105px] max-xl:px-14 max-lg:grid-cols-[minmax(0,1fr)_260px] max-md:min-h-[740px] max-md:grid-cols-1 max-md:px-5">
-          <motion.div initial={false} animate="visible" variants={{ visible: { transition: { staggerChildren: .09 } } }} className="flex max-w-[560px] flex-col justify-start pb-24 pt-[88px] max-md:pb-0 max-md:pt-16">
+          <div className="flex min-w-0 flex-col justify-between pb-8 pt-[88px] max-md:pt-16">
+          <motion.div initial={false} animate="visible" variants={{ visible: { transition: { staggerChildren: .09 } } }} className="flex max-w-[560px] flex-col justify-start">
             <motion.p variants={heroReveal} className="mb-6 text-md font-semibold tracking-wider uppercase text-pp-gold drop-shadow-sm">AI-powered real estate intelligence</motion.p>
             <motion.h1 variants={heroReveal} className="text-hero font-bold leading-tight tracking-tight max-md:text-6xl max-sm:text-6xl">
               <span className="block">Intelligence.</span>
@@ -157,32 +158,34 @@ export function LandingPage({ onExplore, onSignIn }: { onExplore: () => void; on
             </motion.div>
           </motion.div>
 
-          <motion.div initial={false} animate="visible" variants={{ visible: { transition: { staggerChildren: .08, delayChildren: .18 } } }} className="flex flex-col justify-start gap-2.5 pt-[89px] max-md:hidden">
-            {features.map(({ title, copy, icon: Icon }) => (
-              <motion.article variants={railReveal} key={title} className="group relative overflow-hidden grid min-h-[92px] grid-cols-[58px_1px_1fr] items-center gap-4 rounded-xl border border-pp-border/20 bg-pp-surface/82 px-4 py-3 shadow-md backdrop-blur-md transition-all hover:border-pp-border/40 hover:bg-pp-surface hover:shadow-lg">
-                <div className="absolute inset-0 bg-gradient-to-r from-pp-gold/0 to-transparent group-hover:from-pp-gold/5 group-hover:to-pp-gold/8 transition-all"/>
-                <Icon size={34} weight="regular" className="justify-self-center text-pp-gold relative z-10"/>
-                <span aria-hidden="true" className="h-14 w-px bg-gradient-to-b from-pp-border/20 to-pp-border/5"/>
-                <div className="relative z-10">
-                  <h2 className="text-lg font-semibold text-pp-text group-hover:text-pp-gold transition-colors">{title}</h2>
-                  <p className="mt-1.5 text-sm leading-normal text-pp-muted">{copy}</p>
-                </div>
-              </motion.article>
-            ))}
-          </motion.div>
-
-          <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ delay: .55, type: 'spring', stiffness: 130, damping: 23 }} className="absolute bottom-5 inset-x-5 grid min-h-[85px] grid-cols-4 divide-x divide-pp-border/18 rounded-xl border border-pp-border/18 bg-gradient-to-br from-pp-surface/88 to-pp-page/88 shadow-lg backdrop-blur-md max-xl:inset-x-14 lg:left-[90px] lg:right-auto lg:w-[min(995px,calc(100%-430px))] max-md:grid-cols-2 max-md:divide-x-0 max-md:divide-y max-md:min-h-[150px]">
+          <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ delay: .55, type: 'spring', stiffness: 130, damping: 23 }} className="mt-14 grid min-h-[85px] grid-cols-4 divide-x divide-pp-border/18 rounded-xl border border-pp-border/18 bg-gradient-to-br from-pp-surface/88 to-pp-page/88 shadow-lg backdrop-blur-md max-md:mt-10 max-md:grid-cols-2 max-md:divide-x-0 max-md:divide-y max-md:min-h-[150px]">
             {displayMetrics.map(({ value, label, icon: Icon }) => (
-              <div key={label} className="group grid grid-cols-[42px_1fr] items-center gap-3 px-6 py-3 transition-all max-xl:px-3">
-                <Icon size={33} className="text-pp-gold group-hover:scale-110 transition-transform"/>
-                <div>
+              <div key={label} className="group grid grid-cols-[42px_minmax(0,1fr)] items-center gap-3 px-5 py-3 transition-all max-xl:px-3">
+                <Icon size={30} className="shrink-0 text-pp-gold group-hover:scale-110 transition-transform"/>
+                <div className="min-w-0">
                   <strong className="block font-mono text-2xl font-bold text-pp-text">{value}</strong>
                   <span className="mt-1 block text-xs text-pp-muted font-medium">{label}</span>
                 </div>
               </div>
             ))}
           </motion.div>
+          </div>
+
+          <motion.div initial={false} animate="visible" variants={{ visible: { transition: { staggerChildren: .08, delayChildren: .18 } } }} className="flex flex-col justify-start gap-2.5 pb-8 pt-[89px] max-md:hidden">
+            {features.map(({ title, copy, icon: Icon }) => (
+              <motion.article variants={railReveal} key={title} className="group relative overflow-hidden grid min-h-[92px] grid-cols-[58px_1px_minmax(0,1fr)] items-center gap-4 rounded-xl border border-pp-border/20 bg-pp-surface/82 px-4 py-3 shadow-md backdrop-blur-md transition-all hover:border-pp-border/40 hover:bg-pp-surface hover:shadow-lg">
+                <div className="absolute inset-0 bg-gradient-to-r from-pp-gold/0 to-transparent group-hover:from-pp-gold/5 group-hover:to-pp-gold/8 transition-all"/>
+                <Icon size={34} weight="regular" className="justify-self-center text-pp-gold relative z-10"/>
+                <span aria-hidden="true" className="h-14 w-px bg-gradient-to-b from-pp-border/20 to-pp-border/5"/>
+                <div className="relative z-10 min-w-0">
+                  <h2 className="text-lg font-semibold text-pp-text group-hover:text-pp-gold transition-colors">{title}</h2>
+                  <p className="mt-1.5 text-sm leading-normal text-pp-muted">{copy}</p>
+                </div>
+              </motion.article>
+            ))}
+          </motion.div>
         </div>
+
       </section>
 
       <section className="border-b border-pp-border/18 bg-pp-surface" aria-label="Trusted teams">
