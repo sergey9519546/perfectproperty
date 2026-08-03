@@ -37,12 +37,19 @@ function ShadowPage() {
   return (
     <>
       <div className="mx-auto max-w-[1400px] px-6 py-8">
-        <div className="flex items-center gap-3">
-          <div className="rounded-lg p-2" style={{ backgroundColor: "color-mix(in oklab, var(--shadow-ring) 18%, transparent)" }}>
-            <Sparkle className="h-5 w-5 text-shadow-ring" />
-          </div>
-          <PageHead title="Shadow Market" sub="Parcels no portal shows: distress signals stacked and ranked. The Formula's top scores live here — because nobody has competed for them yet." />
-        </div>
+        <PageHead
+          title="Shadow Market"
+          sub="Off-market parcels no portal shows: distress signals stacked and ranked, before anyone competes for them."
+          icon={
+            <div
+              className="rounded-lg p-2"
+              style={{ backgroundColor: "color-mix(in oklab, var(--shadow-ring) 18%, transparent)" }}
+            >
+              <Sparkle className="h-5 w-5 text-shadow-ring" />
+            </div>
+          }
+        />
+
         <div className="mt-6 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {q.isLoading && Array.from({length:6}).map((_,i)=>(<div key={i} className="rounded-lg border border-border bg-surface p-4"><div className="skeleton h-5 w-3/4 rounded-sm" /><div className="skeleton mt-3 h-4 w-1/2 rounded-sm" /><div className="skeleton mt-2 h-4 w-2/3 rounded-sm" /></div>))}
           {(q.data ?? []).map((r: any, i: number) => {

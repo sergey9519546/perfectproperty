@@ -18,6 +18,7 @@ import { SectionBoundary } from "@/components/SectionBoundary";
 import { DataFreshness } from "@/components/DataFreshness";
 import { ScorePill } from "@/components/ScorePill";
 import { TableSkeleton } from "@/components/TableSkeleton";
+import { PageHeader } from "@/components/PageHeader";
 
 export const Route = createFileRoute("/deals")({
   ssr: false,
@@ -227,14 +228,10 @@ function HelpStrip() {
   );
 }
 
-export function PageHead({ title, sub }: { title: string; sub: string }) {
-  return (
-    <div className="border-b border-border pb-5">
-      <h1 className="text-[34px] font-semibold leading-[1.1] tracking-[-0.035em] text-foreground">{title}</h1>
-      <p className="mt-2.5 max-w-[60ch] text-[14px] leading-relaxed text-muted-foreground">{sub}</p>
-    </div>
-  );
+export function PageHead(props: { title: string; sub: string; icon?: React.ReactNode }) {
+  return <PageHeader {...props} />;
 }
+
 
 const SCENARIOS: Record<string, StressScenario> = {
   base: {

@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { fmt$ } from "@/lib/format";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabase as browserSupabase } from "@/integrations/supabase/client";
+import { PageHeader } from "@/components/PageHeader";
 
 const getLatestMetrics = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -47,13 +48,11 @@ function MonitoringPage() {
 
   return (
     <div className="mx-auto max-w-[1400px] px-6 py-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Portfolio Monitoring</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Nightly snapshot of portfolio-level expected loss, tail risk, concentration, calibration
-          and risk-appetite budget.
-        </p>
-      </div>
+      <PageHeader
+        title="Portfolio Monitoring"
+        sub="Nightly snapshot of portfolio-level expected loss, tail risk, concentration, calibration and risk-appetite budget."
+      />
+
 
       {q.isLoading && (
         <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">

@@ -27,13 +27,14 @@ function AccuracyPage() {
   const q = useQuery({ queryKey: ["coverage"], queryFn: () => fn() });
   const c = q.data;
   return (
-    <div className="mx-auto max-w-[1200px] px-6 py-8">
+    <div className="mx-auto max-w-[1400px] px-6 py-8">
       <PageHead title="Learning Loop · Layer 5" sub="Predicted-vs-actual, self-audited every night. Accuracy is measured hardest at the top of the rankings and published openly." />
       {q.isLoading && (
         <>
-          <div className="mt-8 grid grid-cols-4 gap-3">
+          <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
             {Array.from({length:4}).map((_,i)=>(
               <div key={i} className="rounded-lg border border-border bg-surface p-4">
+
                 <div className="skeleton h-3 w-1/2 rounded-sm" />
                 <div className="skeleton mt-2 h-7 w-2/3 rounded-sm" />
               </div>
@@ -51,7 +52,7 @@ function AccuracyPage() {
       )}
       {c && (
         <>
-          <div className="mt-8 grid grid-cols-4 gap-3">
+          <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
             <BigStat label="Outcomes recorded" v={c.accuracy.total.toString()} />
             <BigStat label="Win rate" v={`${Math.round(c.accuracy.win_rate * 100)}%`} color="var(--profit-strong)" />
             <BigStat label="Losses" v={c.accuracy.losses.toString()} color="var(--skeptic)" />
