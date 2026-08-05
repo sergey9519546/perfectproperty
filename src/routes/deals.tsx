@@ -234,9 +234,6 @@ function HelpStrip() {
   );
 }
 
-export function PageHead(props: { title: string; sub: string; icon?: React.ReactNode }) {
-  return <PageHeader {...props} />;
-}
 
 
 const SCENARIOS: Record<string, StressScenario> = {
