@@ -6,7 +6,6 @@ import { listRankedParcels } from "@/lib/parcels.functions";
 import { DossierPanel } from "@/components/DossierPanel";
 import { PageHeader } from "@/components/PageHeader";
 import { fmt$ } from "@/lib/format";
-import { Sparkle } from "@phosphor-icons/react";
 import { supabase } from "@/integrations/supabase/client";
 import { SectionBoundary } from "@/components/SectionBoundary";
 import { ScorePill } from "@/components/ScorePill";
@@ -57,12 +56,12 @@ function ShadowPage() {
                   <ScorePill score={Number(r.perfect_score)} size="lg" />
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-                  <Metric label="Offer" v={fmt$(Number(r.modeled_offer))} />
-                  <Metric label="Profit" v={fmt$(Number(r.gross_profit))} accent />
-                  <Metric label="P(acq)" v={`${Math.round(Number(r.acquisition_probability) * 100)}%`} />
-                  <Metric label="Exit" v={`${r.exit_days}d`} />
+                  <Metric label="Our offer" v={fmt$(Number(r.modeled_offer))} />
+                  <Metric label="Expected profit" v={fmt$(Number(r.gross_profit))} accent />
+                  <Metric label="Deal odds" v={`${Math.round(Number(r.acquisition_probability) * 100)}%`} />
+                  <Metric label="Days to sell" v={`${r.exit_days}d`} />
                 </div>
-                {flags.length > 0 && <div className="mt-2 text-[10px] text-skeptic">{flags.length} skeptic flag{flags.length > 1 ? "s" : ""}</div>}
+                {flags.length > 0 && <div className="mt-2 text-[10px] text-skeptic">{flags.length} warning{flags.length > 1 ? "s" : ""}</div>}
               </button>
             );
           })}
