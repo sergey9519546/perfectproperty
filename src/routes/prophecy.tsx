@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { listProphecyParcels } from "@/lib/parcels.functions";
 import { DossierPanel } from "@/components/DossierPanel";
-import { PageHead } from "./deals";
+import { PageHeader } from "@/components/PageHeader";
 import { fmt$ } from "@/lib/format";
 import { Fire } from "@phosphor-icons/react";
 import { supabase } from "@/integrations/supabase/client";

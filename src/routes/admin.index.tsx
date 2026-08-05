@@ -7,7 +7,7 @@ import { runUnderwrite } from "@/lib/seed.functions";
 import { ingestCounty, scoreAll, listSources } from "@/lib/ingest.functions";
 import { ingestAllNycSales, salesSummary } from "@/lib/sales.functions";
 import { supabase } from "@/integrations/supabase/client";
-import { PageHead } from "./deals";
+import { PageHeader } from "@/components/PageHeader";
 import { toast } from "sonner";
 import { Lightning, Globe, Scroll, Copy } from "@phosphor-icons/react";
 import { ProbePanel } from "@/components/admin/ProbePanel";

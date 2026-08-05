@@ -2,7 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { getCoverage } from "@/lib/parcels.functions";
-import { PageHead } from "./deals";
+import { PageHeader } from "@/components/PageHeader";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { fmt$ } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,7 +28,7 @@ function AccuracyPage() {
   const c = q.data;
   return (
     <div className="mx-auto max-w-[1400px] px-6 py-8">
-      <PageHead title="Learning Loop · Layer 5" sub="Predicted-vs-actual, self-audited every night. Accuracy is measured hardest at the top of the rankings and published openly." />
+      <PageHeader title="Learning Loop · Layer 5" sub="Predicted-vs-actual, self-audited every night. Accuracy is measured hardest at the top of the rankings and published openly." />
       {q.isLoading && (
         <>
           <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
