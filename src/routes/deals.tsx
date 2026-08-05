@@ -52,23 +52,18 @@ function DealsPage() {
   return (
     <>
       <div className="mx-auto max-w-[1400px] px-6 py-8">
-        <PageHead
+        <PageHeader
           title="Ranked deals"
           sub="Every property we've scored, sorted by our overall buy score (0–100). Click any row to see the full breakdown — offer, profit, risks, and comps."
         />
 
         <HelpStrip />
 
-        <div className="mt-4 flex flex-wrap items-center gap-3 text-[13px]">
-          <span className="text-muted-foreground">
-            Showing <span className="font-semibold text-foreground">{q.data?.length ?? 0}</span>{" "}
-            live scored properties
-          </span>
+        <div className="mt-4 text-[13px] text-muted-foreground">
+          Showing <span className="font-semibold text-foreground">{q.data?.length ?? 0}</span> live
+          scored properties
         </div>
-        <RealieLookup onCreated={(id) => setSelected(id)} />
 
-        <BulkLookupPanel />
-        <StressPanel rows={q.data ?? []} />
         <div className="mt-6 overflow-x-auto rounded-lg border border-border bg-surface">
           <table className="w-full text-[14px]">
             <thead className="bg-surface-2 text-[11px] uppercase tracking-wider text-muted-foreground">
