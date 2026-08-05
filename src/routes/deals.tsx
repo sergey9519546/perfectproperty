@@ -73,8 +73,8 @@ function DealsPage() {
           <table className="w-full text-[14px]">
             <thead className="bg-surface-2 text-[11px] uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="w-8 px-2 py-3 text-center text-[10px] text-muted-foreground/60">#</th>
                 <th className="px-4 py-3 text-left">Property</th>
+
                 <th
                   className="px-4 py-3 text-right"
                   title="Overall buy score, 0–100. Higher is better."
