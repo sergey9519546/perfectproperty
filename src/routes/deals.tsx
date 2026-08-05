@@ -126,7 +126,7 @@ function DealsPage() {
               </tr>
             </thead>
             <tbody>
-              {q.isLoading && <TableSkeleton rows={10} columns={12} />}
+              {q.isLoading && <TableSkeleton rows={10} columns={11} />}
               {!q.isLoading && (q.data ?? []).map((r: any, i: number) => {
                 const flags = (r.skeptic_flags as string[]) ?? [];
                 const pLoss = Number(r.mc_p_loss);
