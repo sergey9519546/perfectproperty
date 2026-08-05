@@ -84,7 +84,7 @@ function MonitoringPage() {
           {latest.risk_appetite_breached && (
             <div className="mt-4 rounded-lg border border-skeptic/40 bg-skeptic/10 p-4">
               <div className="text-[11px] uppercase tracking-widest text-skeptic">
-                Risk appetite breached
+                Risk limits exceeded
               </div>
               <div className="mt-2 flex flex-wrap gap-2 text-[12px]">
                 {(latest.breach_reasons as string[]).map((r) => (
@@ -157,7 +157,7 @@ function MonitoringPage() {
 
           <div className="mt-8">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-              History (last 30)
+              Recent nightly checks
             </div>
             <div className="mt-2 overflow-hidden rounded-lg border border-border bg-surface">
               <table className="w-full text-[12px]">
@@ -165,12 +165,12 @@ function MonitoringPage() {
                   <tr>
                     <th className="px-3 py-2 text-left">Timestamp</th>
                     <th className="px-3 py-2 text-right">Deals</th>
-                    <th className="px-3 py-2 text-right">EL</th>
-                    <th className="px-3 py-2 text-right">CVaR</th>
-                    <th className="px-3 py-2 text-right">EC</th>
-                    <th className="px-3 py-2 text-right">HHI cty</th>
-                    <th className="px-3 py-2 text-right">PSI</th>
-                    <th className="px-3 py-2 text-left">Breach</th>
+                    <th className="px-3 py-2 text-right">Expected loss</th>
+                    <th className="px-3 py-2 text-right">Bad-month loss</th>
+                    <th className="px-3 py-2 text-right">Cash held back</th>
+                    <th className="px-3 py-2 text-right">County concentration</th>
+                    <th className="px-3 py-2 text-right">Data drift</th>
+                    <th className="px-3 py-2 text-left">Alerts</th>
                   </tr>
                 </thead>
                 <tbody>
