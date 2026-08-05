@@ -198,7 +198,18 @@ function DealsPage() {
             </tbody>
           </table>
         </div>
+
+        <section className="mt-10 border-t border-border pt-8">
+          <h2 className="text-[15px] font-semibold text-foreground">Tools</h2>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            Add properties to the list, or test how the whole portfolio holds up in a downturn.
+          </p>
+          <RealieLookup onCreated={(id) => setSelected(id)} />
+          <BulkLookupPanel />
+          <StressPanel rows={q.data ?? []} />
+        </section>
       </div>
+
       <DossierPanel parcelId={selected} onClose={() => setSelected(null)} />
     </>
   );
