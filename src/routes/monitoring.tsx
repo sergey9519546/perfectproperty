@@ -84,7 +84,7 @@ function MonitoringPage() {
           {latest.risk_appetite_breached && (
             <div className="mt-4 rounded-lg border border-skeptic/40 bg-skeptic/10 p-4">
               <div className="text-[11px] uppercase tracking-widest text-skeptic">
-                Risk appetite breached
+                Risk limits exceeded
               </div>
               <div className="mt-2 flex flex-wrap gap-2 text-[12px]">
                 {(latest.breach_reasons as string[]).map((r) => (
@@ -100,43 +100,64 @@ function MonitoringPage() {
           )}
 
           <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Metric label="Expected Loss" v={fmt$(Number(latest.el ?? 0))} tone="skeptic" />
-            <Metric label="VaR (95%)" v={fmt$(Number(latest.var_95 ?? 0))} tone="opportunity" />
-            <Metric label="CVaR (95%)" v={fmt$(Number(latest.cvar_95 ?? 0))} tone="skeptic" />
-            <Metric label="Econ. Capital" v={fmt$(Number(latest.ec ?? 0))} />
-            <Metric label="RAROC" v={fmtPct(Number(latest.raroc ?? 0))} />
-            <Metric label="HHI (county)" v={Number(latest.hhi_county ?? 0).toFixed(3)} />
-            <Metric label="HHI (scope)" v={Number(latest.hhi_scope ?? 0).toFixed(3)} />
-            <Metric label="LCR" v={Number(latest.lcr ?? 0).toFixed(2)} />
             <Metric
-              label="PSI"
-              v={
-                <span>
-                  {Number(latest.psi ?? 0).toFixed(3)}{" "}
-                  <span
-                    className="ml-1 text-[10px] uppercase"
-                    style={{ color: bandColor(latest.psi_band) }}
-                  >
-                    {latest.psi_band}
-                  </span>
-                </span>
-              }
+              label="Expected loss"
+              v={fmt$(Number(latest.el ?? 0))}
+              tone="skeptic"
             />
             <Metric
-              label="Calib. slope"
-              v={Number(latest.calibration_slope ?? 1).toFixed(2)}
-              tone={latest.calibration_flag ? "skeptic" : undefined}
+              label="Bad-month loss"
+              v={fmt$(Number(latest.cvar_95 ?? 0))}
+              tone="opportunity"
             />
-            <Metric
-              label="Calib. intercept"
-              v={Number(latest.calibration_intercept ?? 0).toFixed(2)}
-            />
-            <Metric label="Deals" v={<span className="num">{latest.n_deals}</span>} />
+            <Metric label="Cash to hold back" v={fmt$(Number(latest.ec ?? 0))} />
+            <Metric label="Deals in portfolio" v={<span className="num">{latest.n_deals}</span>} />
           </div>
+          <p className="mt-2 text-[12px] text-muted-foreground">
+            Expected loss is the typical hit across all open deals. Bad-month loss is what the worst
+            5% of outcomes cost. Cash to hold back is the buffer that covers it.
+          </p>
+
+          <details className="mt-6 rounded-lg border border-border bg-surface p-4">
+            <summary className="cursor-pointer text-[13px] font-medium text-foreground">
+              Detailed risk model numbers
+            </summary>
+            <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+              <Metric label="VaR (95%)" v={fmt$(Number(latest.var_95 ?? 0))} />
+              <Metric label="Return on risk capital" v={fmtPct(Number(latest.raroc ?? 0))} />
+              <Metric label="County concentration" v={Number(latest.hhi_county ?? 0).toFixed(3)} />
+              <Metric label="Scope concentration" v={Number(latest.hhi_scope ?? 0).toFixed(3)} />
+              <Metric label="Liquidity coverage" v={Number(latest.lcr ?? 0).toFixed(2)} />
+              <Metric
+                label="Data drift (PSI)"
+                v={
+                  <span>
+                    {Number(latest.psi ?? 0).toFixed(3)}{" "}
+                    <span
+                      className="ml-1 text-[10px] uppercase"
+                      style={{ color: bandColor(latest.psi_band) }}
+                    >
+                      {latest.psi_band}
+                    </span>
+                  </span>
+                }
+              />
+              <Metric
+                label="Calibration slope"
+                v={Number(latest.calibration_slope ?? 1).toFixed(2)}
+                tone={latest.calibration_flag ? "skeptic" : undefined}
+              />
+              <Metric
+                label="Calibration intercept"
+                v={Number(latest.calibration_intercept ?? 0).toFixed(2)}
+              />
+            </div>
+          </details>
+
 
           <div className="mt-8">
             <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-              History (last 30)
+              Recent nightly checks
             </div>
             <div className="mt-2 overflow-hidden rounded-lg border border-border bg-surface">
               <table className="w-full text-[12px]">
@@ -144,12 +165,12 @@ function MonitoringPage() {
                   <tr>
                     <th className="px-3 py-2 text-left">Timestamp</th>
                     <th className="px-3 py-2 text-right">Deals</th>
-                    <th className="px-3 py-2 text-right">EL</th>
-                    <th className="px-3 py-2 text-right">CVaR</th>
-                    <th className="px-3 py-2 text-right">EC</th>
-                    <th className="px-3 py-2 text-right">HHI cty</th>
-                    <th className="px-3 py-2 text-right">PSI</th>
-                    <th className="px-3 py-2 text-left">Breach</th>
+                    <th className="px-3 py-2 text-right">Expected loss</th>
+                    <th className="px-3 py-2 text-right">Bad-month loss</th>
+                    <th className="px-3 py-2 text-right">Cash held back</th>
+                    <th className="px-3 py-2 text-right">County concentration</th>
+                    <th className="px-3 py-2 text-right">Data drift</th>
+                    <th className="px-3 py-2 text-left">Alerts</th>
                   </tr>
                 </thead>
                 <tbody>

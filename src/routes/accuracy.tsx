@@ -2,7 +2,7 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { getCoverage } from "@/lib/parcels.functions";
-import { PageHead } from "./deals";
+import { PageHeader } from "@/components/PageHeader";
 import { TableSkeleton } from "@/components/TableSkeleton";
 import { fmt$ } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,8 +15,8 @@ export const Route = createFileRoute("/accuracy")({
   },
   head: () => ({
     meta: [
-      { title: "Accuracy — Layer 5 Learning Loop" },
-      { name: "description", content: "The moat. Every completed flip becomes a test the machine grades against itself." },
+      { title: "Prediction Accuracy — Perfect Property" },
+      { name: "description", content: "How our forecasts compared to real outcomes on completed deals." },
     ],
   }),
   component: AccuracyPage,
@@ -28,7 +28,7 @@ function AccuracyPage() {
   const c = q.data;
   return (
     <div className="mx-auto max-w-[1400px] px-6 py-8">
-      <PageHead title="Learning Loop · Layer 5" sub="Predicted-vs-actual, self-audited every night. Accuracy is measured hardest at the top of the rankings and published openly." />
+      <PageHeader title="Prediction accuracy" sub="How our forecasts compared to what actually happened. Checked automatically every night and published as-is." />
       {q.isLoading && (
         <>
           <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -45,7 +45,7 @@ function AccuracyPage() {
               <thead className="bg-surface-2 text-[10px] uppercase tracking-widest text-muted-foreground">
                 <tr>{["","","","","","",""].map((_,j)=><th key={j} className="px-4 py-2" />)}</tr>
               </thead>
-              <TableSkeleton rows={6} columns={7} />
+              <tbody><TableSkeleton rows={6} columns={7} /></tbody>
             </table>
           </div>
         </>
@@ -56,7 +56,7 @@ function AccuracyPage() {
             <BigStat label="Outcomes recorded" v={c.accuracy.total.toString()} />
             <BigStat label="Win rate" v={`${Math.round(c.accuracy.win_rate * 100)}%`} color="var(--profit-strong)" />
             <BigStat label="Losses" v={c.accuracy.losses.toString()} color="var(--skeptic)" />
-            <BigStat label="Mean abs. ARV error" v={`${c.accuracy.mean_abs_error_pct.toFixed(1)}%`} />
+            <BigStat label="Average value error" v={`${c.accuracy.mean_abs_error_pct.toFixed(1)}%`} />
           </div>
 
           <div className="mt-8 overflow-hidden rounded-lg border border-border bg-surface">

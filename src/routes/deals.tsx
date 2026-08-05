@@ -52,29 +52,24 @@ function DealsPage() {
   return (
     <>
       <div className="mx-auto max-w-[1400px] px-6 py-8">
-        <PageHead
+        <PageHeader
           title="Ranked deals"
           sub="Every property we've scored, sorted by our overall buy score (0–100). Click any row to see the full breakdown — offer, profit, risks, and comps."
         />
 
         <HelpStrip />
 
-        <div className="mt-4 flex flex-wrap items-center gap-3 text-[13px]">
-          <span className="text-muted-foreground">
-            Showing <span className="font-semibold text-foreground">{q.data?.length ?? 0}</span>{" "}
-            live scored properties
-          </span>
+        <div className="mt-4 text-[13px] text-muted-foreground">
+          Showing <span className="font-semibold text-foreground">{q.data?.length ?? 0}</span> live
+          scored properties
         </div>
-        <RealieLookup onCreated={(id) => setSelected(id)} />
 
-        <BulkLookupPanel />
-        <StressPanel rows={q.data ?? []} />
         <div className="mt-6 overflow-x-auto rounded-lg border border-border bg-surface">
           <table className="w-full text-[14px]">
             <thead className="bg-surface-2 text-[11px] uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="w-8 px-2 py-3 text-center text-[10px] text-muted-foreground/60">#</th>
                 <th className="px-4 py-3 text-left">Property</th>
+
                 <th
                   className="px-4 py-3 text-right"
                   title="Overall buy score, 0–100. Higher is better."
@@ -126,7 +121,7 @@ function DealsPage() {
               </tr>
             </thead>
             <tbody>
-              {q.isLoading && <TableSkeleton rows={10} columns={12} />}
+              {q.isLoading && <TableSkeleton rows={10} columns={11} />}
               {!q.isLoading && (q.data ?? []).map((r: any, i: number) => {
                 const flags = (r.skeptic_flags as string[]) ?? [];
                 const pLoss = Number(r.mc_p_loss);
@@ -137,7 +132,7 @@ function DealsPage() {
                     style={{ animationDelay: `${Math.min(i * 35, 600)}ms` }}
                     className="group cursor-pointer border-t border-border transition-colors hover:bg-surface-2 animate-in fade-in slide-in-from-bottom-1 duration-300 fill-mode-backwards"
                   >
-                    <td className="px-2 py-3 text-center text-[11px] text-muted-foreground/50 num">{i + 1}</td>
+                    
                     <td className="sticky left-0 z-10 bg-surface px-4 py-3 group-hover:bg-surface-2">
                       <div className="font-medium">{r.parcels.address}</div>
                       <div className="text-[12px] text-muted-foreground">
@@ -190,7 +185,7 @@ function DealsPage() {
               })}
               {!q.isLoading && (q.data ?? []).length === 0 && (
                 <tr>
-                  <td colSpan={12} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                  <td colSpan={11} className="px-4 py-12 text-center text-sm text-muted-foreground">
                     No scored properties yet. Run the underwriter from the admin panel to generate deals.
                   </td>
                 </tr>
@@ -198,7 +193,18 @@ function DealsPage() {
             </tbody>
           </table>
         </div>
+
+        <section className="mt-10 border-t border-border pt-8">
+          <h2 className="text-[15px] font-semibold text-foreground">Tools</h2>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            Add properties to the list, or test how the whole portfolio holds up in a downturn.
+          </p>
+          <RealieLookup onCreated={(id) => setSelected(id)} />
+          <BulkLookupPanel />
+          <StressPanel rows={q.data ?? []} />
+        </section>
       </div>
+
       <DossierPanel parcelId={selected} onClose={() => setSelected(null)} />
     </>
   );
@@ -228,9 +234,6 @@ function HelpStrip() {
   );
 }
 
-export function PageHead(props: { title: string; sub: string; icon?: React.ReactNode }) {
-  return <PageHeader {...props} />;
-}
 
 
 const SCENARIOS: Record<string, StressScenario> = {

@@ -4,9 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { listRankedParcels } from "@/lib/parcels.functions";
 import { DossierPanel } from "@/components/DossierPanel";
-import { PageHead } from "./deals";
+import { PageHeader } from "@/components/PageHeader";
 import { fmt$ } from "@/lib/format";
-import { Sparkle } from "@phosphor-icons/react";
 import { supabase } from "@/integrations/supabase/client";
 import { SectionBoundary } from "@/components/SectionBoundary";
 import { ScorePill } from "@/components/ScorePill";
@@ -37,18 +36,11 @@ function ShadowPage() {
   return (
     <>
       <div className="mx-auto max-w-[1400px] px-6 py-8">
-        <PageHead
-          title="Shadow Market"
-          sub="Off-market parcels no portal shows: distress signals stacked and ranked, before anyone competes for them."
-          icon={
-            <div
-              className="rounded-lg p-2"
-              style={{ backgroundColor: "color-mix(in oklab, var(--shadow-ring) 18%, transparent)" }}
-            >
-              <Sparkle className="h-5 w-5 text-shadow-ring" />
-            </div>
-          }
+        <PageHeader
+          title="Off-market properties"
+          sub="Properties that aren't listed anywhere yet — ranked by how strong the distress signals are, so you can reach the owner before anyone competes."
         />
+
 
         <div className="mt-6 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {q.isLoading && Array.from({length:6}).map((_,i)=>(<div key={i} className="rounded-lg border border-border bg-surface p-4"><div className="skeleton h-5 w-3/4 rounded-sm" /><div className="skeleton mt-3 h-4 w-1/2 rounded-sm" /><div className="skeleton mt-2 h-4 w-2/3 rounded-sm" /></div>))}
@@ -64,12 +56,12 @@ function ShadowPage() {
                   <ScorePill score={Number(r.perfect_score)} size="lg" />
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-                  <Metric label="Offer" v={fmt$(Number(r.modeled_offer))} />
-                  <Metric label="Profit" v={fmt$(Number(r.gross_profit))} accent />
-                  <Metric label="P(acq)" v={`${Math.round(Number(r.acquisition_probability) * 100)}%`} />
-                  <Metric label="Exit" v={`${r.exit_days}d`} />
+                  <Metric label="Our offer" v={fmt$(Number(r.modeled_offer))} />
+                  <Metric label="Expected profit" v={fmt$(Number(r.gross_profit))} accent />
+                  <Metric label="Deal odds" v={`${Math.round(Number(r.acquisition_probability) * 100)}%`} />
+                  <Metric label="Days to sell" v={`${r.exit_days}d`} />
                 </div>
-                {flags.length > 0 && <div className="mt-2 text-[10px] text-skeptic">{flags.length} skeptic flag{flags.length > 1 ? "s" : ""}</div>}
+                {flags.length > 0 && <div className="mt-2 text-[10px] text-skeptic">{flags.length} warning{flags.length > 1 ? "s" : ""}</div>}
               </button>
             );
           })}
