@@ -137,7 +137,7 @@ function DealsPage() {
                     style={{ animationDelay: `${Math.min(i * 35, 600)}ms` }}
                     className="group cursor-pointer border-t border-border transition-colors hover:bg-surface-2 animate-in fade-in slide-in-from-bottom-1 duration-300 fill-mode-backwards"
                   >
-                    <td className="px-2 py-3 text-center text-[11px] text-muted-foreground/50 num">{i + 1}</td>
+                    
                     <td className="sticky left-0 z-10 bg-surface px-4 py-3 group-hover:bg-surface-2">
                       <div className="font-medium">{r.parcels.address}</div>
                       <div className="text-[12px] text-muted-foreground">
