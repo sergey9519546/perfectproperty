@@ -37,7 +37,7 @@ function ProphecyPage() {
   return (
     <>
       <div className="mx-auto max-w-[1400px] px-6 py-8">
-        <PageHead
+        <PageHeader
           title="Prophecy Ring"
           sub="Signatures the machine has learned appear 60–90 days before a property becomes acquirable. Built from distress trajectories, not listings."
           icon={

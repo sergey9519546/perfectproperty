@@ -127,7 +127,7 @@ function AdminPage() {
 
   return (
     <div className="mx-auto max-w-[1400px] px-6 py-8">
-      <PageHead
+      <PageHeader
         title="Ingestion"
         sub="Every data adapter, every coverage number, every underwrite run. This is the operator's control panel for the pipeline."
       />
