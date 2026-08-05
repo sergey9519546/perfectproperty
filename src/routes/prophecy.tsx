@@ -38,17 +38,10 @@ function ProphecyPage() {
     <>
       <div className="mx-auto max-w-[1400px] px-6 py-8">
         <PageHeader
-          title="Prophecy Ring"
-          sub="Signatures the machine has learned appear 60–90 days before a property becomes acquirable. Built from distress trajectories, not listings."
-          icon={
-            <div
-              className="rounded-lg p-2"
-              style={{ backgroundColor: "color-mix(in oklab, var(--prophecy) 18%, transparent)" }}
-            >
-              <Fire className="h-5 w-5 text-prophecy" />
-            </div>
-          }
+          title="Predicted to sell"
+          sub="Properties showing the pattern that usually comes 60–90 days before an owner sells. Early warning, not a listing."
         />
+
 
         {q.data && q.data.length === 0 && (
           <div className="mt-8 rounded-lg border border-dashed border-border bg-surface p-8 text-center text-sm text-muted-foreground">
